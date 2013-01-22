@@ -673,45 +673,33 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		log.debug("<- Received %d bytes from the remote." % len(data))
+		log.debug("<- Received %d bytes from remote." % len(data))
 		self.circuit = circuit
 
-		# Hand decrypted and deobfuscated data over to the local Tor client.
 		if self.state == ST_CONNECTED:
 			self.sendLocal(circuit, data.read())
 
-		# We are the client and we expect to receive the puzzle.
 		elif self.weAreClient and self.state == ST_WAIT_FOR_PUZZLE:
 			self._receivePuzzle(data)
 
-		# We are the server and we expect to see the client magic.
 		elif self.weAreServer and self.state == ST_WAIT_FOR_MAGIC:
-
 			if self._magicInData(data, self.clientMagic):
 				self._sendMagicValue(circuit, self.serverMagic)
-
 				log.debug("Switching to state ST_CONNECTED.")
 				self.state = ST_CONNECTED
-
 				self.sendLocal(circuit, data.read())
 
-		# We are the client and solving the puzzle right now. We can ignore
-		# everything at this point.
+		elif self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
+			if self._magicInData(data, self.serverMagic):
+				log.debug("Switching to state ST_CONNECTED.")
+				self.state = ST_CONNECTED
+				self.sendLocal(circuit, data.read())
+
+		# Right now, we only expect pseudo-data which can be discarded safely.
 		elif (self.weAreClient and self.state == ST_SOLVING_PUZZLE) or \
 				(self.weAreServer and self.state == ST_WAIT_FOR_PUZZLE):
-
-			randomGarbage = data.read()
 			log.debug("We got %d bytes of pseudo-data in invalid state " \
-				"%d. Discarding data." % (len(randomGarbage), self.state))
-
-		# We are the client and we expect to see the server magic.
-		elif self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
-
-			if self._magicInData(data, self.serverMagic):
-				self.sendLocal(circuit, data.read())
-
-				log.debug("Switching to state ST_CONNECTED.")
-				self.state = ST_CONNECTED
+				"%d. Discarding data." % (len(data.read()), self.state))
 
 		else:
 			 raise base.PluggableTransportError("%s: Reached invalid code " \
