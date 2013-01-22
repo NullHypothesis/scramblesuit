@@ -643,40 +643,46 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			)
 
 
+
+	def _receivePuzzle( self, data ):
+
+		if len(data) < PUZZLE_LENGTH:
+			log.debug("Only have %d bytes out of %d-byte "
+					"puzzle so far." % (len(data), PUZZLE_LENGTH))
+			return
+
+		puzzle = timelock.extractPuzzleFromBlurb(data.read(PUZZLE_LENGTH))
+		t = timelock.new()
+
+		# Prevents us from mistakenly accepting another puzzle.
+		log.debug("Switching to state ST_SOLVING_PUZZLE.")
+		self.state = ST_SOLVING_PUZZLE
+
+		# Solve puzzle in subprocess and invoke callback when finished.
+		log.debug("Attempting to unlock puzzle in dedicated process.")
+		self.spawnPuzzleProcess(puzzle)
+
+
+
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		data = data.read()
+		# data = data.read()
 		log.debug("<- Received %d bytes from the remote." % len(data))
 		self.circuit = circuit
 
 		# Hand decrypted and deobfuscated data over to the local Tor client.
 		if self.state == ST_CONNECTED:
-			self.sendLocal(circuit, data)
+			self.sendLocal(circuit, data.read())
 
 		# We are the client and we expect to receive the puzzle.
 		if self.weAreClient and self.state == ST_WAIT_FOR_PUZZLE:
-			if len(data) < PUZZLE_LENGTH:
-				log.debug("Puzzle not yet fully received. Waiting.")
-				return data
-
-			# Extract the puzzle out of all the randomness.
-			#puzzle = timelock.extractPuzzleFromBlurb(data.read(PUZZLE_LENGTH))
-			puzzle = timelock.extractPuzzleFromBlurb(data[:PUZZLE_LENGTH])
-			t = timelock.new()
-
-			# Prevents us from mistakenly accepting another puzzle.
-			log.debug("Switching to state ST_SOLVING_PUZZLE.")
-			self.state = ST_SOLVING_PUZZLE
-
-			# Solve puzzle in subprocess and invoke callback when finished.
-			log.debug("Attempting to unlock puzzle in dedicated process.")
-			self.spawnPuzzleProcess(puzzle)
+			self._receivePuzzle(data)
 
 		# We are the server and we expect to see the client magic.
 		elif self.weAreServer and self.state == ST_WAIT_FOR_MAGIC:
 
-			received = data
+			received = data.read()
 
 			# FIXME - what happens if magic value is split among multiple TCP
 			# segments? we need to buffer it.
@@ -694,14 +700,14 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# everything at this point.
 		if self.weAreClient and self.state == ST_SOLVING_PUZZLE:
 
-			blurb = data
+			blurb = data.read()
 			log.debug("We got %d bytes of randomness before " \
 				"ST_WAIT_FOR_MAGIC. Ignoring." % len(blurb))
 
 		# We are the client and we expect to see the server magic.
 		if self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
 
-			blurb = data
+			blurb = data.read()
 			self.inbuf += blurb
 			log.debug("Just got %d bytes of data." % len(blurb))
 
