@@ -419,6 +419,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# 256-bit strings).
 		self.clientMagic = MySHA256(clientSecret)
 		self.serverMagic = MySHA256(serverSecret)
+		self.remoteMagic = self.clientMagic if self.weAreServer else \
+				self.serverMagic
 		log.debug("Magic values derived from session key: client=0x%s, " \
 			"server=0x%s." % (self.clientMagic.encode('hex'), \
 			self.serverMagic.encode('hex')))
@@ -667,9 +669,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 
 
-
-
-
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
@@ -682,18 +681,15 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		elif self.weAreClient and self.state == ST_WAIT_FOR_PUZZLE:
 			self._receivePuzzle(data)
 
-		elif self.weAreServer and self.state == ST_WAIT_FOR_MAGIC:
-			if self._magicInData(data, self.clientMagic):
-				self._sendMagicValue(circuit, self.serverMagic)
-				log.debug("Switching to state ST_CONNECTED.")
-				self.state = ST_CONNECTED
-				self.sendLocal(circuit, data.read())
+		elif self.state == ST_WAIT_FOR_MAGIC:
+			if not self._magicInData(data, self.remoteMagic):
+				return
 
-		elif self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
-			if self._magicInData(data, self.serverMagic):
-				log.debug("Switching to state ST_CONNECTED.")
-				self.state = ST_CONNECTED
-				self.sendLocal(circuit, data.read())
+			if self.weAreServer:
+				self._sendMagicValue(circuit, self.serverMagic)
+			log.debug("Switching to state ST_CONNECTED.")
+			self.state = ST_CONNECTED
+			self.sendLocal(circuit, data.read())
 
 		# Right now, we only expect pseudo-data which can be discarded safely.
 		elif (self.weAreClient and self.state == ST_SOLVING_PUZZLE) or \
@@ -703,7 +699,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		else:
 			 raise base.PluggableTransportError("%s: Reached invalid code " \
-					 "branch. This is probably a bug." % TRANSPORT_NAME)
+					"branch. This is probably a bug." % TRANSPORT_NAME)
 
 
 
@@ -750,10 +746,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			for packet in packets:
 				log.debug("Sending one of the morphed packets.")
 				self.sendRemote(circuit, packet)
-
-			#self.sendRemote(circuit, addHeader(d))
-
-			#self.sendRemote(circuit, d)
 
 		# Buffer data we are not ready to transmit yet. It will get flushed
 		# once the puzzle is solved and the connection established.
