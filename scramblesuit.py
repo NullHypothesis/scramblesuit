@@ -42,6 +42,8 @@ MAX_PADDING_LENGTH = 8192
 # when to start extracting the puzzle.
 PUZZLE_LENGTH = 192
 
+MAGIC_LENGTH = 32
+
 # States which are used for the protocol state machine.
 ST_WAIT_FOR_PUZZLE = 0
 ST_SOLVING_PUZZLE = 1
@@ -664,10 +666,32 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 
 
+	def _magicInData( self, data, magic ):
+
+		preview = data.peek()
+
+		index = preview.find(magic)
+		if index == -1:
+			log.debug("Did not find magic value in " \
+					"%d-byte buffer yet." % len(preview))
+			return False
+
+		# this should not really be here.
+		log.debug("Found the remote's magic value. Stopping noise generator.")
+		deferred = self.ts.stopService()
+		# FIXME - deal with this case
+		if not deferred == None:
+			log.error("Ehm, we should have waited for deferred to return.")
+
+		data.drain(index + MAGIC_LENGTH)
+
+		return True
+
+
+
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		# data = data.read()
 		log.debug("<- Received %d bytes from the remote." % len(data))
 		self.circuit = circuit
 
@@ -682,27 +706,16 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# We are the server and we expect to see the client magic.
 		elif self.weAreServer and self.state == ST_WAIT_FOR_MAGIC:
 
-			received = data.read()
-
-			# FIXME - what happens if magic value is split among multiple TCP
-			# segments? we need to buffer it.
-			if self.clientMagic in received:
-				log.debug("Found the client's magic value -> stopping noise generator.")
-				deferred = self.ts.stopService()
-				log.debug("type of deferred: %s." % str(type(deferred)))
-				if deferred == None:
-					self._finishHandshake(None, circuit, received)
-				else:
-					deferred.addCallback(self._finishHandshake, circuit, received)
-
+			if self._magicInData(data, self.clientMagic):
+				self._finishHandshake(circuit, data)
 
 		# We are the client and solving the puzzle right now. We can ignore
 		# everything at this point.
 		if self.weAreClient and self.state == ST_SOLVING_PUZZLE:
 
-			blurb = data.read()
-			log.debug("We got %d bytes of randomness before " \
-				"ST_WAIT_FOR_MAGIC. Ignoring." % len(blurb))
+			randomGarbage = data.read()
+			log.debug("We got %d bytes of pseudo-data before " \
+				"ST_WAIT_FOR_MAGIC. Discarding data." % len(randomGarbage))
 
 		# We are the client and we expect to see the server magic.
 		if self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
@@ -722,7 +735,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				self.state = ST_CONNECTED
 
 
-	def _finishHandshake( self, result, circuit, received ):
+
+	def _finishHandshake( self, circuit, data ):
 		# Got the client's magic value. Now send the server's magic.
 		log.debug("Noise generator stopped. Now sending magic value to client.")
 		circuit.downstream.write(weak_random(random.randint(0, 100)) + \
@@ -731,12 +745,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Switching to state ST_CONNECTED.")
 		self.state = ST_CONNECTED
 
-		log.debug("%d bytes of data from client in buffer." % len(received))
+		log.debug("%d bytes of data from client in buffer." % len(data))
 
-		# Forward the first received Tor bytes to the local client.
-		self.sendLocal(circuit, \
-			received[(received.find(self.clientMagic) + \
-					len(self.clientMagic)):])
+		self.sendLocal(circuit, data.read())
+
 
 
 	def receivedUpstream( self, data, circuit ):
