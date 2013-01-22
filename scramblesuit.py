@@ -561,6 +561,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# 	crypter = self.clientCrypter
 
 		# Sleep a random time period in order to obfuscate inter arrival times.
+		log.debug("...")
 		duration = self.iatMorpher.randomSample()
 		log.debug("Sleeping for %.4f seconds before sending data." % duration)
 		time.sleep(duration)
@@ -700,7 +701,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			self.sendLocal(circuit, data.read())
 
 		# We are the client and we expect to receive the puzzle.
-		if self.weAreClient and self.state == ST_WAIT_FOR_PUZZLE:
+		elif self.weAreClient and self.state == ST_WAIT_FOR_PUZZLE:
 			self._receivePuzzle(data)
 
 		# We are the server and we expect to see the client magic.
@@ -711,14 +712,15 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# We are the client and solving the puzzle right now. We can ignore
 		# everything at this point.
-		if self.weAreClient and self.state == ST_SOLVING_PUZZLE:
+		elif (self.weAreClient and self.state == ST_SOLVING_PUZZLE) or \
+				(self.weAreServer and self.state == ST_WAIT_FOR_PUZZLE):
 
 			randomGarbage = data.read()
-			log.debug("We got %d bytes of pseudo-data before " \
-				"ST_WAIT_FOR_MAGIC. Discarding data." % len(randomGarbage))
+			log.debug("We got %d bytes of pseudo-data in invalid state" \
+				"%d. Discarding data." % (len(randomGarbage), self.state))
 
 		# We are the client and we expect to see the server magic.
-		if self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
+		elif self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
 
 			blurb = data.read()
 			self.inbuf += blurb
@@ -733,6 +735,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				self.inbuf = ""
 				log.debug("Switching to state ST_CONNECTED.")
 				self.state = ST_CONNECTED
+
+		else:
+			 raise base.PluggableTransportError("%s: Reached invalid code " \
+					 "branch. This is probably a bug." % TRANSPORT_NAME)
 
 
 
