@@ -667,26 +667,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 
 
-	def _magicInData( self, data, magic ):
-
-		preview = data.peek()
-
-		index = preview.find(magic)
-		if index == -1:
-			log.debug("Did not find magic value in " \
-					"%d-byte buffer yet." % len(preview))
-			return False
-
-		# this should not really be here.
-		log.debug("Found the remote's magic value. Stopping noise generator.")
-		deferred = self.ts.stopService()
-		# FIXME - deal with this case
-		if not deferred == None:
-			log.error("Ehm, we should have waited for deferred to return.")
-
-		data.drain(index + MAGIC_LENGTH)
-
-		return True
 
 
 
@@ -708,7 +688,12 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		elif self.weAreServer and self.state == ST_WAIT_FOR_MAGIC:
 
 			if self._magicInData(data, self.clientMagic):
-				self._finishHandshake(circuit, data)
+				self._sendMagicValue(circuit, self.serverMagic)
+
+				log.debug("Switching to state ST_CONNECTED.")
+				self.state = ST_CONNECTED
+
+				self.sendLocal(circuit, data.read())
 
 		# We are the client and solving the puzzle right now. We can ignore
 		# everything at this point.
@@ -716,23 +701,15 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				(self.weAreServer and self.state == ST_WAIT_FOR_PUZZLE):
 
 			randomGarbage = data.read()
-			log.debug("We got %d bytes of pseudo-data in invalid state" \
+			log.debug("We got %d bytes of pseudo-data in invalid state " \
 				"%d. Discarding data." % (len(randomGarbage), self.state))
 
 		# We are the client and we expect to see the server magic.
 		elif self.weAreClient and self.state == ST_WAIT_FOR_MAGIC:
 
-			blurb = data.read()
-			self.inbuf += blurb
-			log.debug("Just got %d bytes of data." % len(blurb))
+			if self._magicInData(data, self.serverMagic):
+				self.sendLocal(circuit, data.read())
 
-			# Check if we already have the server's magic in the input buffer.
-			if self.serverMagic in self.inbuf:
-				log.debug("Found the server's magic value.")
-				self.sendLocal(circuit, self.inbuf[ \
-					(self.inbuf.find(self.serverMagic) + \
-					len(self.serverMagic)):])
-				self.inbuf = ""
 				log.debug("Switching to state ST_CONNECTED.")
 				self.state = ST_CONNECTED
 
@@ -742,18 +719,33 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 
 
-	def _finishHandshake( self, circuit, data ):
+	def _magicInData( self, data, magic ):
+
+		preview = data.peek()
+
+		index = preview.find(magic)
+		if index == -1:
+			log.debug("Did not find magic value in " \
+					"%d-byte buffer yet." % len(preview))
+			return False
+
+		log.debug("Found the remote's magic value.")
+		data.drain(index + MAGIC_LENGTH)
+
+		return True
+
+
+
+	def _sendMagicValue( self, circuit, magic ):
+
+		log.debug("Stopping noise generator.")
+		deferred = self.ts.stopService()
+		if not deferred == None:
+			log.error("Ehm, we should have waited for deferred to return.")
+
 		# Got the client's magic value. Now send the server's magic.
-		log.debug("Noise generator stopped. Now sending magic value to client.")
-		circuit.downstream.write(weak_random(random.randint(0, 100)) + \
-				self.serverMagic)
-
-		log.debug("Switching to state ST_CONNECTED.")
-		self.state = ST_CONNECTED
-
-		log.debug("%d bytes of data from client in buffer." % len(data))
-
-		self.sendLocal(circuit, data.read())
+		log.debug("Noise generator stopped. Now sending magic value to remote.")
+		circuit.downstream.write(weak_random(random.randint(0, 100)) + magic)
 
 
 
