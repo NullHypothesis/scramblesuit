@@ -1,7 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-""" This module contains an implementation of the 'b64' transport. """
+"""
+The scramblesuit module implements the ScrambleSuit protocol.
+For more details, check out http://www.cs.kau.se/philwint/scramblesuit/
+"""
 
 from twisted.internet import error
 from twisted.internet import reactor
@@ -26,7 +29,6 @@ import time
 
 import probdist
 import timelock
-
 
 
 # Key size (in bytes) for the AES session key and its IV.
@@ -59,13 +61,14 @@ HMAC_LENGTH = 16
 # TODO - what do we choose? should fit into an ethernet (non-jumbo) frame
 MTU = 1448
 
-# The prefix to the session key which is ``locked'' inside a time-lock puzzle.
-# The client looks for this prefix to verify that a puzzle was unlocked
-# successfully.
+# The prefix before the session key which is ``locked'' inside the time-lock
+# puzzle.  The client looks for this prefix to verify that the puzzle was
+# unlocked successfully.
 SESSION_KEY_PREFIX = "Session key: "
 
 # Used in log messages.
 TRANSPORT_NAME = "ScrambleSuit"
+
 
 log = logging.get_obfslogger()
 
@@ -557,13 +560,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if len(data) == 0 or not data:
 			return
 
-		# if self.weAreServer:
-		# 	crypter = self.serverCrypter
-		# else:
-		# 	crypter = self.clientCrypter
-
 		# Sleep a random time period in order to obfuscate inter arrival times.
-		log.debug("...")
 		duration = self.iatMorpher.randomSample()
 		log.debug("Sleeping for %.4f seconds before sending data." % duration)
 		time.sleep(duration)
@@ -571,13 +568,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("-> Sending %d bytes to the remote." % len(data))
 
 		# Send encrypted and obfuscated data.
-		circuit.downstream.write(
-			self.scrambler.encode(
-				#crypter.encrypt(
-					data
-				#)
-			)
-		)
+		circuit.downstream.write(self.scrambler.encode(data))
+
 
 	def unpack( self, data, crypter ):
 
@@ -624,7 +616,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		return fwdBuf
 
 
-
 	def sendLocal( self, circuit, data ):
 		"""Deobfuscate, then decrypt the given data and send it to the local
 		Tor client."""
@@ -640,13 +631,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		else:
 			crypter = self.serverCrypter
 
-		# Send encrypted and obfuscated data. We don't need a morpher here
-		# since the operating system takes care of reassembling the TCP stream
-		# for us.
+		# Send encrypted and obfuscated data.
 		circuit.upstream.write(
 				self.unpack( self.scrambler.decode(data), crypter)
 			)
-
 
 
 	def _receivePuzzle( self, data ):
@@ -666,7 +654,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Solve puzzle in subprocess and invoke callback when finished.
 		log.debug("Attempting to unlock puzzle in dedicated process.")
 		self.spawnPuzzleProcess(puzzle)
-
 
 
 	def receivedDownstream( self, data, circuit ):
@@ -702,7 +689,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 					"branch. This is probably a bug." % TRANSPORT_NAME)
 
 
-
 	def _magicInData( self, data, magic ):
 
 		preview = data.peek()
@@ -719,7 +705,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		return True
 
 
-
 	def _sendMagicValue( self, circuit, magic ):
 
 		log.debug("Stopping noise generator.")
@@ -732,7 +717,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		circuit.downstream.write(weak_random(random.randint(0, 100)) + magic)
 
 
-
 	def receivedUpstream( self, data, circuit ):
 		"""Data coming from the local Tor client and going to the remote
 		bridge. If the data can't be sent immediately (in state ST_CONNECTED)
@@ -740,9 +724,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Send locally received data to the remote end point.
 		if self.state == ST_CONNECTED:
-			d = data.read()
-
-			packets = self.pktMorpher.morph(d)
+			packets = self.pktMorpher.morph(data.read())
 			for packet in packets:
 				log.debug("Sending one of the morphed packets.")
 				self.sendRemote(circuit, packet)
