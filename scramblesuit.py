@@ -11,11 +11,10 @@ from twisted.internet import reactor
 from twisted.internet import protocol
 from twisted.application.internet import TimerService
 
-from Crypto.Hash import SHA256
-from Crypto.Hash import HMAC
-from Crypto.Util import Counter
-from Crypto.Cipher import AES
-from Crypto.Cipher import ARC4
+import Crypto.Hash.SHA256
+import Crypto.Hash.HMAC
+import Crypto.Util.Counter
+import Crypto.Cipher.AES
 
 import obfsproxy.transports.base as base
 import obfsproxy.common.log as logging
@@ -82,7 +81,7 @@ def MyHMAC_SHA256_128( key, msg ):
 
 	assert(len(key) == SHA256_DIGEST_SIZE)
 
-	h = HMAC.new(key, msg, SHA256)
+	h = Crypto.Hash.HMAC.new(key, msg, Crypto.Hash.SHA256)
 
 	# Return HMAC truncated to 128 out of 256 bits.
 	return h.digest()[:16]
@@ -92,7 +91,7 @@ def MyHMAC_SHA256_128( key, msg ):
 def MySHA256( msg ):
 	"""Wraps Crypto.Hash's SHA256 and returns the binary digest."""
 
-	h = SHA256.new()
+	h = Crypto.Hash.SHA256.new()
 	h.update(msg)
 	return h.digest()
 
@@ -265,8 +264,10 @@ class PayloadCrypter:
 		log.debug("Setting IV for payload crypter: 0x%s." % \
 			iv.encode('hex'))
 		self.sessionKey = key
-		self.counter = Counter.new(128, initial_value=long(iv.encode('hex'), 16))
-		self.crypter = AES.new(key, AES.MODE_CTR, counter=self.counter)
+		self.counter = Crypto.Util.Counter.new(128,
+				initial_value=long(iv.encode('hex'), 16))
+		self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR, \
+				counter=self.counter)
 
 
 	def encrypt( self, data ):
