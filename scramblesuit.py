@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
-The scramblesuit module implements the ScrambleSuit protocol.
+The scramblesuit module implements the ScrambleSuit obfuscation protocol.
 For more details, check out http://www.cs.kau.se/philwint/scramblesuit/
 """
 
@@ -187,8 +187,6 @@ class PacketMorpher:
 		targetLength = (self.dist.randomSample() - HDR_LENGTH)
 
 		log.debug("Samples packet target length: %d bytes." % targetLength)
-
-		log.debug("hmac: %s" % self.localHMAC.encode('hex'))
 
 		# Chunk equal or smaller than target: Pad.
 		if len(payload) <= targetLength:
@@ -620,8 +618,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 					log.debug("WARNING: HMACs (%s / %s) differ!" % \
 						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
 				else:
-					log.debug("HMAC (%s / %s) verified!" % \
-						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
+					log.debug("HMAC of message successfully verified.")
 
 				fwdBuf += crypter.decrypt(self.rcvBuf[HDR_LENGTH: \
 						(self.totalLen+HDR_LENGTH)])[:self.payloadLen]
