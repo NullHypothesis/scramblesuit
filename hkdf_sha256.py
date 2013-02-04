@@ -24,8 +24,8 @@ class HKDF_SHA256( object ):
 					(self.HashLen * 255))
 
 		if len(prk) < self.HashLen:
-			raise ValueError("The PRK must be at least %d bytes in length." % \
-					self.HashLen)
+			raise ValueError("The PRK must be at least %d bytes in length " \
+					"(%d given)." % (self.HashLen, len(prk)))
 
 		self.N = math.ceil(float(length) / self.HashLen)
 		self.prk = prk
