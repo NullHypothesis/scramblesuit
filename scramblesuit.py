@@ -29,13 +29,14 @@ import time
 
 import probdist
 import timelock
+import hkdf_sha256
 
 
 # Key size (in bytes) for the AES session key and its IV.
-SESSION_KEY_SIZE = IV_SIZE = 16
+SESSION_KEY_SIZE = IV_SIZE = 32
 
-# Used to derive client and server key which are used for AES and its IV.
-SHARED_SECRET_SIZE = 16
+# Used to derive other key material, e.g. for AES and HMAC.
+MASTER_SECRET_SIZE = 32
 
 # The maximum padding length to be appended to the puzzle.
 MAX_PADDING_LENGTH = 8192
@@ -55,6 +56,9 @@ ST_CONNECTED = 3
 # Length of len field (in bytes).
 HDR_LENGTH = 16 + 2 + 2
 
+# Digest size of SHA256 (in bytes).
+SHA256_DIGEST_SIZE = 32
+
 # Length of HMAC-SHA256-128.
 HMAC_LENGTH = 16
 
@@ -64,7 +68,7 @@ MTU = 1448
 # The prefix before the session key which is ``locked'' inside the time-lock
 # puzzle.  The client looks for this prefix to verify that the puzzle was
 # unlocked successfully.
-SESSION_KEY_PREFIX = "Session key: "
+MASTER_KEY_PREFIX = "Session key: "
 
 # Used in log messages.
 TRANSPORT_NAME = "ScrambleSuit"
@@ -73,11 +77,10 @@ TRANSPORT_NAME = "ScrambleSuit"
 log = logging.get_obfslogger()
 
 
-key = "0123456789abcdef"
 def MyHMAC_SHA256_128( key, msg ):
 	"""Wraps Crypto.Hash's HMAC."""
 
-	assert(len(key) == 16)
+	assert(len(key) == SHA256_DIGEST_SIZE)
 
 	h = HMAC.new(key, msg, SHA256)
 
@@ -122,7 +125,7 @@ def htons( data ):
 
 
 
-def addHeader( crypter, payload, padding="" ):
+def addHeader( crypter, HMACKey, payload, padding="" ):
 	"""Add header information to the given chunk of data and return
 	ready-to-send protocol message."""
 
@@ -134,7 +137,7 @@ def addHeader( crypter, payload, padding="" ):
 	payloadLen = htons(len(payload))
 	totalLen = htons(len(payload) + len(padding))
 	packet = crypter.encrypt(totalLen + payloadLen + payload + padding)
-	hmac = MyHMAC_SHA256_128(key, packet)
+	hmac = MyHMAC_SHA256_128(HMACKey, packet)
 	log.debug("Prepending HMAC: %s." % hmac.encode('hex'))
 
 	return hmac + packet
@@ -157,7 +160,7 @@ class PacketMorpher:
 	does not consider the source probability distribution."""
 
 
-	def __init__( self, crypter, dist=None ):
+	def __init__( self, crypter, hmac, dist=None ):
 		"""Initialize the PacketMorpher with a packet probability distribution.
 		If none is given, a distribution is randomly generated."""
 
@@ -168,6 +171,7 @@ class PacketMorpher:
 		self.payloadCtr = 0
 		self.paddingCtr = 0
 		self.crypter = crypter
+		self.localHMAC = hmac
 
 
 	def morph( self, payload ):
@@ -185,10 +189,12 @@ class PacketMorpher:
 
 		log.debug("Samples packet target length: %d bytes." % targetLength)
 
+		log.debug("hmac: %s" % self.localHMAC.encode('hex'))
+
 		# Chunk equal or smaller than target: Pad.
 		if len(payload) <= targetLength:
 			padding = "\0" * (targetLength - len(payload))
-			packet = addHeader(self.crypter, payload, padding)
+			packet = addHeader(self.crypter, self.localHMAC, payload, padding)
 
 			# Update statistics.
 			self.payloadCtr += len(payload)
@@ -206,7 +212,8 @@ class PacketMorpher:
 
 		# Chunk larger than target: Split.
 		else:
-			packets.append(addHeader(self.crypter, payload[:targetLength]))
+			packets.append(addHeader(self.crypter, self.localHMAC, \
+					payload[:targetLength]))
 			self.payloadCtr += len(payload[:targetLength])
 
 			log.debug("PacketMorpher: Splitting packet.")
@@ -368,8 +375,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# FIXME - this should probably be called sendCrypter and rcvCrypter
 		self.clientCrypter = PayloadCrypter()
 		self.serverCrypter = PayloadCrypter()
-		self.pktMorpher = PacketMorpher(self.clientCrypter if self.weAreClient \
-			else self.serverCrypter)
+		self.pktMorpher = None
+		
 		self.ts = None
 		# Used by the unpack mechanism
 		self.totalLen = None
@@ -400,30 +407,43 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			env=os.environ)
 
 
-	def deriveSecrets( self, sharedSecret ):
-		"""Derives the two magic values (one for server and client, each) from
-		the session key. The magic values are necessary to tell when the random
-		garbage stops and the encrypted data starts."""
+	def deriveSecrets( self, masterSecret ):
+		"""Derives session keys (AES keys, counter nonces, HMAC keys and magic
+		values) from the given master secret. All key material is derived using
+		HKDF-SHA256."""
 
-		log.debug("Master secret: 0x%s." % sharedSecret.encode('hex'))
+		log.debug("Master secret: 0x%s." % masterSecret.encode('hex'))
 
-		# Derive secrets specific to client and server.
-		clientSecret = MySHA256("Client" + sharedSecret)#[:SHARED_SECRET_SIZE]
-		serverSecret = MySHA256("Server" + sharedSecret)#[SHARED_SECRET_SIZE:]
+		# We need key material for two magic values, symmetric keys, nonces and
+		# HMACs. All of them are 32 bytes in size.
+		hkdf = hkdf_sha256.HKDF_SHA256(masterSecret, "", 32 * 8)
+		okm = hkdf.expand()
 
-		# Generate two symmetric session keys.
-		self.clientCrypter.setSessionKey(clientSecret[:SESSION_KEY_SIZE], \
-			clientSecret[IV_SIZE:])
-		self.serverCrypter.setSessionKey(serverSecret[:SESSION_KEY_SIZE], \
-			serverSecret[IV_SIZE:])
+		# Set the symmetric AES keys.
+		self.clientCrypter.setSessionKey(okm[0:32],  okm[32:64])
+		self.serverCrypter.setSessionKey(okm[64:96], okm[96:128])
 
 		# Derive a magic value for the client as well as the server. They must
 		# be distinct to prevent fingerprinting (e.g. look for two identical
 		# 256-bit strings).
-		self.clientMagic = MySHA256(clientSecret)
-		self.serverMagic = MySHA256(serverSecret)
+		self.clientMagic = okm[128:160]
+		self.serverMagic = okm[160:192]
 		self.remoteMagic = self.clientMagic if self.weAreServer else \
 				self.serverMagic
+
+		# Set the HMAC keys.
+		self.localHMAC = okm[192:224]
+		self.remoteHMAC = okm[224:256]
+		if self.weAreServer:
+			tmp = self.localHMAC
+			self.localHMAC = self.remoteHMAC
+			self.remoteHMAC = tmp
+		log.debug("Local HMAC key:  %s" % self.localHMAC.encode('hex'))
+		log.debug("Remote HMAC key: %s" % self.remoteHMAC.encode('hex'))
+
+		self.pktMorpher =  PacketMorpher(self.clientCrypter if self.weAreClient \
+			else self.serverCrypter, self.localHMAC)
+
 		log.debug("Magic values derived from session key: client=0x%s, " \
 			"server=0x%s." % (self.clientMagic.encode('hex'), \
 			self.serverMagic.encode('hex')))
@@ -488,16 +508,13 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		yield the symmetric session key."""
 
 		# Generate master secret and derive client -and server secret.
-		sharedSecret = strong_random(SHARED_SECRET_SIZE)
+		masterSecret = strong_random(MASTER_SECRET_SIZE)
+		self.deriveSecrets(masterSecret)
 
-		log.debug("Deriving secrets from the master secret.")
-		self.deriveSecrets(sharedSecret)
-
-		# Create puzzle which ``time-locks'' the shared session key.
+		# Create puzzle which ``locks'' the shared session key.
 		riddler = timelock.new()
-		puzzle = riddler.generatePuzzle(SESSION_KEY_PREFIX + \
-			sharedSecret)
-		log.debug("Generated puzzle: %s." % str(puzzle))
+		puzzle = riddler.generatePuzzle(MASTER_KEY_PREFIX + \
+			masterSecret)
 
 		# Convert base 10 numbers to raw strings.
 		rawPuzzle = bytearray()
@@ -515,12 +532,12 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Callback invoked after solved puzzle.")
 
 		# Sanity check to verify that we solved a real puzzle.
-		if not SESSION_KEY_PREFIX in sharedSecret:
-			log.critical("No SESSION_KEY_PREFIX in puzzle. What did we just " \
+		if not MASTER_KEY_PREFIX in sharedSecret:
+			log.critical("No MASTER_KEY_PREFIX in puzzle. What did we just " \
 					"solve?")
 			return
 
-		sharedSecret = sharedSecret[len(SESSION_KEY_PREFIX):]
+		sharedSecret = sharedSecret[len(MASTER_KEY_PREFIX):]
 
 		# The session key is known now, so the magic values can be derived.
 		self.deriveSecrets(sharedSecret)
@@ -597,7 +614,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			# Sufficient data -> remove packet from input buffer.
 			else:
 				rcvdHMAC = self.rcvBuf[:HMAC_LENGTH]
-				vrfyHMAC = MyHMAC_SHA256_128(key, self.rcvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
+				vrfyHMAC = MyHMAC_SHA256_128(self.remoteHMAC, self.rcvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
 				if rcvdHMAC != vrfyHMAC:
 					log.debug("WARNING: HMACs (%s / %s) differ!" % \
 						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
