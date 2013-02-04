@@ -1,12 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Crypto.Hash import HMAC
-from Crypto.Hash import SHA256
+import Crypto.Hash.SHA256
+import Crypto.Hash.HMAC
 
 import obfsproxy.transports.base as base
 
 import math
+import os
+
+# Digest size of SHA256 (in bytes).
+SHA256_DIGEST_SIZE = 32
 
 
 class HKDF_SHA256( object ):
@@ -47,9 +51,38 @@ class HKDF_SHA256( object ):
 					"be re-used by application.")
 
 		while self.length > len(self.T):
-			tmp = HMAC.new(self.prk, tmp + self.info + chr(self.ctr),
-					SHA256).digest()
+			tmp = Crypto.Hash.HMAC.new(self.prk, tmp + self.info + \
+					chr(self.ctr), Crypto.Hash.SHA256).digest()
 			self.T += tmp
 			self.ctr += 1
 
 		return self.T[:self.length]
+
+
+
+def MyHMAC_SHA256_128( key, msg ):
+	"""Wraps Crypto.Hash's HMAC."""
+
+	assert(len(key) == SHA256_DIGEST_SIZE)
+
+	h = Crypto.Hash.HMAC.new(key, msg, Crypto.Hash.SHA256)
+
+	# Return HMAC truncated to 128 out of 256 bits.
+	return h.digest()[:16]
+
+
+
+def strong_random( size ):
+	"""Returns `size' bytes of strong randomness which is suitable for
+	cryptographic use."""
+
+	return os.urandom(size)
+
+
+
+def weak_random( size ):
+	"""Returns `size' bytes of weak randomness which can be used to pad
+	application data but is not suitable for cryptographic use."""
+
+	# TODO - Get a function which does not exhaust the OSes entropy pool.
+	return os.urandom(size)

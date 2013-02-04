@@ -11,8 +11,6 @@ from twisted.internet import reactor
 from twisted.internet import protocol
 from twisted.application.internet import TimerService
 
-import Crypto.Hash.SHA256
-import Crypto.Hash.HMAC
 import Crypto.Util.Counter
 import Crypto.Cipher.AES
 
@@ -28,7 +26,7 @@ import time
 
 import probdist
 import timelock
-import hkdf_sha256
+import mycrypto
 
 
 # Key size (in bytes) for the AES session key and its IV.
@@ -55,9 +53,6 @@ ST_CONNECTED = 3
 # Length of len field (in bytes).
 HDR_LENGTH = 16 + 2 + 2
 
-# Digest size of SHA256 (in bytes).
-SHA256_DIGEST_SIZE = 32
-
 # Length of HMAC-SHA256-128.
 HMAC_LENGTH = 16
 
@@ -74,43 +69,6 @@ TRANSPORT_NAME = "ScrambleSuit"
 
 
 log = logging.get_obfslogger()
-
-
-def MyHMAC_SHA256_128( key, msg ):
-	"""Wraps Crypto.Hash's HMAC."""
-
-	assert(len(key) == SHA256_DIGEST_SIZE)
-
-	h = Crypto.Hash.HMAC.new(key, msg, Crypto.Hash.SHA256)
-
-	# Return HMAC truncated to 128 out of 256 bits.
-	return h.digest()[:16]
-
-
-
-def MySHA256( msg ):
-	"""Wraps Crypto.Hash's SHA256 and returns the binary digest."""
-
-	h = Crypto.Hash.SHA256.new()
-	h.update(msg)
-	return h.digest()
-
-
-
-def strong_random( size ):
-	"""Returns `size' bytes of strong randomness which is suitable for
-	cryptographic use."""
-
-	return os.urandom(size)
-
-
-
-def weak_random( size ):
-	"""Returns `size' bytes of weak randomness which can be used to pad
-	application data but is not suitable for cryptographic use."""
-
-	# TODO - Get a function which does not exhaust the OSes entropy pool.
-	return os.urandom(size)
 
 
 
@@ -136,7 +94,7 @@ def addHeader( crypter, HMACKey, payload, padding="" ):
 	payloadLen = htons(len(payload))
 	totalLen = htons(len(payload) + len(padding))
 	packet = crypter.encrypt(totalLen + payloadLen + payload + padding)
-	hmac = MyHMAC_SHA256_128(HMACKey, packet)
+	hmac = mycrypto.MyHMAC_SHA256_128(HMACKey, packet)
 	log.debug("Prepending HMAC: %s." % hmac.encode('hex'))
 
 	return hmac + packet
@@ -383,30 +341,17 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# inter arrival time obfuscator
 		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.05)
 
+
 	def generateNoise( self ):
 		"""Send random noise to the remote end point to confuse statistical
 		classifiers. The remote machine will simply discard the data."""
 
-		noise = weak_random(random.randint(0, 1000))
+		noise = mycrypto.weak_random(random.randint(0, 1000))
 		log.debug("Generated %d bytes of noise. Sending now." % len(noise))
 		self.circuit.downstream.write(noise)
 
 
-	def spawnPuzzleProcess( self, puzzle ):
-
-		# Python interpreter.
-		executable = sys.executable
-		pp = MyProcessProtocol(puzzle, self.decryptedPuzzleCallback)
-
-		# Solve puzzle in dedicated process.
-		log.debug("We are in: %s" % os.getcwd())
-		reactor.spawnProcess(pp, executable, [executable, 
-			# FIXME - need to use relative paths here.
-			"/home/phw/sw/pyobfsproxy/obfsproxy/transports/timelock.py"], \
-			env=os.environ)
-
-
-	def deriveSecrets( self, masterSecret ):
+	def _deriveSecrets( self, masterSecret ):
 		"""Derives session keys (AES keys, counter nonces, HMAC keys and magic
 		values) from the given master secret. All key material is derived using
 		HKDF-SHA256."""
@@ -415,7 +360,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# We need key material for two magic values, symmetric keys, nonces and
 		# HMACs. All of them are 32 bytes in size.
-		hkdf = hkdf_sha256.HKDF_SHA256(masterSecret, "", 32 * 8)
+		hkdf = mycrypto.HKDF_SHA256(masterSecret, "", 32 * 8)
 		okm = hkdf.expand()
 
 		# Set the symmetric AES keys.
@@ -482,11 +427,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.debug("Successfully generated %d-byte puzzle." % \
 				len(rawPuzzle))
 
-			# The session key is known now, so the magic values can be derived.
-			#self.deriveSecrets()
-
 			# Append random padding to obfuscate length and transmit blurb.
-			padding = weak_random(random.randint(0, MAX_PADDING_LENGTH))
+			padding = mycrypto.weak_random(random.randint(0, MAX_PADDING_LENGTH))
 			log.debug("Sending puzzle with %d bytes of random padding." % \
 					len(padding))
 			circuit.downstream.write(rawPuzzle + padding)
@@ -507,8 +449,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		yield the symmetric session key."""
 
 		# Generate master secret and derive client -and server secret.
-		masterSecret = strong_random(MASTER_SECRET_SIZE)
-		self.deriveSecrets(masterSecret)
+		masterSecret = mycrypto.strong_random(MASTER_SECRET_SIZE)
+		self._deriveSecrets(masterSecret)
 
 		# Create puzzle which ``locks'' the shared session key.
 		riddler = timelock.new()
@@ -539,7 +481,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		sharedSecret = sharedSecret[len(MASTER_KEY_PREFIX):]
 
 		# The session key is known now, so the magic values can be derived.
-		self.deriveSecrets(sharedSecret)
+		self._deriveSecrets(sharedSecret)
 
 		# Make sure that noise generator has stopped before sending the
 		# magic value.
@@ -550,7 +492,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Send bridge randomness || magic value.
 		log.debug("Sending magic value to server.")
-		self.circuit.downstream.write(weak_random(random.randint(0, \
+		self.circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
 				MAX_PADDING_LENGTH)) + self.clientMagic)
 
 		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
@@ -613,7 +555,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			# Sufficient data -> remove packet from input buffer.
 			else:
 				rcvdHMAC = self.rcvBuf[:HMAC_LENGTH]
-				vrfyHMAC = MyHMAC_SHA256_128(self.remoteHMAC, self.rcvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
+				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.remoteHMAC, self.rcvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
 				if rcvdHMAC != vrfyHMAC:
 					log.debug("WARNING: HMACs (%s / %s) differ!" % \
 						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
@@ -668,7 +610,17 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Solve puzzle in subprocess and invoke callback when finished.
 		log.debug("Attempting to unlock puzzle in dedicated process.")
-		self.spawnPuzzleProcess(puzzle)
+
+		# Python interpreter.
+		executable = sys.executable
+		pp = MyProcessProtocol(puzzle, self.decryptedPuzzleCallback)
+
+		# Solve puzzle in dedicated process.
+		log.debug("We are in: %s" % os.getcwd())
+		reactor.spawnProcess(pp, executable, [executable, 
+			# FIXME - need to use relative paths here.
+			"/home/phw/sw/pyobfsproxy/obfsproxy/transports/timelock.py"], \
+			env=os.environ)
 
 
 	def receivedDownstream( self, data, circuit ):
@@ -729,7 +681,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Got the client's magic value. Now send the server's magic.
 		log.debug("Noise generator stopped. Now sending magic value to remote.")
-		circuit.downstream.write(weak_random(random.randint(0, 100)) + magic)
+		circuit.downstream.write(mycrypto.weak_random(random.randint(0, 100)) \
+				+ magic)
 
 
 	def receivedUpstream( self, data, circuit ):
