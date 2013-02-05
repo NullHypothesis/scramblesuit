@@ -16,12 +16,13 @@ SHA256_DIGEST_SIZE = 32
 class HKDF_SHA256( object ):
 	"""
 	Implements HKDF using SHA256: https://tools.ietf.org/html/rfc5869
-	This class only implements the `expand' but not the `extract' stage.
+	This class only implements the `expand' but not the `extract' stage since
+	the provided PRK already exhibits strong entropy.
 	"""
 
 	def __init__( self, prk, info="", length=32 ):
 
-		self.HashLen = 32
+		self.HashLen = SHA256_DIGEST_SIZE
 
 		if length > (self.HashLen * 255):
 			raise ValueError("The OKM's length cannot be larger than %d." % \
@@ -40,8 +41,8 @@ class HKDF_SHA256( object ):
 
 
 	def expand( self ):
-		"""Expands, based on PRK, info and L, the given input material to the
-		output key material."""
+		"""Returns the expanded output key material which is calculated based
+		on the given PRK, info and L."""
 
 		tmp = ""
 
@@ -61,7 +62,7 @@ class HKDF_SHA256( object ):
 
 
 def MyHMAC_SHA256_128( key, msg ):
-	"""Wraps Crypto.Hash's HMAC."""
+	"""Returns the HMAC-SHA256-128 of the given `key' and `msg'."""
 
 	assert(len(key) == SHA256_DIGEST_SIZE)
 
@@ -84,5 +85,5 @@ def weak_random( size ):
 	"""Returns `size' bytes of weak randomness which can be used to pad
 	application data but is not suitable for cryptographic use."""
 
-	# TODO - Get a function which does not exhaust the OSes entropy pool.
+	# TODO - Use a function which does not stress our entropy pool.
 	return os.urandom(size)
