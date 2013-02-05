@@ -11,8 +11,6 @@ from twisted.internet import reactor
 from twisted.internet import protocol
 from twisted.application.internet import TimerService
 
-import Crypto.Util.Counter
-import Crypto.Cipher.AES
 
 import obfsproxy.transports.base as base
 import obfsproxy.common.log as logging
@@ -198,46 +196,6 @@ class PayloadScrambler:
 
 
 
-class PayloadCrypter:
-	"""Encrypts plain Tor data using AES. The encrypted data is then passed on
-	to the obfuscation component PayloadScrambler."""
-
-	# FIXME - in here we can handle authenticated encryption.
-
-	def __init__( self ):
-
-		log.debug("Initializing payload crypter.")
-		self.sessionKey = None
-		self.crypter = None
-		self.counter = None
-
-
-	def setSessionKey( self, key, iv ):
-		"""Set the AES session key and initialize counter mode."""
-
-		log.debug("Setting session key for payload crypter: 0x%s." % \
-			key.encode('hex'))
-		log.debug("Setting IV for payload crypter: 0x%s." % \
-			iv.encode('hex'))
-		self.sessionKey = key
-		self.counter = Crypto.Util.Counter.new(128,
-				initial_value=long(iv.encode('hex'), 16))
-		self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR, \
-				counter=self.counter)
-
-
-	def encrypt( self, data ):
-		"""Encrypts the given `data' using AES."""
-
-		# Send unencrypted data if AES is not initialized yet.
-		if self.crypter == None:
-			return data
-		else:
-			return self.crypter.encrypt(data)
-
-
-	# Encryption equals decryption in AES CTR.
-	decrypt = encrypt
 
 
 
@@ -330,8 +288,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.circuit = None
 		self.scrambler = PayloadScrambler()
 		# FIXME - this should probably be called sendCrypter and rcvCrypter
-		self.clientCrypter = PayloadCrypter()
-		self.serverCrypter = PayloadCrypter()
+		self.clientCrypter = mycrypto.PayloadCrypter()
+		self.serverCrypter = mycrypto.PayloadCrypter()
 		self.pktMorpher = None
 		
 		self.ts = None
@@ -523,8 +481,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Sleeping for %.4f seconds before sending data." % duration)
 		time.sleep(duration)
 
-		log.debug("-> Sending %d bytes to the remote." % len(data))
-
 		# Send encrypted and obfuscated data.
 		circuit.downstream.write(self.scrambler.encode(data))
 
@@ -626,7 +582,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		log.debug("<- Received %d bytes from remote." % len(data))
 		self.circuit = circuit
 
 		if self.state == ST_CONNECTED:
