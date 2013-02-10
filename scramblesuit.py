@@ -20,11 +20,13 @@ import sys
 import random
 import pickle
 import struct
+import string
 import time
 
 import probdist
 import timelock
 import mycrypto
+import message
 
 
 # Key size (in bytes) for the AES session key and its IV.
@@ -66,6 +68,7 @@ MASTER_KEY_PREFIX = "Session key: "
 TRANSPORT_NAME = "ScrambleSuit"
 
 
+
 log = logging.get_obfslogger()
 
 
@@ -80,98 +83,42 @@ def htons( data ):
 
 
 
-def addHeader( crypter, HMACKey, payload, padding="" ):
-	"""Add header information to the given chunk of data and return
-	ready-to-send protocol message."""
+class PacketMorpher( object ):
+	"""Provides an interface to morph large chunks of bytes to a given target
+	probability distribution. This is implemented by naively sampling the
+	target probability distribution."""
 
-	# TODO - the following should be an assert() since this should not happen.
-	# Are we exceeding the MTU after adding the header?
-	if (HDR_LENGTH + len(payload) + len(padding)) > MTU:
-		log.info("WARNING: padding would be more than configured MTU.")
+	def __init__( self, dist=None ):
+		"""Initialize the PacketMorpher with a discrete probability
+		distribution. If none is given, a distribution is randomly
+		generated."""
 
-	payloadLen = htons(len(payload))
-	totalLen = htons(len(payload) + len(padding))
-	packet = crypter.encrypt(totalLen + payloadLen + payload + padding)
-	hmac = mycrypto.MyHMAC_SHA256_128(HMACKey, packet)
-	log.debug("Prepending HMAC: %s." % hmac.encode('hex'))
-
-	return hmac + packet
-
-
-
-def padPacket( packet, padlen, padchar="\0" ):
-
-	# Are we exceeding the MTU after padding?
-	if (len(packet) + padlen) > MTU:
-		log.info("WARNING: padding would be more than configured MTU.")
-
-	return packet + (padchar * padlen)
-
-
-
-class PacketMorpher:
-	"""Provides an interface to morph chunks of network data to a given target
-	probability distribution. This is implemented using naive sampling which
-	does not consider the source probability distribution."""
-
-
-	def __init__( self, crypter, hmac, dist=None ):
-		"""Initialize the PacketMorpher with a packet probability distribution.
-		If none is given, a distribution is randomly generated."""
-
-		#self.dist = dist if dist else PacketSizeDistribution()
 		self.dist = dist if dist else \
 			probdist.RandProbDist(lambda: random.randint(1, MTU))
-		# Create statistics to be able to calculate overhead.
-		self.payloadCtr = 0
-		self.paddingCtr = 0
-		self.crypter = crypter
-		self.localHMAC = hmac
 
 
-	def morph( self, payload ):
-		"""Transform the given chunk of payload to ready-to-transmit packets
-		whose length matches the configured target frequency distribution."""
+	def morph( self, dataLen ):
+		"""Based on `dataLen', the length of the data to morph, this function
+		returns a chopper function which is used to chop the data as well as
+		the length of padding which is appended to the last protocol
+		message."""
 
-		# List of final packets which are sent over the wire.
-		packets = []
+		breakPoints = []
+		lastBreakPoint = 0
+		progress = 0
 
-		log.debug("Morphing %d bytes of data." % len(payload))
+		while progress < dataLen:
+			newBreakPoint = progress + self.dist.randomSample()
+			breakPoints.append((lastBreakPoint, newBreakPoint))
+			lastBreakPoint = newBreakPoint
+			progress += newBreakPoint
 
-		# Get target length by randomly sampling the target frequency
-		# distribution.
-		targetLength = (self.dist.randomSample() - HDR_LENGTH)
+		paddingLen = progress - dataLen
+		breakPoints.append((lastBreakPoint, progress))
 
-		log.debug("Samples packet target length: %d bytes." % targetLength)
+		chopper = lambda data: [data[x:y] for (x, y) in breakPoints]
 
-		# Chunk equal or smaller than target: Pad.
-		if len(payload) <= targetLength:
-			padding = "\0" * (targetLength - len(payload))
-			packet = addHeader(self.crypter, self.localHMAC, payload, padding)
-
-			# Update statistics.
-			self.payloadCtr += len(payload)
-			self.paddingCtr += len(padding)
-
-			log.debug("PacketMorpher: Adding %d bytes of padding." % \
-				len(padding))
-
-			# FIXME - put this somewhere else
-			log.debug("Data overhead: %f%%." % \
-				(100/(float(self.payloadCtr) / \
-					(self.paddingCtr if self.paddingCtr > 0 else 1))))
-
-			return packets + [packet]
-
-		# Chunk larger than target: Split.
-		else:
-			packets.append(addHeader(self.crypter, self.localHMAC, \
-					payload[:targetLength]))
-			self.payloadCtr += len(payload[:targetLength])
-
-			log.debug("PacketMorpher: Splitting packet.")
-
-			return packets + self.morph(payload[targetLength:])
+		return (chopper, paddingLen)
 
 
 
@@ -193,9 +140,6 @@ class PayloadScrambler:
 		"""Decodes the given `data' and."""
 
 		return data
-
-
-
 
 
 
@@ -227,39 +171,6 @@ class MyProcessProtocol( protocol.ProcessProtocol ):
 
 		log.debug("Read unlocked message from the external process.")
 		self.callback(data.strip())
-
-
-# class ScrambleSuitMessage:
-# 	def __init__( self, payload="", paddingLen=0 ):
-# 		self.payload = payload
-# 		self.padding = paddingLen * '\0'
-# 		self.encryptedMsg = ""
-# 
-# 		self.hmac = ""
-# 		self.totalLen = ""
-# 		self.payloadLen = ""
-# 
-# 	def dump( self ):
-# 		"""Return ScrambeSuit message as byte string which is ready to be sent
-# 		over the wire."""
-# 		pass
-# 
-# 	def addHeader( self, key, crypter ):
-# 
-# 		assert(len(self.payload) > 0)
-# 
-# 		self.payloadLen = len(self.payload)
-# 		self.totalLen = self.payloadLen + len(self.padding)
-# 
-# 		encryptedMsg = crypter.encrypt(htons(totalLen) + \
-# 			htons(payloadLen) + self.payload + self.padding)
-# 
-# 		# Finally, authenticate the encrypted protocol message using the HMAC.
-# 		self.hmac = MyHMAC_SHA256_128(key, encryptedMsg)
-# 
-# 
-# 	def extractPayload( self ):
-# 		# Verify HMAC.
 
 
 
@@ -343,8 +254,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Local HMAC key:  %s" % self.localHMAC.encode('hex'))
 		log.debug("Remote HMAC key: %s" % self.remoteHMAC.encode('hex'))
 
-		self.pktMorpher =  PacketMorpher(self.clientCrypter if self.weAreClient \
-			else self.serverCrypter, self.localHMAC)
+		self.pktMorpher =  PacketMorpher()
 
 		log.debug("Magic values derived from session key: client=0x%s, " \
 			"server=0x%s." % (self.clientMagic.encode('hex'), \
@@ -460,11 +370,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if len(self.outbuf):
 			log.debug("Flushing %d bytes of buffered data from local Tor." % \
 				len(self.outbuf))
-
-			packets = self.pktMorpher.morph(self.outbuf)
-			for packet in packets:
-				self.sendRemote(self.circuit, packet)
-
+			self.sendRemote(self.circuit, self.outbuf)
 			self.outbuf = ""
 
 
@@ -472,17 +378,31 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		"""Encrypt, then obfuscate the given data and send it to the remote
 		bridge."""
 
-		# Don't send empty data.
 		if len(data) == 0 or not data:
 			return
 
-		# Sleep a random time period in order to obfuscate inter arrival times.
-		duration = self.iatMorpher.randomSample()
-		log.debug("Sleeping for %.4f seconds before sending data." % duration)
-		time.sleep(duration)
+		# Wrap the application's data in ScrambleSuit protocol messages.
+		messages = message.createMessages(data)
 
-		# Send encrypted and obfuscated data.
-		circuit.downstream.write(self.scrambler.encode(data))
+		# Invoke the packet morpher and pad the last protocol message.
+		chopper, paddingLen = self.pktMorpher.morph(sum([len(msg) \
+				for msg in messages]))
+		messages[-1].addPadding(paddingLen)
+
+		# Encrypt and authenticate all messages.
+		blurb = string.join([msg.encryptAndHMAC(self.clientCrypter \
+				if self.weAreClient else self.serverCrypter, self.localHMAC) \
+				for msg in messages], '')
+
+		# Chop the encrypted blurb to fit the target probability distribution.
+		choppedBlurbs = chopper(blurb)
+
+		for blurb in choppedBlurbs:
+			# Random sleeps to obfuscate inter arrival times.
+			duration = self.iatMorpher.randomSample()
+			log.debug("Sleeping for %.4f seconds before sending data." % duration)
+			time.sleep(duration)
+			circuit.downstream.write(blurb)
 
 
 	def unpack( self, data, crypter ):
@@ -506,8 +426,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			# Current protocol message not fully received yet.
 			if (len(self.rcvBuf) - HDR_LENGTH) < self.totalLen:
 				log.debug("Protocol message not yet fully received.")
-				#return ""
 				return fwdBuf
+
 			# Sufficient data -> remove packet from input buffer.
 			else:
 				rcvdHMAC = self.rcvBuf[:HMAC_LENGTH]
@@ -647,10 +567,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Send locally received data to the remote end point.
 		if self.state == ST_CONNECTED:
-			packets = self.pktMorpher.morph(data.read())
-			for packet in packets:
-				log.debug("Sending one of the morphed packets.")
-				self.sendRemote(circuit, packet)
+			self.sendRemote(circuit, data.read())
 
 		# Buffer data we are not ready to transmit yet. It will get flushed
 		# once the puzzle is solved and the connection established.
