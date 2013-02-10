@@ -181,28 +181,37 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		log.debug("Initializing %s." % TRANSPORT_NAME)
 
-		if self.weAreClient:
-			log.debug("Switching to state ST_WAIT_FOR_PUZZLE.")
-			self.state = ST_WAIT_FOR_PUZZLE
-		elif self.weAreServer:
-			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-			self.state = ST_WAIT_FOR_PUZZLE
+		# Initialize the protocol' state machine.
+		self.state = ST_WAIT_FOR_PUZZLE
 
+		# Magic values to tell when the actual communication begins.
 		self.sendMagic = self.recvMagic = None
-		self.outbuf = self.inbuf = ""
-		self.rcvBuf = ""
-		self.circuit = None
-		self.scrambler = PayloadScrambler()
+
+		# Buffers for incoming and outgoing data.
+		self.sendBuf = self.recvBuf = ""
+
+		# AES instances for incoming and outgoing data.
 		self.sendCrypter = mycrypto.PayloadCrypter()
 		self.recvCrypter = mycrypto.PayloadCrypter()
+
+		# Payload scrambler to encode encrypted data.
+		self.scrambler = PayloadScrambler()
+
+		# Packet morpher to modify the protocol's packet length distribution.
 		self.pktMorpher = None
-		
+
+		# Inter arrival time morpher to obfuscate inter arrival times.
+		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.05)
+
+		# Circuit to write data to and receive data from.
+		self.circuit = None
+
+		# Timer service to generate garbage data while puzzle is being solved.
 		self.ts = None
+
 		# Used by the unpack mechanism
 		self.totalLen = None
 		self.payloadLen = None
-		# inter arrival time obfuscator
-		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.05)
 
 
 	def generateNoise( self ):
@@ -363,11 +372,11 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.state = ST_WAIT_FOR_MAGIC
 
 		# Flush the buffered data, Tor wanted to send in the meantime.
-		if len(self.outbuf):
+		if len(self.sendBuf):
 			log.debug("Flushing %d bytes of buffered data from local Tor." % \
-				len(self.outbuf))
-			self.sendRemote(self.circuit, self.outbuf)
-			self.outbuf = ""
+				len(self.sendBuf))
+			self.sendRemote(self.circuit, self.sendBuf)
+			self.sendBuf = ""
 
 
 	def sendRemote( self, circuit, data ):
@@ -405,38 +414,38 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Getting %d bytes to unpack." % len(data))
 
 		# Input buffer which is not yet processed and forwarded.
-		self.rcvBuf += data
+		self.recvBuf += data
 		fwdBuf = ""
 
 		# Keep trying to unpack as long as there seems to be enough data.
-		while len(self.rcvBuf) >= HDR_LENGTH:
+		while len(self.recvBuf) >= HDR_LENGTH:
 
 			# Extract length fields if we don't have them already.
 			if self.totalLen == None:# and self.payloadLen == None:
-				self.totalLen = ntohs(crypter.decrypt(self.rcvBuf[16:18]))[0]
-				self.payloadLen = ntohs(crypter.decrypt(self.rcvBuf[18:20]))[0]
+				self.totalLen = ntohs(crypter.decrypt(self.recvBuf[16:18]))[0]
+				self.payloadLen = ntohs(crypter.decrypt(self.recvBuf[18:20]))[0]
 				log.debug("totalLen=%d, payloadLen=%d" % \
 					(self.totalLen, self.payloadLen))
 
 			# Current protocol message not fully received yet.
-			if (len(self.rcvBuf) - HDR_LENGTH) < self.totalLen:
+			if (len(self.recvBuf) - HDR_LENGTH) < self.totalLen:
 				log.debug("Protocol message not yet fully received.")
 				return fwdBuf
 
 			# Sufficient data -> remove packet from input buffer.
 			else:
-				rcvdHMAC = self.rcvBuf[:HMAC_LENGTH]
-				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, self.rcvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
+				rcvdHMAC = self.recvBuf[:HMAC_LENGTH]
+				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, self.recvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
 				if rcvdHMAC != vrfyHMAC:
 					log.debug("WARNING: HMACs (%s / %s) differ!" % \
 						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
 				else:
 					log.debug("HMAC of message successfully verified.")
 
-				fwdBuf += crypter.decrypt(self.rcvBuf[HDR_LENGTH: \
+				fwdBuf += crypter.decrypt(self.recvBuf[HDR_LENGTH: \
 						(self.totalLen+HDR_LENGTH)])[:self.payloadLen]
 
-				self.rcvBuf = self.rcvBuf[HDR_LENGTH + self.totalLen:]
+				self.recvBuf = self.recvBuf[HDR_LENGTH + self.totalLen:]
 				# Protocol message extracted - resetting length fields.
 				self.totalLen = self.payloadLen = None
 
@@ -563,7 +572,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# once the puzzle is solved and the connection established.
 		else:
 			blurb = data.read()
-			self.outbuf += blurb
+			self.sendBuf += blurb
 			log.debug("Buffering %d bytes of outgoing data." % len(blurb))
 
 
