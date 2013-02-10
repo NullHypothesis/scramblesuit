@@ -71,7 +71,8 @@ TRANSPORT_NAME = "ScrambleSuit"
 
 log = logging.get_obfslogger()
 
-
+def swap( a, b ):
+	return (b, a)
 
 def ntohs( data ):
 	return struct.unpack('!H', data)
@@ -183,24 +184,17 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if self.weAreClient:
 			log.debug("Switching to state ST_WAIT_FOR_PUZZLE.")
 			self.state = ST_WAIT_FOR_PUZZLE
-			#self.sendCrypter = self.clientCrypter
-			#self.recvCrypter = self.serverCrypter
 		elif self.weAreServer:
 			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 			self.state = ST_WAIT_FOR_PUZZLE
-			#self.state = ST_WAIT_FOR_MAGIC
-			#self.recvCrypter = self.clientCrypter
-			#self.sendCrypter = self.serverCrypter
 
-		self.clientMagic = self.serverMagic = None
+		self.sendMagic = self.recvMagic = None
 		self.outbuf = self.inbuf = ""
-		#self.unpackBuf = ""
 		self.rcvBuf = ""
 		self.circuit = None
 		self.scrambler = PayloadScrambler()
-		# FIXME - this should probably be called sendCrypter and rcvCrypter
-		self.clientCrypter = mycrypto.PayloadCrypter()
-		self.serverCrypter = mycrypto.PayloadCrypter()
+		self.sendCrypter = mycrypto.PayloadCrypter()
+		self.recvCrypter = mycrypto.PayloadCrypter()
 		self.pktMorpher = None
 		
 		self.ts = None
@@ -233,32 +227,34 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		okm = hkdf.expand()
 
 		# Set the symmetric AES keys.
-		self.clientCrypter.setSessionKey(okm[0:32],  okm[32:64])
-		self.serverCrypter.setSessionKey(okm[64:96], okm[96:128])
+		self.sendCrypter.setSessionKey(okm[0:32],  okm[32:64])
+		self.recvCrypter.setSessionKey(okm[64:96], okm[96:128])
 
 		# Derive a magic value for the client as well as the server. They must
 		# be distinct to prevent fingerprinting (e.g. look for two identical
 		# 256-bit strings).
-		self.clientMagic = okm[128:160]
-		self.serverMagic = okm[160:192]
-		self.remoteMagic = self.clientMagic if self.weAreServer else \
-				self.serverMagic
+		self.sendMagic = okm[128:160]
+		self.recvMagic = okm[160:192]
 
 		# Set the HMAC keys.
-		self.localHMAC = okm[192:224]
-		self.remoteHMAC = okm[224:256]
+		self.sendHMAC = okm[192:224]
+		self.recvHMAC = okm[224:256]
+
 		if self.weAreServer:
-			tmp = self.localHMAC
-			self.localHMAC = self.remoteHMAC
-			self.remoteHMAC = tmp
-		log.debug("Local HMAC key:  %s" % self.localHMAC.encode('hex'))
-		log.debug("Remote HMAC key: %s" % self.remoteHMAC.encode('hex'))
+			self.sendHMAC, self.recvHMAC = swap(self.sendHMAC, \
+					self.recvHMAC)
+			self.sendCrypter, self.recvCrypter = swap(self.sendCrypter, \
+					self.recvCrypter)
+			self.sendMagic, self.recvMagic = swap(self.sendMagic, \
+					self.recvMagic)
+		log.debug("Local HMAC key:  %s" % self.sendHMAC.encode('hex'))
+		log.debug("Remote HMAC key: %s" % self.recvHMAC.encode('hex'))
 
 		self.pktMorpher =  PacketMorpher()
 
-		log.debug("Magic values derived from session key: client=0x%s, " \
-			"server=0x%s." % (self.clientMagic.encode('hex'), \
-			self.serverMagic.encode('hex')))
+		log.debug("Magic values derived from session key: send=0x%s, " \
+			"recv=0x%s." % (self.sendMagic.encode('hex'), \
+			self.recvMagic.encode('hex')))
 
 
 	def circuitDestroyed( self, circuit, reason, side ):
@@ -361,7 +357,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Send bridge randomness || magic value.
 		log.debug("Sending magic value to server.")
 		self.circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
-				MAX_PADDING_LENGTH)) + self.clientMagic)
+				MAX_PADDING_LENGTH)) + self.sendMagic)
 
 		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 		self.state = ST_WAIT_FOR_MAGIC
@@ -390,8 +386,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		messages[-1].addPadding(paddingLen)
 
 		# Encrypt and authenticate all messages.
-		blurb = string.join([msg.encryptAndHMAC(self.clientCrypter \
-				if self.weAreClient else self.serverCrypter, self.localHMAC) \
+		blurb = string.join([msg.encryptAndHMAC(self.sendCrypter, self.sendHMAC) \
 				for msg in messages], '')
 
 		# Chop the encrypted blurb to fit the target probability distribution.
@@ -431,7 +426,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			# Sufficient data -> remove packet from input buffer.
 			else:
 				rcvdHMAC = self.rcvBuf[:HMAC_LENGTH]
-				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.remoteHMAC, self.rcvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
+				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, self.rcvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
 				if rcvdHMAC != vrfyHMAC:
 					log.debug("WARNING: HMACs (%s / %s) differ!" % \
 						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
@@ -459,15 +454,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if len(data) == 0 or not data:
 			return
 
-		if self.weAreServer:
-			crypter = self.clientCrypter
-		else:
-			crypter = self.serverCrypter
-
 		# Send encrypted and obfuscated data.
 		circuit.upstream.write(
-				self.unpack( self.scrambler.decode(data), crypter)
-			)
+			self.unpack(self.scrambler.decode(data), self.recvCrypter)
+		)
 
 
 	def _receivePuzzle( self, data ):
@@ -511,11 +501,11 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			self._receivePuzzle(data)
 
 		elif self.state == ST_WAIT_FOR_MAGIC:
-			if not self._magicInData(data, self.remoteMagic):
+			if not self._magicInData(data, self.recvMagic):
 				return
 
 			if self.weAreServer:
-				self._sendMagicValue(circuit, self.serverMagic)
+				self._sendMagicValue(circuit, self.sendMagic)
 			log.debug("Switching to state ST_CONNECTED.")
 			self.state = ST_CONNECTED
 			self.sendLocal(circuit, data.read())
