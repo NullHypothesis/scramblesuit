@@ -12,8 +12,8 @@ import obfsproxy.common.log as logging
 import math
 import os
 
-# Digest size of SHA256 (in bytes).
-SHA256_DIGEST_SIZE = 32
+import const
+
 
 log = logging.get_obfslogger()
 
@@ -27,7 +27,7 @@ class HKDF_SHA256( object ):
 
 	def __init__( self, prk, info="", length=32 ):
 
-		self.HashLen = SHA256_DIGEST_SIZE
+		self.HashLen = const.SHA256_DIGEST_SIZE
 
 		if length > (self.HashLen * 255):
 			raise ValueError("The OKM's length cannot be larger than %d." % \
@@ -69,7 +69,7 @@ class HKDF_SHA256( object ):
 def MyHMAC_SHA256_128( key, msg ):
 	"""Returns the HMAC-SHA256-128 of the given `key' and `msg'."""
 
-	assert(len(key) == SHA256_DIGEST_SIZE)
+	assert(len(key) == const.SHA256_DIGEST_SIZE)
 
 	h = Crypto.Hash.HMAC.new(key, msg, Crypto.Hash.SHA256)
 

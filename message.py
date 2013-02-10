@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-MTU = 1448
-HDR_LENGTH = 20
-
 import obfsproxy.common.log as logging
 
 import struct
 import mycrypto
+import const
 
 log = logging.get_obfslogger()
 
@@ -29,9 +27,9 @@ def createMessages( data ):
 
 	log.debug("Creating protocol messages.")
 
-	while len(data) >= (MTU - HDR_LENGTH):
-		messages.append(ProtocolMessage(data[:(MTU - HDR_LENGTH)]))
-		data = data[(MTU - HDR_LENGTH):]
+	while len(data) >= (const.MTU - const.HDR_LENGTH):
+		messages.append(ProtocolMessage(data[:(const.MTU - const.HDR_LENGTH)]))
+		data = data[(const.MTU - const.HDR_LENGTH):]
 
 	messages.append(ProtocolMessage(data))
 
@@ -46,7 +44,7 @@ class ProtocolMessage( object ):
 	def __init__( self, payload="", paddingLen=0 ):
 
 		payloadLen = len(payload)
-		assert((payloadLen + paddingLen) <= (MTU - HDR_LENGTH))
+		assert((payloadLen + paddingLen) <= (const.MTU - const.HDR_LENGTH))
 
 		self.hmac = ""
 		self.totalLen = payloadLen + paddingLen
@@ -72,23 +70,23 @@ class ProtocolMessage( object ):
 		if paddingLen == 0:
 			return
 
-		if (self.totalLen + paddingLen) > (MTU - HDR_LENGTH):
+		if (self.totalLen + paddingLen) > (const.MTU - const.HDR_LENGTH):
 			log.error("Padding would exceed MTU.")
 			# TODO - raise exception
 
 		log.debug("Adding %d bytes of padding to %d-byte message." % \
-				(paddingLen, HDR_LENGTH + self.totalLen))
+				(paddingLen, const.HDR_LENGTH + self.totalLen))
 		self.totalLen += paddingLen
 
 
 	def __len__( self ):
-		return HDR_LENGTH + self.totalLen
+		return const.HDR_LENGTH + self.totalLen
 
 
 
 def decryptAndVerify( encryptedMsg, crypter, HMACKey ):
 
-	assert(HDR_LENGTH <= len(encryptedMsg) <= MTU)
+	assert(const.HDR_LENGTH <= len(encryptedMsg) <= MTU)
 	assert(crypter and HMACKey)
 
 	hmac = mycrypto.MyHMAC_SHA256_128(HMACKey, encryptedMsg)

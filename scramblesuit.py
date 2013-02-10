@@ -27,45 +27,7 @@ import probdist
 import timelock
 import mycrypto
 import message
-
-
-# Key size (in bytes) for the AES session key and its IV.
-SESSION_KEY_SIZE = IV_SIZE = 32
-
-# Used to derive other key material, e.g. for AES and HMAC.
-MASTER_SECRET_SIZE = 32
-
-# The maximum padding length to be appended to the puzzle.
-MAX_PADDING_LENGTH = 8192
-
-# Length of the puzzle (in bytes). The client needs to know the size to know
-# when to start extracting the puzzle.
-PUZZLE_LENGTH = 192
-
-MAGIC_LENGTH = 32
-
-# States which are used for the protocol state machine.
-ST_WAIT_FOR_PUZZLE = 0
-ST_SOLVING_PUZZLE = 1
-ST_WAIT_FOR_MAGIC = 2
-ST_CONNECTED = 3
-
-# Length of len field (in bytes).
-HDR_LENGTH = 16 + 2 + 2
-
-# Length of HMAC-SHA256-128.
-HMAC_LENGTH = 16
-
-# TODO - what do we choose? should fit into an ethernet (non-jumbo) frame
-MTU = 1448
-
-# The prefix before the session key which is ``locked'' inside the time-lock
-# puzzle.  The client looks for this prefix to verify that the puzzle was
-# unlocked successfully.
-MASTER_KEY_PREFIX = "Session key: "
-
-# Used in log messages.
-TRANSPORT_NAME = "ScrambleSuit"
+import const
 
 
 
@@ -95,7 +57,7 @@ class PacketMorpher( object ):
 		generated."""
 
 		self.dist = dist if dist else \
-			probdist.RandProbDist(lambda: random.randint(1, MTU))
+			probdist.RandProbDist(lambda: random.randint(1, const.MTU))
 
 
 	def morph( self, dataLen ):
@@ -179,10 +141,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def __init__( self ):
 
-		log.debug("Initializing %s." % TRANSPORT_NAME)
+		log.debug("Initializing %s." % const.TRANSPORT_NAME)
 
 		# Initialize the protocol' state machine.
-		self.state = ST_WAIT_FOR_PUZZLE
+		self.state = const.ST_WAIT_FOR_PUZZLE
 
 		# Magic values to tell when the actual communication begins.
 		self.sendMagic = self.recvMagic = None
@@ -296,19 +258,18 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Only the server is generating and transmitting a puzzle.
 		if self.weAreServer:
 
-			rawPuzzle = self.getPuzzle()
-			log.debug("Successfully generated %d-byte puzzle." % \
-				len(rawPuzzle))
+			# Generate master secret and derive client -and server secret.
+			masterSecret = mycrypto.strong_random(const.MASTER_SECRET_SIZE)
+			self._deriveSecrets(masterSecret)
 
 			# Append random padding to obfuscate length and transmit blurb.
-			padding = mycrypto.weak_random(random.randint(0, MAX_PADDING_LENGTH))
+			padding = mycrypto.weak_random(random.randint(0, const.MAX_PADDING_LENGTH))
 			log.debug("Sending puzzle with %d bytes of random padding." % \
 					len(padding))
-			circuit.downstream.write(rawPuzzle + padding)
-			# FIXME - like obfs3, we could use repr() to print the puzzle.
+			circuit.downstream.write(timelock.getPuzzle(masterSecret) + padding)
 
 			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-			self.state = ST_WAIT_FOR_MAGIC
+			self.state = const.ST_WAIT_FOR_MAGIC
 
 		# Both sides start a noise generator to create and transmit randomness.
 		# This should ``break the silence'' while the client is solving the
@@ -316,27 +277,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.ts = TimerService(1, self.generateNoise)
 		self.ts.startService()
 
-
-	def getPuzzle( self ):
-		"""Generates the time-lock puzzle for the client to solve. This will
-		yield the symmetric session key."""
-
-		# Generate master secret and derive client -and server secret.
-		masterSecret = mycrypto.strong_random(MASTER_SECRET_SIZE)
-		self._deriveSecrets(masterSecret)
-
-		# Create puzzle which ``locks'' the shared session key.
-		riddler = timelock.new()
-		puzzle = riddler.generatePuzzle(MASTER_KEY_PREFIX + \
-			masterSecret)
-
-		# Convert base 10 numbers to raw strings.
-		rawPuzzle = bytearray()
-		rawPuzzle = [timelock.dump(x) for x in \
-			[puzzle["n"], puzzle["a"], puzzle["Cm"]]]
-
-		# Return single concatenated string.
-		return reduce(lambda x, y: x + y, rawPuzzle)
 
 
 	def decryptedPuzzleCallback( self, sharedSecret ):
@@ -346,12 +286,12 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Callback invoked after solved puzzle.")
 
 		# Sanity check to verify that we solved a real puzzle.
-		if not MASTER_KEY_PREFIX in sharedSecret:
+		if not const.MASTER_KEY_PREFIX in sharedSecret:
 			log.critical("No MASTER_KEY_PREFIX in puzzle. What did we just " \
 					"solve?")
 			return
 
-		sharedSecret = sharedSecret[len(MASTER_KEY_PREFIX):]
+		sharedSecret = sharedSecret[len(const.MASTER_KEY_PREFIX):]
 
 		# The session key is known now, so the magic values can be derived.
 		self._deriveSecrets(sharedSecret)
@@ -366,10 +306,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Send bridge randomness || magic value.
 		log.debug("Sending magic value to server.")
 		self.circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
-				MAX_PADDING_LENGTH)) + self.sendMagic)
+				const.MAX_PADDING_LENGTH)) + self.sendMagic)
 
 		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-		self.state = ST_WAIT_FOR_MAGIC
+		self.state = const.ST_WAIT_FOR_MAGIC
 
 		# Flush the buffered data, Tor wanted to send in the meantime.
 		if len(self.sendBuf):
@@ -418,7 +358,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		fwdBuf = ""
 
 		# Keep trying to unpack as long as there seems to be enough data.
-		while len(self.recvBuf) >= HDR_LENGTH:
+		while len(self.recvBuf) >= const.HDR_LENGTH:
 
 			# Extract length fields if we don't have them already.
 			if self.totalLen == None:# and self.payloadLen == None:
@@ -428,24 +368,24 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 					(self.totalLen, self.payloadLen))
 
 			# Current protocol message not fully received yet.
-			if (len(self.recvBuf) - HDR_LENGTH) < self.totalLen:
+			if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
 				log.debug("Protocol message not yet fully received.")
 				return fwdBuf
 
 			# Sufficient data -> remove packet from input buffer.
 			else:
-				rcvdHMAC = self.recvBuf[:HMAC_LENGTH]
-				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, self.recvBuf[HMAC_LENGTH:(self.totalLen+HDR_LENGTH)])
+				rcvdHMAC = self.recvBuf[:const.HMAC_LENGTH]
+				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, self.recvBuf[const.HMAC_LENGTH:(self.totalLen+const.HDR_LENGTH)])
 				if rcvdHMAC != vrfyHMAC:
 					log.debug("WARNING: HMACs (%s / %s) differ!" % \
 						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
 				else:
 					log.debug("HMAC of message successfully verified.")
 
-				fwdBuf += crypter.decrypt(self.recvBuf[HDR_LENGTH: \
-						(self.totalLen+HDR_LENGTH)])[:self.payloadLen]
+				fwdBuf += crypter.decrypt(self.recvBuf[const.HDR_LENGTH: \
+						(self.totalLen+const.HDR_LENGTH)])[:self.payloadLen]
 
-				self.recvBuf = self.recvBuf[HDR_LENGTH + self.totalLen:]
+				self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
 				# Protocol message extracted - resetting length fields.
 				self.totalLen = self.payloadLen = None
 
@@ -471,17 +411,17 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def _receivePuzzle( self, data ):
 
-		if len(data) < PUZZLE_LENGTH:
+		if len(data) < const.PUZZLE_LENGTH:
 			log.debug("Only have %d bytes out of %d-byte "
-					"puzzle so far." % (len(data), PUZZLE_LENGTH))
+					"puzzle so far." % (len(data), const.PUZZLE_LENGTH))
 			return
 
-		puzzle = timelock.extractPuzzleFromBlurb(data.read(PUZZLE_LENGTH))
+		puzzle = timelock.extractPuzzleFromBlurb(data.read(const.PUZZLE_LENGTH))
 		t = timelock.new()
 
 		# Prevents us from mistakenly accepting another puzzle.
 		log.debug("Switching to state ST_SOLVING_PUZZLE.")
-		self.state = ST_SOLVING_PUZZLE
+		self.state = const.ST_SOLVING_PUZZLE
 
 		# Solve puzzle in subprocess and invoke callback when finished.
 		log.debug("Attempting to unlock puzzle in dedicated process.")
@@ -503,31 +443,31 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		self.circuit = circuit
 
-		if self.state == ST_CONNECTED:
+		if self.state == const.ST_CONNECTED:
 			self.sendLocal(circuit, data.read())
 
-		elif self.weAreClient and self.state == ST_WAIT_FOR_PUZZLE:
+		elif self.weAreClient and self.state == const.ST_WAIT_FOR_PUZZLE:
 			self._receivePuzzle(data)
 
-		elif self.state == ST_WAIT_FOR_MAGIC:
+		elif self.state == const.ST_WAIT_FOR_MAGIC:
 			if not self._magicInData(data, self.recvMagic):
 				return
 
 			if self.weAreServer:
 				self._sendMagicValue(circuit, self.sendMagic)
 			log.debug("Switching to state ST_CONNECTED.")
-			self.state = ST_CONNECTED
+			self.state = const.ST_CONNECTED
 			self.sendLocal(circuit, data.read())
 
 		# Right now, we only expect pseudo-data which can be discarded safely.
-		elif (self.weAreClient and self.state == ST_SOLVING_PUZZLE) or \
-				(self.weAreServer and self.state == ST_WAIT_FOR_PUZZLE):
+		elif (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
+				(self.weAreServer and self.state == const.ST_WAIT_FOR_PUZZLE):
 			log.debug("We got %d bytes of pseudo-data in invalid state " \
 				"%d. Discarding data." % (len(data.read()), self.state))
 
 		else:
 			 raise base.PluggableTransportError("%s: Reached invalid code " \
-					"branch. This is probably a bug." % TRANSPORT_NAME)
+					"branch. This is probably a bug." % const.TRANSPORT_NAME)
 
 
 	def _magicInData( self, data, magic ):
@@ -541,7 +481,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			return False
 
 		log.debug("Found the remote's magic value.")
-		data.drain(index + MAGIC_LENGTH)
+		data.drain(index + const.MAGIC_LENGTH)
 
 		return True
 
@@ -565,7 +505,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		it is buffered to be transmitted later."""
 
 		# Send locally received data to the remote end point.
-		if self.state == ST_CONNECTED:
+		if self.state == const.ST_CONNECTED:
 			self.sendRemote(circuit, data.read())
 
 		# Buffer data we are not ready to transmit yet. It will get flushed

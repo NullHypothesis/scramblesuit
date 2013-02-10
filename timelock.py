@@ -20,6 +20,7 @@ import struct
 from Crypto.Util import number
 from Crypto.Cipher import ARC4
 
+import const
 
 
 def dump( n ):
@@ -45,6 +46,23 @@ def extractPuzzleFromBlurb( blurb ):
 	puzzle["Cm"] = int(blurb[256:384], 16)
 
 	return puzzle
+
+
+def getPuzzle( masterSecret ):
+	"""Generates the time-lock puzzle for the client to solve. This will
+	yield the symmetric session key."""
+
+	# Create puzzle which ``locks'' the shared session key.
+	riddler = TimeLockPuzzle()
+	puzzle = riddler.generatePuzzle(const.MASTER_KEY_PREFIX + \
+		masterSecret)
+
+	# Convert base 10 numbers to raw strings.
+	rawPuzzle = bytearray()
+	rawPuzzle = [dump(x) for x in [puzzle["n"], puzzle["a"], puzzle["Cm"]]]
+
+	# Return single concatenated string.
+	return reduce(lambda x, y: x + y, rawPuzzle)
 
 
 class TimeLockPuzzle:
