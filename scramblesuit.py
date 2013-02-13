@@ -294,7 +294,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Invoke the packet morpher and pad the last protocol message.
 		chopper, paddingLen = self.pktMorpher.morph(sum([len(msg) \
 				for msg in messages]))
-		messages[-1].addPadding(paddingLen)
+
+		if paddingLen > const.HDR_LENGTH:
+			messages.append(message.ProtocolMessage("", \
+					paddingLen=paddingLen - const.HDR_LENGTH))
 
 		# Encrypt and authenticate all messages.
 		blurb = string.join([msg.encryptAndHMAC(self.sendCrypter, self.sendHMAC) \

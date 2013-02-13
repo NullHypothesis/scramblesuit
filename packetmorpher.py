@@ -17,7 +17,7 @@ class PacketMorpher( object ):
 		generated."""
 
 		self.dist = dist if dist else \
-			probdist.RandProbDist(lambda: random.randint(1, const.MTU))
+			probdist.RandProbDist(lambda: random.randint(const.HDR_LENGTH, const.MTU))
 
 
 	def morph( self, dataLen ):
@@ -34,7 +34,7 @@ class PacketMorpher( object ):
 			newBreakPoint = progress + self.dist.randomSample()
 			breakPoints.append((lastBreakPoint, newBreakPoint))
 			lastBreakPoint = newBreakPoint
-			progress += newBreakPoint
+			progress = newBreakPoint
 
 		paddingLen = progress - dataLen
 		breakPoints.append((lastBreakPoint, progress))
