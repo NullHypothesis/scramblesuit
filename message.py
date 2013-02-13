@@ -67,12 +67,11 @@ class ProtocolMessage( object ):
 
 	def addPadding( self, paddingLen ):
 
+		# The padding must not exceed the message size.
+		assert ((self.totalLen + paddingLen) <= (const.MTU - const.HDR_LENGTH))
+
 		if paddingLen == 0:
 			return
-
-		if (self.totalLen + paddingLen) > (const.MTU - const.HDR_LENGTH):
-			log.error("Padding would exceed MTU.")
-			# TODO - raise exception
 
 		log.debug("Adding %d bytes of padding to %d-byte message." % \
 				(paddingLen, const.HDR_LENGTH + self.totalLen))
