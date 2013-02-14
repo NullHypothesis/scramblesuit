@@ -125,7 +125,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.pktMorpher = None
 
 		# Inter arrival time morpher to obfuscate inter arrival times.
-		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.05)
+		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.02)
 
 		# Circuit to write data to and receive data from.
 		self.circuit = None
@@ -225,9 +225,9 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			self._deriveSecrets(masterSecret)
 
 			# Append random padding to obfuscate length and transmit blurb.
-			padding = mycrypto.weak_random(random.randint(0, const.MAX_PADDING_LENGTH))
-			log.debug("Sending puzzle with %d bytes of random padding." % \
-					len(padding))
+			padding = mycrypto.weak_random(random.randint(0, \
+					const.MAX_PADDING_LENGTH))
+			log.debug("Sending puzzle with %d-byte of padding." % len(padding))
 			circuit.downstream.write(timelock.getPuzzle(masterSecret) + padding)
 
 			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
@@ -236,7 +236,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Both sides start a noise generator to create and transmit randomness.
 		# This should ``break the silence'' while the client is solving the
 		# puzzle.
-		self.ts = TimerService(1, self.generateNoise)
+		self.ts = TimerService(0.1, self.generateNoise)
 		self.ts.startService()
 
 
@@ -308,9 +308,9 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		for blurb in choppedBlurbs:
 			# Random sleeps to obfuscate inter arrival times.
-			duration = self.iatMorpher.randomSample()
-			log.debug("Sleeping for %.4f seconds before sending data." % duration)
-			time.sleep(duration)
+			# duration = self.iatMorpher.randomSample()
+			# log.debug("Sleeping for %.4f seconds before sending data." % duration)
+			# time.sleep(duration)
 			circuit.downstream.write(blurb)
 
 
@@ -362,11 +362,11 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		"""Deobfuscate, then decrypt the given data and send it to the local
 		Tor client."""
 
-		log.debug("Attempting to send %d bytes of data to local." % len(data))
-
 		# Don't send empty data.
 		if len(data) == 0 or not data:
 			return
+
+		log.debug("Attempting to send %d bytes of data to local." % len(data))
 
 		# Send encrypted and obfuscated data.
 		circuit.upstream.write(
@@ -424,44 +424,43 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			self.state = const.ST_CONNECTED
 			self.sendLocal(circuit, data.read())
 
-		# Right now, we only expect pseudo-data which can be discarded safely.
 		elif (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
 				(self.weAreServer and self.state == const.ST_WAIT_FOR_PUZZLE):
-			log.debug("We got %d bytes of pseudo-data in invalid state " \
-				"%d. Discarding data." % (len(data.read()), self.state))
+			log.debug("Discarding %d bytes of bogus data." % len(data.read()))
 
 		else:
-			 raise base.PluggableTransportError("%s: Reached invalid code " \
-					"branch. This is probably a bug." % const.TRANSPORT_NAME)
+			log.error("Reached invalid code branch. This is probably a bug.")
 
 
 	def _magicInData( self, data, magic ):
+		"""Returns True if the given `magic' is found in `data'. If not, False
+		is returned."""
 
 		preview = data.peek()
 
-		index = preview.find(magic)
-		if index == -1:
-			log.debug("Did not find magic value in " \
-					"%d-byte buffer yet." % len(preview))
+		magicIndex = preview.find(magic)
+		if magicIndex == -1:
+			log.debug("Found no magic value in %d-byte buffer." % len(preview))
 			return False
 
 		log.debug("Found the remote's magic value.")
-		data.drain(index + const.MAGIC_LENGTH)
+		data.drain(magicIndex + const.MAGIC_LENGTH)
 
 		return True
 
 
 	def _sendMagicValue( self, circuit, magic ):
+		"""Sends the given `magic' to the remote machine. Before that, the
+		noise generator is stopped."""
 
-		log.debug("Stopping noise generator.")
+		log.debug("Attempting to stop noise generator.")
 		deferred = self.ts.stopService()
-		if not deferred == None:
+		if not deferred == None: # FIXME
 			log.error("Ehm, we should have waited for deferred to return.")
 
-		# Got the client's magic value. Now send the server's magic.
 		log.debug("Noise generator stopped. Now sending magic value to remote.")
-		circuit.downstream.write(mycrypto.weak_random(random.randint(0, 100)) \
-				+ magic)
+		circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
+				const.MAX_PADDING_LENGTH)) + magic)
 
 
 	def receivedUpstream( self, data, circuit ):
@@ -469,19 +468,18 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		bridge. If the data can't be sent immediately (in state ST_CONNECTED)
 		it is buffered to be transmitted later."""
 
-		# Send locally received data to the remote end point.
 		if self.state == const.ST_CONNECTED:
 			self.sendRemote(circuit, data.read())
 
 		# Buffer data we are not ready to transmit yet. It will get flushed
 		# once the puzzle is solved and the connection established.
 		else:
-			blurb = data.read()
-			self.sendBuf += blurb
-			log.debug("Buffering %d bytes of outgoing data." % len(blurb))
+			self.sendBuf += data.read()
+			log.debug("%d bytes of outgoing data buffered." % len(self.sendBuf))
 
 
 class ScrambleSuitClient( ScrambleSuitDaemon ):
+
 	def __init__( self ):
 		self.weAreClient = True
 		self.weAreServer = False
@@ -489,6 +487,7 @@ class ScrambleSuitClient( ScrambleSuitDaemon ):
 
 
 class ScrambleSuitServer( ScrambleSuitDaemon ):
+
 	def __init__( self ):
 		self.weAreServer = True
 		self.weAreClient = False

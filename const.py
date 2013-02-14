@@ -8,7 +8,7 @@ SESSION_KEY_SIZE = IV_SIZE = 32
 MASTER_SECRET_SIZE = 32
 
 # The maximum padding length to be appended to the puzzle.
-MAX_PADDING_LENGTH = 8192
+MAX_PADDING_LENGTH = 4096
 
 # Length of the puzzle (in bytes). The client needs to know the size to know
 # when to start extracting the puzzle.
