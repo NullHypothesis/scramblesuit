@@ -125,7 +125,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.pktMorpher = None
 
 		# Inter arrival time morpher to obfuscate inter arrival times.
-		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.02)
+		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.01)
 
 		# Circuit to write data to and receive data from.
 		self.circuit = None
@@ -308,10 +308,10 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		for blurb in choppedBlurbs:
 			# Random sleeps to obfuscate inter arrival times.
-			# duration = self.iatMorpher.randomSample()
-			# log.debug("Sleeping for %.4f seconds before sending data." % duration)
-			# time.sleep(duration)
-			circuit.downstream.write(blurb)
+			duration = self.iatMorpher.randomSample()
+			log.debug("Sleeping for %.4f seconds before sending data." % duration)
+			time.sleep(duration)
+			circuit.downstream.transport.writeSomeData(blurb)
 
 
 	def unpack( self, data, crypter ):
