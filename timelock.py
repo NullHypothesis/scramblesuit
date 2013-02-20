@@ -127,7 +127,7 @@ new = TimeLockPuzzle
 
 # If invoked standalone, try to solve the pickled puzzle coming over stdin.
 if __name__ == '__main__':
-	tl = TimeLockPuzzle()
+	riddler = TimeLockPuzzle()
 
 	puzzle = pickle.load(sys.stdin)
 	assert isinstance(puzzle["n"], long) and isinstance(puzzle["Ck"], long)
@@ -135,4 +135,4 @@ if __name__ == '__main__':
 	assert int(math.log(puzzle["Ck"], 2)) <= const.PUZZLE_MODULUS_LENGTH
 
 	# Inform calling process about solved puzzle by writing to stdout.
-	print tl.solvePuzzle(puzzle)
+	print riddler.solvePuzzle(puzzle)
