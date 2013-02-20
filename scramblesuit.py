@@ -377,8 +377,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 	def _receivePuzzle( self, data ):
 
 		if len(data) < const.PUZZLE_LENGTH:
-			log.debug("Only have %d bytes out of %d-byte "
-					"puzzle so far." % (len(data), const.PUZZLE_LENGTH))
+			log.debug("Still missing %d bytes of puzzle." % \
+					(const.PUZZLE_LENGTH - len(data)))
 			return
 
 		puzzle = timelock.extractPuzzleFromBlurb(data.read(const.PUZZLE_LENGTH))

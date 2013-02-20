@@ -42,9 +42,8 @@ def extractPuzzleFromBlurb( blurb ):
 	blurb = blurb.encode('hex')
 
 	puzzle = {}
-	puzzle["n"] =  int(blurb[0:128],   16)
-	puzzle["a"] =  int(blurb[128:256], 16)
-	puzzle["Cm"] = int(blurb[256:384], 16)
+	puzzle["n"] = int(blurb[0:128], 16)
+	puzzle["Ck"] = int(blurb[128:256], 16)
 
 	return puzzle
 
@@ -61,7 +60,7 @@ def getPuzzle( masterSecret ):
 
 	# Convert base 10 numbers to raw strings.
 	rawPuzzle = bytearray()
-	rawPuzzle = [dump(x) for x in [puzzle["n"], puzzle["a"], puzzle["Cm"]]]
+	rawPuzzle = [dump(x) for x in [puzzle["n"], puzzle["Ck"]]]
 
 	# Return single concatenated string.
 	return reduce(lambda x, y: x + y, rawPuzzle)
@@ -72,9 +71,10 @@ class TimeLockPuzzle:
 	by Rivest, Shamir and Wagner."""
 
 	def __init__( self ):
+		self.a = 2
 		self.squaringsPerSec = 4000000 # Calibrated on Intel Core i7, 2.13 GHz.
 		#self.squaringsPerSec = 10 # Calibrated on Intel Core i7, 2.13 GHz.
-		self.lockTime = 3 # TODO
+		self.lockTime = 10 # TODO
 		self.t = self.squaringsPerSec * self.lockTime
 
 
@@ -96,21 +96,15 @@ class TimeLockPuzzle:
 			n = p * q
 			puzzle["n"] = n
 
-			# Generate random `a' and add it to the puzzle.
-			a = random.randint(1, n)
-			puzzle["a"] = a
-
 			# Use phi_n as a shortcut to ``encrypt'' the message.
 			phi_n = (p - 1) * (q - 1)
 			e = pow(2, self.t, phi_n)
-			b = pow(a, e, n)
-			Cm = (int(message.encode("hex"), 16) + b) % n
-			puzzle["Cm"] = Cm
+			b = pow(self.a, e, n)
+			Ck = (int(message.encode("hex"), 16) + b) % n
+			puzzle["Ck"] = Ck
 
 			# Make sure that the puzzle is always of the same size.
-			if len(dump(puzzle["n"])) == 64 and \
-				len(dump(puzzle["a"])) == 64 and \
-				len(dump(puzzle["Cm"])) == 64:
+			if len(dump(puzzle["n"])) == 64 and len(dump(puzzle["Ck"])) == 64:
 				break
 
 		return puzzle
@@ -119,18 +113,17 @@ class TimeLockPuzzle:
 	def solvePuzzle( self, puzzle ):
 		"""Solves the time-lock puzzle and returns the decrypted message."""
 
-		assert len(puzzle.items()) == 3
+		assert len(puzzle.items()) == 2
 
-		n, a, Cm = puzzle["n"], puzzle["a"], puzzle["Cm"]
+		n, Ck = puzzle["n"], puzzle["Ck"]
 
 		# Note that there are faster ways to do modular squaring, such as a
 		# pure C implementation or FPGAs!
-		b = pow(gmpy.mpz(a), pow(2, self.t), n)
+		b = pow(gmpy.mpz(self.a), pow(2, self.t), n)
 
-		# Extract the message.
-		M = (Cm - b) % n
+		masterKey = (Ck - b) % n
 
-		return dump(M)
+		return dump(masterKey)
 
 # Alias class name in order to provide a more intuitive API.
 new = TimeLockPuzzle

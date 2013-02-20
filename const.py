@@ -10,13 +10,13 @@ MASTER_SECRET_SIZE = 32
 # The maximum padding length to be appended to the puzzle.
 MAX_PADDING_LENGTH = 4096
 
-# Length of the puzzle (in bytes). The client needs to know the size to know
-# when to start extracting the puzzle.
-PUZZLE_LENGTH = 192
+# Length of the time-lock puzzle (consisting of `n' and `Ck') in bytes.
+PUZZLE_LENGTH = 128
 
 # The length of the puzzle's modulus `n' in bits.
 PUZZLE_MODULUS_LENGTH = 512
 
+# Length of the magic values in bytes.
 MAGIC_LENGTH = 32
 
 # States which are used for the protocol state machine.
