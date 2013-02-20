@@ -14,6 +14,7 @@ not be decrypted before a given time period.
 import os
 import sys
 import gmpy
+import math
 import random
 import pickle
 import struct
@@ -129,6 +130,9 @@ if __name__ == '__main__':
 	tl = TimeLockPuzzle()
 
 	puzzle = pickle.load(sys.stdin)
+	assert isinstance(puzzle["n"], long) and isinstance(puzzle["Ck"], long)
+	assert int(math.log(puzzle["n"], 2)) <= const.PUZZLE_MODULUS_LENGTH
+	assert int(math.log(puzzle["Ck"], 2)) <= const.PUZZLE_MODULUS_LENGTH
 
 	# Inform calling process about solved puzzle by writing to stdout.
 	print tl.solvePuzzle(puzzle)
