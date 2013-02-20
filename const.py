@@ -14,6 +14,9 @@ MAX_PADDING_LENGTH = 4096
 # when to start extracting the puzzle.
 PUZZLE_LENGTH = 192
 
+# The length of the puzzle's modulus `n' in bits.
+PUZZLE_MODULUS_LENGTH = 512
+
 MAGIC_LENGTH = 32
 
 # States which are used for the protocol state machine.

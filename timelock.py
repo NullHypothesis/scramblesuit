@@ -36,7 +36,8 @@ def dump( n ):
 def extractPuzzleFromBlurb( blurb ):
 	"""Extracts and returns a time-lock puzzle out of the given blurb."""
 
-	assert(len(blurb) == 192)
+	assert len(blurb) == const.PUZZLE_LENGTH
+	assert isinstance(blurb, str)
 
 	blurb = blurb.encode('hex')
 
@@ -52,10 +53,11 @@ def getPuzzle( masterSecret ):
 	"""Generates the time-lock puzzle for the client to solve. This will
 	yield the symmetric session key."""
 
+	assert len(masterSecret) == const.MASTER_SECRET_SIZE
+
 	# Create puzzle which ``locks'' the shared session key.
 	riddler = TimeLockPuzzle()
-	puzzle = riddler.generatePuzzle(const.MASTER_KEY_PREFIX + \
-		masterSecret)
+	puzzle = riddler.generatePuzzle(const.MASTER_KEY_PREFIX + masterSecret)
 
 	# Convert base 10 numbers to raw strings.
 	rawPuzzle = bytearray()
@@ -80,8 +82,10 @@ class TimeLockPuzzle:
 	# (in bits) should be small to not waste too many of the bridge's CPU
 	# cycles but still large enough to be significantly harder to factor
 	# than the puzzle to solve. Otherwise it would become the weakest link.
-	def generatePuzzle( self, message, modulus=512):
+	def generatePuzzle( self, message, modulus=const.PUZZLE_MODULUS_LENGTH):
 		"""Generates and returns the time-lock puzzle."""
+
+		assert (len(message) * 8) < const.PUZZLE_MODULUS_LENGTH
 
 		puzzle = {}
 
@@ -114,6 +118,8 @@ class TimeLockPuzzle:
 
 	def solvePuzzle( self, puzzle ):
 		"""Solves the time-lock puzzle and returns the decrypted message."""
+
+		assert len(puzzle.items()) == 3
 
 		n, a, Cm = puzzle["n"], puzzle["a"], puzzle["Cm"]
 
