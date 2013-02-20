@@ -147,16 +147,16 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.circuit.downstream.transport.writeSomeData(noise)
 
 
-	def _deriveSecrets( self, masterSecret ):
+	def _deriveSecrets( self, masterKey ):
 		"""Derives session keys (AES keys, counter nonces, HMAC keys and magic
 		values) from the given master secret. All key material is derived using
 		HKDF-SHA256."""
 
-		log.debug("Master secret: 0x%s." % masterSecret.encode('hex'))
+		log.debug("Master key: 0x%s." % masterKey.encode('hex'))
 
 		# We need key material for two magic values, symmetric keys, nonces and
 		# HMACs. All of them are 32 bytes in size.
-		hkdf = mycrypto.HKDF_SHA256(masterSecret, "", 32 * 8)
+		hkdf = mycrypto.HKDF_SHA256(masterKey, "", 32 * 8)
 		okm = hkdf.expand()
 
 		# Set the symmetric AES keys.
@@ -220,15 +220,16 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Only the server is generating and transmitting a puzzle.
 		if self.weAreServer:
 
-			# Generate master secret and derive client -and server secret.
-			masterSecret = mycrypto.strong_random(const.MASTER_SECRET_SIZE)
-			self._deriveSecrets(masterSecret)
+			# Generate master key and derive client -and server key.
+			masterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
+			self._deriveSecrets(masterKey)
 
 			# Append random padding to obfuscate length and transmit blurb.
 			padding = mycrypto.weak_random(random.randint(0, \
 					const.MAX_PADDING_LENGTH))
 			log.debug("Sending puzzle with %d-byte of padding." % len(padding))
-			circuit.downstream.transport.writeSomeData(timelock.getPuzzle(masterSecret) + padding)
+			circuit.downstream.transport.writeSomeData( \
+				timelock.generateRawPuzzle(masterKey) + padding)
 
 			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 			self.state = const.ST_WAIT_FOR_MAGIC
@@ -241,22 +242,22 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 
 
-	def decryptedPuzzleCallback( self, sharedSecret ):
+	def decryptedPuzzleCallback( self, masterKey ):
 		"""This method is invoked as soon as the puzzle is unlocked. The
-		argument `sharedSecret' is the content of the unlocked puzzle."""
+		argument `masterKey' is the content of the unlocked puzzle."""
 
 		log.debug("Callback invoked after solved puzzle.")
 
 		# Sanity check to verify that we solved a real puzzle.
-		if not const.MASTER_KEY_PREFIX in sharedSecret:
+		if not const.MASTER_KEY_PREFIX in masterKey:
 			log.critical("No MASTER_KEY_PREFIX in puzzle. What did we just " \
 					"solve?")
 			return
 
-		sharedSecret = sharedSecret[len(const.MASTER_KEY_PREFIX):]
+		masterKey = masterKey[len(const.MASTER_KEY_PREFIX):]
 
 		# The session key is known now, so the magic values can be derived.
-		self._deriveSecrets(sharedSecret)
+		self._deriveSecrets(masterKey)
 
 		# Make sure that noise generator has stopped before sending the
 		# magic value.
@@ -381,7 +382,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 					(const.PUZZLE_LENGTH - len(data)))
 			return
 
-		puzzle = timelock.extractPuzzleFromBlurb(data.read(const.PUZZLE_LENGTH))
+		puzzle = timelock.extractPuzzle(data.read(const.PUZZLE_LENGTH))
 		t = timelock.new()
 
 		# Prevents us from mistakenly accepting another puzzle.

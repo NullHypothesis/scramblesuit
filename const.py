@@ -5,7 +5,7 @@
 SESSION_KEY_SIZE = IV_SIZE = 32
 
 # Used to derive other key material, e.g. for AES and HMAC.
-MASTER_SECRET_SIZE = 32
+MASTER_KEY_SIZE = 32
 
 # The maximum padding length to be appended to the puzzle.
 MAX_PADDING_LENGTH = 4096
@@ -15,6 +15,9 @@ PUZZLE_LENGTH = 128
 
 # The length of the puzzle's modulus `n' in bits.
 PUZZLE_MODULUS_LENGTH = 512
+
+# Approximate CPU time in seconds necessary to solve the puzzle.
+PUZZLE_UNLOCK_TIME = 120
 
 # Length of the magic values in bytes.
 MAGIC_LENGTH = 32
@@ -37,7 +40,7 @@ MTU = 1448
 # The prefix before the session key which is ``locked'' inside the time-lock
 # puzzle.  The client looks for this prefix to verify that the puzzle was
 # unlocked successfully.
-MASTER_KEY_PREFIX = "Session key: "
+MASTER_KEY_PREFIX = "MasterKey="
 
 # Used in log messages.
 TRANSPORT_NAME = "ScrambleSuit"
