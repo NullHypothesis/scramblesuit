@@ -144,7 +144,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		noise = mycrypto.weak_random(random.randint(0, 1000))
 		log.debug("Generated %d bytes of noise. Sending now." % len(noise))
-		self.circuit.downstream.write(noise)
+		self.circuit.downstream.transport.writeSomeData(noise)
 
 
 	def _deriveSecrets( self, masterSecret ):
@@ -228,7 +228,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			padding = mycrypto.weak_random(random.randint(0, \
 					const.MAX_PADDING_LENGTH))
 			log.debug("Sending puzzle with %d-byte of padding." % len(padding))
-			circuit.downstream.write(timelock.getPuzzle(masterSecret) + padding)
+			circuit.downstream.transport.writeSomeData(timelock.getPuzzle(masterSecret) + padding)
 
 			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 			self.state = const.ST_WAIT_FOR_MAGIC
@@ -267,7 +267,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Send bridge randomness || magic value.
 		log.debug("Sending magic value to server.")
-		self.circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
+		self.circuit.downstream.transport.writeSomeData(mycrypto.weak_random(random.randint(0, \
 				const.MAX_PADDING_LENGTH)) + self.sendMagic)
 
 		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
@@ -459,7 +459,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.error("Ehm, we should have waited for deferred to return.")
 
 		log.debug("Noise generator stopped. Now sending magic value to remote.")
-		circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
+		circuit.downstream.transport.writeSomeData(mycrypto.weak_random(random.randint(0, \
 				const.MAX_PADDING_LENGTH)) + magic)
 
 
