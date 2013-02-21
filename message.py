@@ -11,11 +11,6 @@ import const
 log = logging.get_obfslogger()
 
 
-# +-----------------+--------------+----------------+---------+---------+
-# |     16-byte     |    2-byte    |     2-byte     |         |         |
-# | HMAC-SHA256-128 | total length | payload length | payload | padding |
-# +-----------------+--------------+----------------+---------+---------+
-
 def createMessages( data ):
 
 	messages = []
@@ -75,14 +70,3 @@ class ProtocolMessage( object ):
 
 	def __len__( self ):
 		return const.HDR_LENGTH + self.totalLen
-
-
-
-def decryptAndVerify( encryptedMsg, crypter, HMACKey ):
-
-	assert(const.HDR_LENGTH <= len(encryptedMsg) <= MTU)
-	assert(crypter and HMACKey)
-
-	hmac = mycrypto.MyHMAC_SHA256_128(HMACKey, encryptedMsg)
-	if hmac != encryptedMsg[:16]:
-		log.debug("hmac check failed.")

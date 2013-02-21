@@ -113,9 +113,7 @@ class TimeLockPuzzle:
 		assert len(puzzle.items()) == 2
 
 		n, Ck = puzzle["n"], puzzle["Ck"]
-
 		b = pow(gmpy.mpz(self.a), pow(2, self.t), n)
-
 		masterKey = (Ck - b) % n
 
 		return dump(masterKey)
