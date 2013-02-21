@@ -11,6 +11,7 @@ from twisted.internet import reactor
 from twisted.application.internet import TimerService
 
 import obfsproxy.transports.base as base
+import obfsproxy.common.serialize as serialize
 import obfsproxy.common.log as logging
 
 import os
@@ -33,13 +34,6 @@ log = logging.get_obfslogger()
 
 def swap( a, b ):
 	return (b, a)
-
-def ntohs( data ):
-	return struct.unpack('!H', data)
-
-
-def htons( data ):
-	return struct.pack('!H', data)
 
 
 class ScrambleSuitDaemon( base.BaseTransport ):
@@ -267,8 +261,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 			# Extract length fields if we don't have them already.
 			if self.totalLen == None:# and self.payloadLen == None:
-				self.totalLen = ntohs(crypter.decrypt(self.recvBuf[16:18]))[0]
-				self.payloadLen = ntohs(crypter.decrypt(self.recvBuf[18:20]))[0]
+				self.totalLen = serialize.ntohs(crypter.decrypt(self.recvBuf[16:18]))
+				self.payloadLen = serialize.ntohs(crypter.decrypt(self.recvBuf[18:20]))
 				log.debug("totalLen=%d, payloadLen=%d" % \
 					(self.totalLen, self.payloadLen))
 

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import obfsproxy.common.log as logging
+import obfsproxy.common.serialize as serialize
 
 import struct
 import mycrypto
@@ -9,12 +10,6 @@ import const
 
 log = logging.get_obfslogger()
 
-def ntohs( data ):
-	return struct.unpack('!H', data)
-
-
-def htons( data ):
-	return struct.pack('!H', data)
 
 # +-----------------+--------------+----------------+---------+---------+
 # |     16-byte     |    2-byte    |     2-byte     |         |         |
@@ -55,8 +50,8 @@ class ProtocolMessage( object ):
 	def encryptAndHMAC( self, crypter, HMACKey ):
 
 		log.debug("Encrypting message body.")
-		encrypted = crypter.encrypt(htons(self.totalLen) + \
-				htons(self.payloadLen) + self.payload + \
+		encrypted = crypter.encrypt(serialize.htons(self.totalLen) + \
+				serialize.htons(self.payloadLen) + self.payload + \
 				(self.totalLen - self.payloadLen) * '\0')
 
 		log.debug("Building HMAC over encrypted body.")
