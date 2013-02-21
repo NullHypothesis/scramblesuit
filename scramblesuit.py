@@ -8,9 +8,7 @@ For more details, check out http://www.cs.kau.se/philwint/scramblesuit/
 
 from twisted.internet import error
 from twisted.internet import reactor
-from twisted.internet import protocol
 from twisted.application.internet import TimerService
-
 
 import obfsproxy.transports.base as base
 import obfsproxy.common.log as logging
@@ -18,7 +16,6 @@ import obfsproxy.common.log as logging
 import os
 import sys
 import random
-import pickle
 import struct
 import string
 import time
@@ -29,7 +26,7 @@ import mycrypto
 import message
 import const
 import packetmorpher
-
+import processprotocol
 
 
 log = logging.get_obfslogger()
@@ -41,62 +38,8 @@ def ntohs( data ):
 	return struct.unpack('!H', data)
 
 
-
 def htons( data ):
 	return struct.pack('!H', data)
-
-
-
-class PayloadScrambler:
-	"""Obfuscates data after encryption to make analysis harder. Also, this
-	should make it possible to evade high-entropy filters."""
-
-	def __init__( self ):
-		log.debug("Initializing payload scrambler.")
-
-
-	def encode( self, data ):
-		"""Encodes the given `data' to be sent over the wire."""
-
-		return data
-
-
-	def decode( self, data ):
-		"""Decodes the given `data' and."""
-
-		return data
-
-
-
-class MyProcessProtocol( protocol.ProcessProtocol ):
-	"""Used to communicate with the time-lock solver which is an external
-	python process. This class is able to send a puzzle to the process and
-	retrieve the result."""
-
-
-	def __init__( self, puzzle, callback ):
-
-		log.debug("Initializing process protocol.")
-		self.puzzle = puzzle
-		self.callback = callback
-
-
-	def connectionMade( self ):
-		"""Writes the pickled time-lock puzzle to the external processes
-		stdin."""
-
-		log.debug("Handing pickled time-lock puzzle to external process.")
-		pickle.dump(self.puzzle, self.transport)
-		self.transport.closeStdin()
-
-
-	def outReceived( self, data ):
-		"""Reads the content of the unlocked puzzle from the external processes
-		stdout. Afterwards, the result is delivered using a callback."""
-
-		log.debug("Read unlocked message from the external process.")
-		self.callback(data.strip())
-
 
 
 class ScrambleSuitDaemon( base.BaseTransport ):
@@ -117,9 +60,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# AES instances for incoming and outgoing data.
 		self.sendCrypter = mycrypto.PayloadCrypter()
 		self.recvCrypter = mycrypto.PayloadCrypter()
-
-		# Payload scrambler to encode encrypted data.
-		self.scrambler = PayloadScrambler()
 
 		# Packet morpher to modify the protocol's packet length distribution.
 		self.pktMorpher = None
@@ -174,8 +114,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.recvHMAC = okm[224:256]
 
 		if self.weAreServer:
-			self.sendHMAC, self.recvHMAC = swap(self.sendHMAC, \
-					self.recvHMAC)
+			self.sendHMAC, self.recvHMAC = swap(self.sendHMAC, self.recvHMAC)
 			self.sendCrypter, self.recvCrypter = swap(self.sendCrypter, \
 					self.recvCrypter)
 			self.sendMagic, self.recvMagic = swap(self.sendMagic, \
@@ -370,9 +309,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Attempting to send %d bytes of data to local." % len(data))
 
 		# Send encrypted and obfuscated data.
-		circuit.upstream.write(
-			self.unpack(self.scrambler.decode(data), self.recvCrypter)
-		)
+		circuit.upstream.write(self.unpack(data, self.recvCrypter))
 
 
 	def _receivePuzzle( self, data ):
@@ -394,7 +331,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Python interpreter.
 		executable = sys.executable
-		pp = MyProcessProtocol(puzzle, self.decryptedPuzzleCallback)
+		pp = processprotocol.MyProcessProtocol(puzzle, \
+				self.decryptedPuzzleCallback)
 
 		# Solve puzzle in dedicated process.
 		log.debug("We are in: %s" % os.getcwd())
