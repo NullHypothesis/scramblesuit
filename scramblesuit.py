@@ -40,9 +40,9 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def __init__( self ):
 
-		log.debug("Initializing %s." % const.TRANSPORT_NAME)
+		log.info("Initializing %s." % const.TRANSPORT_NAME)
 
-		# Initialize the protocol' state machine.
+		# Initialize the protocol's state machine.
 		self.state = const.ST_WAIT_FOR_PUZZLE
 
 		# Magic values to tell when the actual communication begins.
@@ -56,7 +56,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.recvCrypter = mycrypto.PayloadCrypter()
 
 		# Packet morpher to modify the protocol's packet length distribution.
-		self.pktMorpher = None
+		self.pktMorpher =  packetmorpher.PacketMorpher()
 
 		# Inter arrival time morpher to obfuscate inter arrival times.
 		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.01)
@@ -113,10 +113,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 					self.recvCrypter)
 			self.sendMagic, self.recvMagic = swap(self.sendMagic, \
 					self.recvMagic)
-		log.debug("Local HMAC key:  %s" % self.sendHMAC.encode('hex'))
-		log.debug("Remote HMAC key: %s" % self.recvHMAC.encode('hex'))
-
-		self.pktMorpher =  packetmorpher.PacketMorpher()
 
 		log.debug("Magic values derived from session key: send=0x%s, " \
 			"recv=0x%s." % (self.sendMagic.encode('hex'), \
@@ -188,8 +184,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			return
 
 		masterKey = masterKey[len(const.MASTER_KEY_PREFIX):]
+		assert len(masterKey) == const.MASTER_KEY_SIZE
 
-		# The session key is known now, so the magic values can be derived.
 		self._deriveSecrets(masterKey)
 
 		# Make sure that noise generator has stopped before sending the
@@ -201,8 +197,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		# Send bridge randomness || magic value.
 		log.debug("Sending magic value to server.")
-		self.circuit.downstream.transport.writeSomeData(mycrypto.weak_random(random.randint(0, \
-				const.MAX_PADDING_LENGTH)) + self.sendMagic)
+		self.circuit.downstream.transport.writeSomeData(mycrypto.weak_random(
+				random.randint(0, const.MAX_PADDING_LENGTH)) + self.sendMagic)
 
 		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 		self.state = const.ST_WAIT_FOR_MAGIC
@@ -309,7 +305,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 	def _receivePuzzle( self, data ):
 
 		if len(data) < const.PUZZLE_LENGTH:
-			log.debug("Still missing %d bytes of puzzle." % \
+			log.debug("Missing %d bytes of puzzle." % \
 					(const.PUZZLE_LENGTH - len(data)))
 			return
 
