@@ -17,8 +17,10 @@ from Crypto.Hash import SHA256
 
 import mycrypto
 
+# Length of the ticket's name which is used to quickly identify issued tickets.
 NAME_LENGTH = 16
 
+# Length of the IV which is used for AES-CBC.
 IV_LENGTH = 16
 
 # Must be a multiple of 16 bytes due to AES' block size.
@@ -81,7 +83,7 @@ class SessionTicket( object ):
 		aes = AES.new(self.symmTicketKey, mode=AES.MODE_CBC, IV=self.IV)
 		state = repr(self.state)
 		assert (len(state) % AES.block_size) == 0
-		cryptedState = aes.encrypt(repr(self.state))
+		cryptedState = aes.encrypt(state)
 
 		# Authenticate ticket name, IV and the encrypted state.
 		hmac = HMAC.new(self.hmacTicketKey, self.keyName + self.IV + \
