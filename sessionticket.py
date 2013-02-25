@@ -27,12 +27,43 @@ IV_LENGTH = 16
 IDENTIFIER = "ScrambleSuitTicket"
 
 
+def decryptTicket( ticket ):
+	"""Verifies the validity, decrypts and finally returns the given potential
+	ticket as a ProtocolState object. If the ticket is invalid, `None' is
+	returned."""
+
+	assert len(ticket) == const.SESSION_TICKET_LENGTH
+
+	# Did we previously issue this key name?
+	if not (ticket[:16] == keyName):
+		log.debug("Ticket name not found. We are not dealing with a ticket.")
+		return None
+
+	# Verify if HMAC is correct.
+	hmac = HMAC.new(globalHMACKey, ticket[:-32], digestmod=SHA256).digest()
+	if not hmac == ticket[-32:]:
+		log.debug("Invalid HMAC. Probably no ticket.")
+		return None
+
+	# Decrypt ticket to obtain state.
+	aes = AES.new(globalAESKey, mode=AES.MODE_CBC, IV=ticket[16:32])
+	plainTicket = aes.decrypt(ticket[32:-32])
+
+	issueDate = plainTicket[:10]
+	identifier = plainTicket[10:28]
+	if not (identifier == IDENTIFIER):
+		log.error("Invalid identifier. This could be a bug.")
+		return None
+	masterKey = plainTicket[28:44]
+	return ProtocolState(masterKey, issueDate)
+
+
 class ProtocolState( object ):
 	"""Describes the protocol state of a ScrambleSuit server which is part of a
 	session ticket. The state can be used to bootstrap a ScrambleSuit session
 	without the client unlocking the puzzle."""
 
-	def __init__( self, masterKey ):
+	def __init__( self, masterKey, issueDate=int(time.time()) ):
 		self.identifier = IDENTIFIER
 		#self.protocolVersion = None
 		self.masterKey = masterKey
@@ -40,6 +71,19 @@ class ProtocolState( object ):
 		self.issueDate = None
 		# Pad to multiple of 16 bytes due to AES' block size.
 		self.pad = "\0\0\0\0"
+
+
+	def isValid( self ):
+		"""Returns `True' if the protocol state is valid, i.e., if the life time
+		has not expired yet. Otherwise, `False' is returned."""
+
+		assert issueDate
+		now = int(time.time())
+
+		if (now - self.issueDate) > const.SESSION_TICKET_LIFETIME:
+			return False
+
+		return True
 
 
 	def __repr__( self ):
