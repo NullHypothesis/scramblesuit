@@ -29,10 +29,11 @@ PUZZLE_UNLOCK_TIME = 120
 MAGIC_LENGTH = 32
 
 # States which are used for the protocol state machine.
-ST_WAIT_FOR_PUZZLE = 0
-ST_SOLVING_PUZZLE = 1
-ST_WAIT_FOR_MAGIC = 2
-ST_CONNECTED = 3
+ST_WAIT_FOR_TICKET = 0
+ST_WAIT_FOR_PUZZLE = 1
+ST_SOLVING_PUZZLE = 2
+ST_WAIT_FOR_MAGIC = 3
+ST_CONNECTED = 4
 
 # Length of ScrambleSuit's header in bytes.
 HDR_LENGTH = 16 + 2 + 2
@@ -42,6 +43,12 @@ HMAC_LENGTH = 16
 
 # Length of ScrambleSuit's MTU in bytes.
 MTU = 1460
+
+# Length of a session ticket in bytes.
+SESSION_TICKET_LENGTH = 112
+
+# Life time of session tickets in hours.
+SESSION_TICKET_LIFETIME = 24 * 7
 
 # The prefix prepended to the master key which is locked inside the time-lock
 # puzzle. The client looks for this prefix to verify that the puzzle was
