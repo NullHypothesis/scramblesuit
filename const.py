@@ -35,6 +35,12 @@ ST_SOLVING_PUZZLE = 2
 ST_WAIT_FOR_MAGIC = 3
 ST_CONNECTED = 4
 
+# FIXME - Directory where long-lived information is stored.
+DATA_DIRECTORY = "/tmp/"
+
+# File which holds our session ticket.
+TICKET_FILE = "session_ticket.bin"
+
 # Length of ScrambleSuit's header in bytes.
 HDR_LENGTH = 16 + 2 + 2
 
@@ -45,7 +51,7 @@ HMAC_LENGTH = 16
 MTU = 1460
 
 # Length of a session ticket in bytes.
-SESSION_TICKET_LENGTH = 112
+TICKET_LENGTH = 112
 
 # Life time of session tickets in hours.
 SESSION_TICKET_LIFETIME = 24 * 7
