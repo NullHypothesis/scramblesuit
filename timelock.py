@@ -19,20 +19,11 @@ import time
 import random
 import pickle
 import struct
+import util
 from Crypto.Util import number
 from Crypto.Cipher import ARC4
 
 import const
-
-
-def dump( n ):
-	"""Converts the given number to a byte string ready to be sent over the
-	wire."""
-
-	s = '%x' % n
-	if len(s) & 1:
-		s = '0' + s
-	return s.decode('hex')
 
 
 def stressTest( seconds ):
@@ -78,7 +69,7 @@ def generateRawPuzzle( masterKey ):
 
 	# Convert decimal numbers to raw strings.
 	rawPuzzle = bytearray()
-	rawPuzzle = [dump(x) for x in [puzzle["n"], puzzle["Ck"]]]
+	rawPuzzle = [util.dump(x) for x in [puzzle["n"], puzzle["Ck"]]]
 
 	# Return single concatenated string.
 	return "".join(rawPuzzle)
@@ -121,8 +112,8 @@ class TimeLockPuzzle:
 			puzzle["Ck"] = Ck
 
 			# Make sure that the puzzle is always of the same size.
-			if len(dump(puzzle["n"])) == \
-					len(dump(puzzle["Ck"])) == (modulus / 8):
+			if len(util.dump(puzzle["n"])) == \
+					len(util.dump(puzzle["Ck"])) == (modulus / 8):
 				return puzzle
 
 
@@ -136,7 +127,7 @@ class TimeLockPuzzle:
 		b = pow(gmpy.mpz(self.a), pow(2, self.t), n)
 		masterKey = (Ck - b) % n
 
-		return dump(masterKey)
+		return util.dump(masterKey)
 
 
 # Alias class name in order to provide a more intuitive API.
