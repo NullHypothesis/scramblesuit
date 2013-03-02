@@ -15,6 +15,7 @@ import os
 import sys
 import gmpy
 import math
+import time
 import random
 import pickle
 import struct
@@ -32,6 +33,21 @@ def dump( n ):
 	if len(s) & 1:
 		s = '0' + s
 	return s.decode('hex')
+
+
+def stressTest( seconds ):
+	"""Tests how many puzzles can be generated within the given amount of
+	seconds. The number is returned."""
+
+	start = time.time()
+	r = os.urandom(16)
+	count = 0
+
+	while (time.time() - start) < seconds:
+		t = TimeLockPuzzle()
+		puzzle = t.generatePuzzle(r)
+		count += 1
+	return count
 
 
 def extractPuzzle( data ):
@@ -85,6 +101,9 @@ class TimeLockPuzzle:
 
 		assert (len(message) * 8) < const.PUZZLE_MODULUS_LENGTH
 
+		if (modulus % 8) != 0:
+			raise ValueError("Modulus must be divisible by 8.")
+
 		puzzle = {}
 
 		while True:
@@ -102,7 +121,8 @@ class TimeLockPuzzle:
 			puzzle["Ck"] = Ck
 
 			# Make sure that the puzzle is always of the same size.
-			if len(dump(puzzle["n"])) == 64 and len(dump(puzzle["Ck"])) == 64:
+			if len(dump(puzzle["n"])) == \
+					len(dump(puzzle["Ck"])) == (modulus / 8):
 				return puzzle
 
 
