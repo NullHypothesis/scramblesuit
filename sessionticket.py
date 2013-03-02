@@ -15,7 +15,11 @@ from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA256
 
+import obfsproxy.common.log as logging
+
 import mycrypto
+
+log = logging.get_obfslogger()
 
 # Length of the ticket's name which is used to quickly identify issued tickets.
 NAME_LENGTH = 16
@@ -26,36 +30,42 @@ IV_LENGTH = 16
 # Must be a multiple of 16 bytes due to AES' block size.
 IDENTIFIER = "ScrambleSuitTicket"
 
+# +------------+------------------+--------------+
+# | 16-byte IV | 64-byte E(state) | 32-byte HMAC |
+# +------------+------------------+--------------+
 
 def decryptTicket( ticket ):
 	"""Verifies the validity, decrypts and finally returns the given potential
 	ticket as a ProtocolState object. If the ticket is invalid, `None' is
 	returned."""
 
-	assert len(ticket) == const.SESSION_TICKET_LENGTH
+	assert len(ticket) == const.TICKET_LENGTH
 
-	# Did we previously issue this key name?
-	if not (ticket[:16] == keyName):
-		log.debug("Ticket name not found. We are not dealing with a ticket.")
-		return None
+	log.debug("Attempting to verify and decrypt %d-byte ticket." % len(ticket))
+	log.debug("Ticket: %s" % ticket.encode('hex'))
+
+	globalHMACKey = "A"*32
+	globalAESKey = "A"*16
 
 	# Verify if HMAC is correct.
-	hmac = HMAC.new(globalHMACKey, ticket[:-32], digestmod=SHA256).digest()
-	if not hmac == ticket[-32:]:
+	hmac = HMAC.new(globalHMACKey, ticket[0:80], digestmod=SHA256).digest()
+	if hmac != ticket[80:const.TICKET_LENGTH]:
 		log.debug("Invalid HMAC. Probably no ticket.")
 		return None
 
 	# Decrypt ticket to obtain state.
-	aes = AES.new(globalAESKey, mode=AES.MODE_CBC, IV=ticket[16:32])
-	plainTicket = aes.decrypt(ticket[32:-32])
+	aes = AES.new(globalAESKey, mode=AES.MODE_CBC, IV=ticket[0:16])
+	plainTicket = aes.decrypt(ticket[16:80])
 
-	issueDate = plainTicket[:10]
+	issueDate = plainTicket[0:10]
 	identifier = plainTicket[10:28]
+	masterKey = plainTicket[28:60]
+
 	if not (identifier == IDENTIFIER):
-		log.error("Invalid identifier. This could be a bug.")
+		log.error("Valid HMAC but invalid identifier. This could be a bug.")
 		return None
-	masterKey = plainTicket[28:44]
-	return ProtocolState(masterKey, issueDate)
+
+	return ProtocolState(masterKey, int(issueDate.encode('hex'), 16))
 
 
 class ProtocolState( object ):
@@ -68,7 +78,7 @@ class ProtocolState( object ):
 		#self.protocolVersion = None
 		self.masterKey = masterKey
 		#self.clientIdentity = None
-		self.issueDate = None
+		self.issueDate = issueDate
 		# Pad to multiple of 16 bytes due to AES' block size.
 		self.pad = "\0\0\0\0"
 
@@ -77,10 +87,11 @@ class ProtocolState( object ):
 		"""Returns `True' if the protocol state is valid, i.e., if the life time
 		has not expired yet. Otherwise, `False' is returned."""
 
-		assert issueDate
+		assert self.issueDate
 		now = int(time.time())
 
 		if (now - self.issueDate) > const.SESSION_TICKET_LIFETIME:
+			log.debug("Ticket is not valid anymore.")
 			return False
 
 		return True
@@ -100,10 +111,12 @@ class SessionTicket( object ):
 		parameter `symmTicketKey' is used to encrypt the ticket and
 		`hmacTicketKey' is used to authenticate the ticket when issued."""
 
-		assert len(masterKey) == len(symmTicketKey) == len(hmacTicketKey) == 16
+		assert len(masterKey) == const.MASTER_KEY_SIZE
+		assert len(symmTicketKey) == 16
+		assert len(hmacTicketKey) == 32
 
 		# The random name is used to recognize previously issued tickets.
-		self.keyName = mycrypto.weak_random(NAME_LENGTH)
+		#self.keyName = mycrypto.weak_random(NAME_LENGTH)
 
 		# Initialization vector for AES-CBC.
 		self.IV = mycrypto.strong_random(IV_LENGTH)
@@ -130,12 +143,15 @@ class SessionTicket( object ):
 		cryptedState = aes.encrypt(state)
 
 		# Authenticate ticket name, IV and the encrypted state.
-		hmac = HMAC.new(self.hmacTicketKey, self.keyName + self.IV + \
+		hmac = HMAC.new(self.hmacTicketKey, self.IV + \
 				cryptedState, digestmod=SHA256).digest()
 
-		ticket = self.keyName + self.IV + cryptedState + hmac
+		ticket = self.IV + cryptedState + hmac
 
-		return (self.keyName, ticket)
+		log.debug("Returning %d-byte ticket." % (len(self.IV) +
+			len(cryptedState) + len(hmac)))
+
+		return ticket
 
 
 # Alias class name in order to provide a more intuitive API.
