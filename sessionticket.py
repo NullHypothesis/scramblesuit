@@ -105,7 +105,6 @@ def decryptTicket( ticket ):
 	global creationTime
 
 	log.debug("Attempting to verify and decrypt %d-byte ticket." % len(ticket))
-	log.debug("Ticket: %s" % ticket.encode('hex'))
 
 	checkKeys()
 

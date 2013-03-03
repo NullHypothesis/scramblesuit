@@ -191,7 +191,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				stop = True
 
 			if not stop:
-				log.debug("Ticket: %s" % ticket.encode('hex'))
 				self._deriveSecrets(masterKey)
 				padding = mycrypto.weak_random(random.randint(0, \
 						const.MAX_PADDING_LENGTH))
@@ -277,8 +276,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def unpack( self, data, crypter ):
 
-		log.debug("Getting %d bytes to unpack." % len(data))
-
 		# Input buffer which is not yet processed and forwarded.
 		self.recvBuf += data
 		fwdBuf = ""
@@ -290,7 +287,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			if self.totalLen == None:# and self.payloadLen == None:
 				self.totalLen = serialize.ntohs(crypter.decrypt(self.recvBuf[16:18]))
 				self.payloadLen = serialize.ntohs(crypter.decrypt(self.recvBuf[18:20]))
-				log.debug("totalLen=%d, payloadLen=%d" % \
+				log.debug("Message header: totalLen=%d, payloadLen=%d." % \
 					(self.totalLen, self.payloadLen))
 
 			# Current protocol message not fully received yet.
@@ -303,10 +300,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				rcvdHMAC = self.recvBuf[:const.HMAC_LENGTH]
 				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, self.recvBuf[const.HMAC_LENGTH:(self.totalLen+const.HDR_LENGTH)])
 				if rcvdHMAC != vrfyHMAC:
-					log.debug("WARNING: HMACs (%s / %s) differ!" % \
-						(rcvdHMAC.encode('hex'), vrfyHMAC.encode('hex')))
-				else:
-					log.debug("HMAC of message successfully verified.")
+					log.error("Protocol message's HMAC is invalid!")
 
 				fwdBuf += crypter.decrypt(self.recvBuf[const.HDR_LENGTH: \
 						(self.totalLen+const.HDR_LENGTH)])[:self.payloadLen]
@@ -327,7 +321,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if len(data) == 0 or not data:
 			return
 
-		log.debug("Attempting to send %d bytes of data to local." % len(data))
+		log.debug("Processing %d bytes of incoming data." % len(data))
 
 		# Send encrypted and obfuscated data.
 		circuit.upstream.write(self.unpack(data, self.recvCrypter))
@@ -417,6 +411,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				len(self.sendBuf))
 			self.sendRemote(circuit, self.sendBuf)
 			self.sendBuf = ""
+		else:
+			log.debug("Empty buffer: no data to flush.")
 
 
 	def _receiveClientMagic( self, data, circuit ):
@@ -490,8 +486,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		ticket = sessionticket.new(nextMasterKey)
 		rawTicket = ticket.issue()
-
-		log.debug("Ticket: %s" % rawTicket.encode('hex'))
 
 		return rawTicket, nextMasterKey
 

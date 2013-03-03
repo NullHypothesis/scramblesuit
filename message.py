@@ -44,12 +44,10 @@ class ProtocolMessage( object ):
 
 	def encryptAndHMAC( self, crypter, HMACKey ):
 
-		log.debug("Encrypting message body.")
 		encrypted = crypter.encrypt(serialize.htons(self.totalLen) + \
 				serialize.htons(self.payloadLen) + self.payload + \
 				(self.totalLen - self.payloadLen) * '\0')
 
-		log.debug("Building HMAC over encrypted body.")
 		hmac = mycrypto.MyHMAC_SHA256_128(HMACKey, encrypted)
 
 		return hmac + encrypted
