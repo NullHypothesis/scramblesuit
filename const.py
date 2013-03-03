@@ -38,6 +38,12 @@ ST_CONNECTED = 4
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"
 
+# Key rotation time for session ticket keys in hours.
+KEY_ROTATION_TIME = 24 * 7
+
+# File where session ticket keys are stored.
+KEY_STORE = "ticket_keys.bin"
+
 # File which holds our session ticket.
 TICKET_FILE = "session_ticket.bin"
 

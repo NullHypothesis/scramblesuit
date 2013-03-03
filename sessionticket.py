@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Implements a variant of session tickets as proposed for TLS in RFC 5077:
+Implements a subset of session tickets as proposed for TLS in RFC 5077:
 https://tools.ietf.org/html/rfc5077
 """
 
@@ -10,6 +10,8 @@ import os
 import random
 import time
 import const
+import sys
+import pickle
 
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
@@ -27,12 +29,69 @@ NAME_LENGTH = 16
 # Length of the IV which is used for AES-CBC.
 IV_LENGTH = 16
 
+HMAC_KEY_LENGTH = 32
+AES_KEY_LENGTH = 16
+
 # Must be a multiple of 16 bytes due to AES' block size.
 IDENTIFIER = "ScrambleSuitTicket"
 
 # +------------+------------------+--------------+
 # | 16-byte IV | 64-byte E(state) | 32-byte HMAC |
 # +------------+------------------+--------------+
+
+
+HMACKey = None
+AESKey = None
+creationTime = None
+
+
+def rotateKeys( ):
+
+	log.debug("Rotating session ticket keys.")
+
+	global HMACKey
+	global AESKey
+	global creationTime
+
+	HMACKey = mycrypto.strong_random(HMAC_KEY_LENGTH)
+	AESKey = mycrypto.strong_random(AES_KEY_LENGTH)
+	creationTime = int(time.time())
+
+	try:
+		with open(const.DATA_DIRECTORY + const.KEY_STORE, "wb") as fd:
+			pickle.dump([creationTime, HMACKey, AESKey], fd)
+			fd.close()
+	except IOError as e:
+		log.error("Error opening ticket key file: %s." % e)
+
+
+def loadKeys( ):
+
+	log.debug("Reading session ticket keys from file.")
+
+	global HMACKey
+	global AESKey
+	global creationTime
+
+	if not os.path.exists(const.DATA_DIRECTORY + const.KEY_STORE):
+		rotateKeys()
+		return
+
+	try:
+		with open(const.DATA_DIRECTORY + const.KEY_STORE, "rb") as fd:
+			creationTime, HMACKey, AESKey = pickle.load(fd)
+			fd.close()
+	except IOError as e:
+		log.error("Error opening ticket key file: %s." % e)
+
+
+def checkKeys( ):
+	if (HMACKey is None) or (AESKey is None):
+		loadKeys()
+
+	if (int(time.time()) - creationTime) > const.KEY_ROTATION_TIME:
+		rotateKeys()
+
 
 def decryptTicket( ticket ):
 	"""Verifies the validity, decrypts and finally returns the given potential
@@ -41,20 +100,23 @@ def decryptTicket( ticket ):
 
 	assert len(ticket) == const.TICKET_LENGTH
 
+	global HMACKey
+	global AESKey
+	global creationTime
+
 	log.debug("Attempting to verify and decrypt %d-byte ticket." % len(ticket))
 	log.debug("Ticket: %s" % ticket.encode('hex'))
 
-	globalHMACKey = "A"*32
-	globalAESKey = "A"*16
+	checkKeys()
 
 	# Verify if HMAC is correct.
-	hmac = HMAC.new(globalHMACKey, ticket[0:80], digestmod=SHA256).digest()
+	hmac = HMAC.new(HMACKey, ticket[0:80], digestmod=SHA256).digest()
 	if hmac != ticket[80:const.TICKET_LENGTH]:
 		log.debug("Invalid HMAC. Probably no ticket.")
 		return None
 
 	# Decrypt ticket to obtain state.
-	aes = AES.new(globalAESKey, mode=AES.MODE_CBC, IV=ticket[0:16])
+	aes = AES.new(AESKey, mode=AES.MODE_CBC, IV=ticket[0:16])
 	plainTicket = aes.decrypt(ticket[16:80])
 
 	issueDate = plainTicket[0:10]
@@ -106,14 +168,14 @@ class SessionTicket( object ):
 	"""Encapsulates a session ticket which can be used by the client to gain
 	access to a ScrambleSuit server without solving the served puzzle."""
 
-	def __init__( self, masterKey, symmTicketKey, hmacTicketKey ):
+	def __init__( self, masterKey ):
 		"""Initialize a new session ticket which contains `masterKey'. The
 		parameter `symmTicketKey' is used to encrypt the ticket and
 		`hmacTicketKey' is used to authenticate the ticket when issued."""
 
 		assert len(masterKey) == const.MASTER_KEY_SIZE
-		assert len(symmTicketKey) == 16
-		assert len(hmacTicketKey) == 32
+
+		checkKeys()
 
 		# The random name is used to recognize previously issued tickets.
 		#self.keyName = mycrypto.weak_random(NAME_LENGTH)
@@ -125,8 +187,8 @@ class SessionTicket( object ):
 		self.state = ProtocolState(masterKey)
 
 		# AES and HMAC key to protect the ticket.
-		self.symmTicketKey = symmTicketKey
-		self.hmacTicketKey = hmacTicketKey
+		self.symmTicketKey = AESKey
+		self.hmacTicketKey = HMACKey
 
 
 	def issue( self ):

@@ -488,7 +488,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Generating new session ticket and master key.")
 		nextMasterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
 
-		ticket = sessionticket.new(nextMasterKey, "A"*16, "A"*32)
+		ticket = sessionticket.new(nextMasterKey)
 		rawTicket = ticket.issue()
 
 		log.debug("Ticket: %s" % rawTicket.encode('hex'))
