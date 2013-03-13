@@ -438,6 +438,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				const.MASTER_KEY_SIZE):
 			return
 
+		# FIXME - only solve puzzle if there was no magic in MAX_PADDING data.
+
 		# If we don't find the expected magic, solve the cached puzzle.
 		if not self._magicInData(data, self.recvMagic):
 			log.debug("Ticket probably not accepted. Solving the puzzle, then.")
