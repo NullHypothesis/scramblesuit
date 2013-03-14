@@ -38,8 +38,8 @@ ST_CONNECTED = 4
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"
 
-# Key rotation time for session ticket keys in hours.
-KEY_ROTATION_TIME = 24 * 7
+# Key rotation time for session ticket keys in seconds.
+KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 
 # File where session ticket keys are stored.
 KEY_STORE = "ticket_keys.bin"
@@ -59,8 +59,8 @@ MTU = 1460
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
 
-# Life time of session tickets in hours.
-SESSION_TICKET_LIFETIME = 24 * 7
+# Life time of session tickets in seconds.
+SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
 
 # The prefix prepended to the master key which is locked inside the time-lock
 # puzzle. The client looks for this prefix to verify that the puzzle was
