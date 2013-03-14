@@ -71,6 +71,9 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Timer service to generate garbage data while puzzle is being solved.
 		self.ts = None
 
+		# When the client magic was sent to guess if the ticket was accepted.
+		self.magicSent = None
+
 		# `True' if the client used a session ticket, `False' otherwise.
 		self.redeemedTicket = None
 
@@ -191,6 +194,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				stop = True
 
 			if not stop:
+				log.debug("Trying to redeem session ticket: 0x%s..." % \
+						ticket.encode('hex')[:10])
 				self._deriveSecrets(masterKey)
 				padding = mycrypto.weak_random(random.randint(0, \
 						const.MAX_PADDING_LENGTH))
@@ -238,7 +243,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 		self.state = const.ST_WAIT_FOR_MAGIC
-		self._flushSendBuffer(self.circuit)
+		#self._flushSendBuffer(self.circuit)
 
 
 	def sendRemote( self, circuit, data ):
@@ -309,7 +314,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				# Protocol message extracted - resetting length fields.
 				self.totalLen = self.payloadLen = None
 
-		log.debug("Flushing %d bytes of data: %s..." % (len(fwdBuf), fwdBuf[:10].encode('hex')))
+		log.debug("Unpacked %d bytes of data: 0x%s..." % \
+				(len(fwdBuf), fwdBuf[:10].encode('hex')))
 		return fwdBuf
 
 
@@ -342,7 +348,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			self.cachedPuzzle = puzzle
 
 			self._sendMagicValue(circuit, self.sendMagic)
-			self._flushSendBuffer(circuit)
+			self.magicSent = time.time()
+			#self._flushSendBuffer(circuit)
 
 			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 			self.state = const.ST_WAIT_FOR_MAGIC
@@ -377,7 +384,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			return
 
 		potentialTicket = data.read(const.TICKET_LENGTH)
-		log.debug("Read a potential session ticket.")
+		log.debug("Read a potential session ticket: 0x%s..." % \
+				potentialTicket.encode('hex')[:10])
 
 		ticket = sessionticket.decryptTicket(potentialTicket)
 		if ticket != None and ticket.isValid():
@@ -433,24 +441,23 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def _receiveServerMagic( self, data, circuit ):
 
-		# FIXME - code duplication in _receiveClientMagic()
-		if len(data) < (const.MAGIC_LENGTH + const.TICKET_LENGTH + \
-				const.MASTER_KEY_SIZE):
-			return
 
-		# FIXME - only solve puzzle if there was no magic in MAX_PADDING data.
+		if self._magicInData(data, self.recvMagic):
+			# FIXME - what to do in this situation?
+			assert len(data) >= const.TICKET_LENGTH
+			self._receiveEncryptedTicket(data)
 
-		# If we don't find the expected magic, solve the cached puzzle.
-		if not self._magicInData(data, self.recvMagic):
+			log.debug("Switching to state ST_CONNECTED.")
+			self.state = const.ST_CONNECTED
+
+			self._flushSendBuffer(circuit)
+			self.sendLocal(circuit, data.read())
+
+		elif (time.time() - self.magicSent) >= 5:
 			log.debug("Ticket probably not accepted. Solving the puzzle, then.")
 			self._solvePuzzleInProcess(self.cachedPuzzle)
+		else:
 			return
-
-		self._receiveEncryptedTicket(data)
-
-		log.debug("Switching to state ST_CONNECTED.")
-		self.state = const.ST_CONNECTED
-		self.sendLocal(circuit, data.read())
 
 
 	def receivedDownstream( self, data, circuit ):
