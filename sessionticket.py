@@ -66,6 +66,7 @@ def rotateKeys( ):
 
 
 def loadKeys( ):
+	"""Try to load the AES and HMAC key from the key store."""
 
 	log.debug("Reading session ticket keys from file.")
 
@@ -86,6 +87,9 @@ def loadKeys( ):
 
 
 def checkKeys( ):
+	"""Load the AES and the HMAC key if they are not defined yet. If they are
+	expired, rotate the keys."""
+
 	if (HMACKey is None) or (AESKey is None):
 		loadKeys()
 
