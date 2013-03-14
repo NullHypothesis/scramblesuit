@@ -17,14 +17,21 @@ def createMessages( data ):
 
 	log.debug("Creating protocol messages.")
 
-	while len(data) >= (const.MTU - const.HDR_LENGTH):
-		messages.append(ProtocolMessage(data[:(const.MTU - const.HDR_LENGTH)]))
-		data = data[(const.MTU - const.HDR_LENGTH):]
+	while len(data) >= const.MPU:
+		messages.append(ProtocolMessage(data[:const.MPU]))
+		data = data[const.MPU:]
 
 	messages.append(ProtocolMessage(data))
 
 	return messages
 
+
+def saneLengths( totalLen, payloadLen ):
+
+	def ok( length ):
+		return True if (0 <= length <= const.MPU) else False
+
+	return ok(totalLen) and ok(payloadLen)
 
 
 class ProtocolMessage( object ):
@@ -34,7 +41,7 @@ class ProtocolMessage( object ):
 	def __init__( self, payload="", paddingLen=0 ):
 
 		payloadLen = len(payload)
-		assert((payloadLen + paddingLen) <= (const.MTU - const.HDR_LENGTH))
+		assert((payloadLen + paddingLen) <= (const.MPU))
 
 		self.hmac = ""
 		self.totalLen = payloadLen + paddingLen
@@ -56,7 +63,7 @@ class ProtocolMessage( object ):
 	def addPadding( self, paddingLen ):
 
 		# The padding must not exceed the message size.
-		assert ((self.totalLen + paddingLen) <= (const.MTU - const.HDR_LENGTH))
+		assert ((self.totalLen + paddingLen) <= const.MPU)
 
 		if paddingLen == 0:
 			return

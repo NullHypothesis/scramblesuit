@@ -11,7 +11,7 @@ from twisted.internet import reactor
 from twisted.application.internet import TimerService
 
 import obfsproxy.transports.base as base
-import obfsproxy.common.serialize as serialize
+import obfsproxy.common.serialize as pack
 import obfsproxy.common.log as logging
 
 import os
@@ -279,7 +279,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			circuit.downstream.transport.writeSomeData(blurb)
 
 
-	def unpack( self, data, crypter ):
+	def unpack( self, data, aes ):
 
 		# Input buffer which is not yet processed and forwarded.
 		self.recvBuf += data
@@ -289,25 +289,34 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		while len(self.recvBuf) >= const.HDR_LENGTH:
 
 			# Extract length fields if we don't have them already.
-			if self.totalLen == None:# and self.payloadLen == None:
-				self.totalLen = serialize.ntohs(crypter.decrypt(self.recvBuf[16:18]))
-				self.payloadLen = serialize.ntohs(crypter.decrypt(self.recvBuf[18:20]))
+			if self.totalLen == None:
+				self.totalLen = pack.ntohs(aes.decrypt(self.recvBuf[16:18]))
+				self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
+
+				# Abort immediately if the extracted lengths do not make sense.
+				if not message.saneLengths(self.totalLen, self.payloadLen):
+					raise base.PluggableTransportError("Invalid message " \
+							"length(s): totalLen=%d, payloadLen=%d." % \
+							(self.totalLen, self.payloadLen))
 				log.debug("Message header: totalLen=%d, payloadLen=%d." % \
 					(self.totalLen, self.payloadLen))
 
-			# Current protocol message not fully received yet.
 			if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
-				log.debug("Protocol message not yet fully received.")
 				return fwdBuf
 
-			# Sufficient data -> remove packet from input buffer.
+			# We have a full message; let's extract it.
 			else:
-				rcvdHMAC = self.recvBuf[:const.HMAC_LENGTH]
-				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, self.recvBuf[const.HMAC_LENGTH:(self.totalLen+const.HDR_LENGTH)])
-				if rcvdHMAC != vrfyHMAC:
-					log.error("Protocol message's HMAC is invalid!")
+				log.debug("Extracting fully received protocol message.")
+				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
+				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, \
+						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
+						const.HDR_LENGTH)])
 
-				fwdBuf += crypter.decrypt(self.recvBuf[const.HDR_LENGTH: \
+				# Abort immediately if the HMAC is invalid.
+				if rcvdHMAC != vrfyHMAC:
+					raise base.PluggableTransportError("Invalid HMAC!")
+
+				fwdBuf += aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
 						(self.totalLen+const.HDR_LENGTH)])[:self.payloadLen]
 
 				self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
@@ -441,7 +450,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def _receiveServerMagic( self, data, circuit ):
 
-
 		if self._magicInData(data, self.recvMagic):
 			# FIXME - what to do in this situation?
 			assert len(data) >= const.TICKET_LENGTH
@@ -453,7 +461,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			self._flushSendBuffer(circuit)
 			self.sendLocal(circuit, data.read())
 
-		elif (time.time() - self.magicSent) >= 5:
+		elif self.redeemedTicket and ((time.time() - self.magicSent) >= 5):
 			log.debug("Ticket probably not accepted. Solving the puzzle, then.")
 			self._solvePuzzleInProcess(self.cachedPuzzle)
 		else:

@@ -56,6 +56,9 @@ HMAC_LENGTH = 16
 # Length of ScrambleSuit's MTU in bytes.
 MTU = 1460
 
+# Maximum payload unit of a ScrambleSuit message in bytes.
+MPU = MTU - HDR_LENGTH
+
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
 
