@@ -276,6 +276,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			duration = self.iatMorpher.randomSample()
 			log.debug("Sleeping for %.4f seconds before sending data." % duration)
 			time.sleep(duration)
+			# FIXME - sometimes data is sent out-of-order when writeSomeData()
+			# is called. This does not happen with downstream.write()!
 			circuit.downstream.transport.writeSomeData(blurb)
 
 
