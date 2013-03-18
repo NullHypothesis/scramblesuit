@@ -16,7 +16,7 @@ MASTER_KEY_SIZE = 32
 # The maximum padding length to be appended to the puzzle in bytes.
 MAX_PADDING_LENGTH = 4096
 
-# Length of the time-lock puzzle (consisting of `n' and `Ck') in bytes.
+# Length of the raw time-lock puzzle (consisting of `n' and `Ck') in bytes.
 PUZZLE_LENGTH = 128
 
 # The length of the puzzle's modulus `n' in bits.
@@ -24,6 +24,12 @@ PUZZLE_MODULUS_LENGTH = 512
 
 # Approximate CPU time in seconds necessary to solve the puzzle.
 PUZZLE_UNLOCK_TIME = 120
+
+# Size of random key used to obfuscate a puzzle in bits.
+PUZZLE_OBFUSCATION_KEYSPACE = 7
+
+# Nonce size prepended to encrypted puzzle in bytes.
+PUZZLE_NONCE_LENGTH = 8
 
 # Length of the magic values in bytes.
 MAGIC_LENGTH = 32
