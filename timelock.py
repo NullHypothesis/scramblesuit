@@ -19,11 +19,22 @@ import time
 import random
 import pickle
 import struct
-import util
+
+from Crypto.Util import Counter
 from Crypto.Util import number
-from Crypto.Cipher import ARC4
+from Crypto.Cipher import AES
+from twisted.internet import reactor
+
+import obfsproxy.common.log as logging
 
 import const
+import primes
+import util
+import mycrypto
+import processprotocol
+
+
+log = logging.get_obfslogger()
 
 
 def stressTest( seconds ):
@@ -57,6 +68,7 @@ def extractPuzzle( data ):
 	return puzzle
 
 
+
 def generateRawPuzzle( masterKey ):
 	"""Generates a time-lock puzzle with the given masterKey locked inside.
 	Returns the puzzle as 128-byte string which is ready to be sent over the
@@ -74,6 +86,81 @@ def generateRawPuzzle( masterKey ):
 	# Return single concatenated string.
 	return "".join(rawPuzzle)
 
+
+def looksLikePuzzle( assumedPuzzle ):
+	"""Returns `True' if any of the hard-coded primes is a factor of a given `n'
+	or `False' otherwise."""
+
+	if not (len(util.dump(assumedPuzzle["n"])) == \
+			len(util.dump(assumedPuzzle["Ck"])) == \
+			(const.PUZZLE_MODULUS_LENGTH / 8)):
+		return False
+
+	for prime in primes.primes:
+		if (assumedPuzzle["n"] % prime) == 0:
+			return False
+	return True
+
+
+def encryptPuzzle( rawPuzzle ):
+	"""Encrypts the given `rawPuzzle' with a randomly chosen and small key and
+	returns the encrypted puzzle together with the nonce used for AES-CTR."""
+
+	assert len(rawPuzzle) == const.PUZZLE_LENGTH
+
+	log.debug("Encrypting raw %d-byte puzzle." % len(rawPuzzle))
+
+	nonce = mycrypto.strong_random(const.PUZZLE_NONCE_LENGTH)
+	cntr = Counter.new(128, initial_value=long(nonce.encode('hex'), 16))
+	key = 2**120 + random.randint(0, (2 ** const.PUZZLE_OBFUSCATION_KEYSPACE) - 1)
+	cipher = AES.new(util.dump(key), AES.MODE_CTR, counter=cntr)
+
+	log.debug("Puzzle key=%x, nonce=%s." % (key, nonce.encode('hex')))
+
+	return cipher.encrypt(rawPuzzle), nonce
+
+
+def bruteForcePuzzle( nonce, encryptedPuzzle, callback ):
+	"""Try to obtain the original puzzle by brute-forcing `encryptedPuzzle'
+	using the given `nonce' for AES-CTR. When the original is found, `callback'
+	is called with the locked master key as argument."""
+
+	assert len(nonce) == const.PUZZLE_NONCE_LENGTH
+	assert len(encryptedPuzzle) == const.PUZZLE_LENGTH
+
+	# Try to obtain the puzzle by brute-forcing the n-bit key space.
+	for key in xrange(2 ** const.PUZZLE_OBFUSCATION_KEYSPACE):
+
+		cntr = Counter.new(128, initial_value=long(nonce.encode('hex'), 16))
+		cipher = AES.new(util.dump(2**120 + key), AES.MODE_CTR, counter=cntr)
+		assumedPuzzle = extractPuzzle(cipher.decrypt(encryptedPuzzle))
+
+		# FIXME - terminate still running processes if the puzzle was already
+		# found.
+
+		if looksLikePuzzle(assumedPuzzle):
+			log.debug("Solving puzzle candidate with key=0x100...00%x." % key)
+			solvePuzzleInProcess(assumedPuzzle, callback)
+
+
+def solvePuzzleInProcess( puzzle, callback ):
+
+	log.debug("Attempting to unlock puzzle in dedicated process.")
+
+	def finished( masterKey ):
+		if not const.MASTER_KEY_PREFIX in masterKey:
+			log.debug("Solved a wrong puzzle, oops!")
+			return
+		else:
+			log.debug("Right puzzle. calling back.")
+			callback(masterKey)
+
+	log.debug("We are in: %s" % os.getcwd())
+	pp = processprotocol.MyProcessProtocol(puzzle, finished)
+	reactor.spawnProcess(pp, sys.executable, [sys.executable, 
+		# FIXME - need to use relative paths here.
+		"/home/phw/sw/pyobfsproxy/obfsproxy/transports/timelock.py"], \
+		env=os.environ)
 
 class TimeLockPuzzle:
 	"""Implements time-lock puzzles as proposed by Rivest, Shamir and Wagner in

@@ -16,7 +16,6 @@ class MyProcessProtocol( protocol.ProcessProtocol ):
 
 	def __init__( self, puzzle, callback ):
 
-		log.debug("Initializing process protocol.")
 		self.puzzle = puzzle
 		self.callback = callback
 

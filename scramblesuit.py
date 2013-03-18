@@ -7,7 +7,6 @@ For more details, check out http://www.cs.kau.se/philwint/scramblesuit/
 """
 
 from twisted.internet import error
-from twisted.internet import reactor
 from twisted.application.internet import TimerService
 
 import obfsproxy.transports.base as base
@@ -172,10 +171,11 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			padding = mycrypto.weak_random(random.randint(0, \
 					const.MAX_PADDING_LENGTH))
 			log.debug("Sending puzzle with %d-byte of padding." % len(padding))
-			p = timelock.generateRawPuzzle(masterKey)
-			log.debug("Puzzle: %s" % p.encode('hex'))
-			circuit.downstream.transport.writeSomeData( \
-				timelock.generateRawPuzzle(masterKey) + padding)
+
+			puzzle, nonce = timelock.encryptPuzzle( \
+					timelock.generateRawPuzzle(masterKey))
+
+			circuit.downstream.transport.writeSomeData(nonce + puzzle + padding)
 
 			log.debug("Switching to state ST_WAIT_FOR_TICKET.")
 			self.state = const.ST_WAIT_FOR_TICKET
@@ -208,7 +208,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.circuit = circuit
 		self.ts = TimerService(0.1, self.generateNoise)
 		self.ts.startService()
-
 
 
 	def decryptedPuzzleCallback( self, masterKey ):
@@ -346,12 +345,13 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def _receivePuzzle( self, data, circuit ):
 
-		if len(data) < const.PUZZLE_LENGTH:
-			log.debug("Missing %d bytes of puzzle." % \
-					(const.PUZZLE_LENGTH - len(data)))
+		if len(data) < (const.PUZZLE_LENGTH + const.PUZZLE_NONCE_LENGTH):
+			log.debug("Puzzle not yet fully received.")
 			return
 
-		puzzle = timelock.extractPuzzle(data.read(const.PUZZLE_LENGTH))
+		nonce = data.read(const.PUZZLE_NONCE_LENGTH)
+		#puzzle = timelock.extractPuzzle(data.read(const.PUZZLE_LENGTH))
+		puzzle = data.read(const.PUZZLE_LENGTH)
 
 		# Cache puzzle when we try our luck with the session ticket.
 		if self.redeemedTicket:
@@ -365,26 +365,12 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
 			self.state = const.ST_WAIT_FOR_MAGIC
 		else:
-			self._solvePuzzleInProcess(puzzle)
-
-
-	def _solvePuzzleInProcess( self, puzzle ):
-
-		# Prevents us from mistakenly accepting another puzzle.
-		log.debug("Switching to state ST_SOLVING_PUZZLE.")
-		self.state = const.ST_SOLVING_PUZZLE
-
-		log.debug("Attempting to unlock puzzle in dedicated process.")
-		executable = sys.executable
-		pp = processprotocol.MyProcessProtocol(puzzle, \
-				self.decryptedPuzzleCallback)
-
-		# Solve puzzle in dedicated process.
-		log.debug("We are in: %s" % os.getcwd())
-		reactor.spawnProcess(pp, executable, [executable, 
-			# FIXME - need to use relative paths here.
-			"/home/phw/sw/pyobfsproxy/obfsproxy/transports/timelock.py"], \
-			env=os.environ)
+			# Prevents us from mistakenly accepting another puzzle.
+			log.debug("Switching to state ST_SOLVING_PUZZLE.")
+			self.state = const.ST_SOLVING_PUZZLE
+			#self._solvePuzzleInProcess(puzzle)
+			timelock.bruteForcePuzzle(nonce, puzzle, \
+					self.decryptedPuzzleCallback)
 
 
 	def _receiveTicket( self, data ):
@@ -478,24 +464,23 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if self.state == const.ST_CONNECTED:
 			self.sendLocal(circuit, data.read())
 
-		elif self.weAreClient and self.state == const.ST_WAIT_FOR_PUZZLE:
+		if self.weAreClient and self.state == const.ST_WAIT_FOR_PUZZLE:
 			self._receivePuzzle(data, circuit)
 
-		elif self.weAreServer and self.state == const.ST_WAIT_FOR_TICKET:
+		if self.weAreServer and self.state == const.ST_WAIT_FOR_TICKET:
 			self._receiveTicket(data)
 
-		elif self.weAreServer and self.state == const.ST_WAIT_FOR_MAGIC:
+		if self.weAreServer and self.state == const.ST_WAIT_FOR_MAGIC:
 			self._receiveClientMagic(data, circuit)
 
-		elif self.weAreClient and self.state == const.ST_WAIT_FOR_MAGIC:
+		if self.weAreClient and self.state == const.ST_WAIT_FOR_MAGIC:
 			self._receiveServerMagic(data, circuit)
 
-		elif (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
+		if (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
 				(self.weAreServer and self.state == const.ST_WAIT_FOR_PUZZLE):
 			log.debug("Discarding %d bytes of bogus data." % len(data.read()))
 
-		else:
-			log.error("Reached invalid code branch. This is probably a bug.")
+		log.error("Reached invalid code branch. This is probably a bug.")
 
 
 	def _getSessionTicket( self, circuit ):
