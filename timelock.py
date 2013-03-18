@@ -145,24 +145,28 @@ def bruteForcePuzzle( nonce, encryptedPuzzle, callback ):
 			solvePuzzleInProcess(assumedPuzzle, callback)
 
 
-def solvePuzzleInProcess( puzzle, callback ):
+def solvePuzzleInProcess( puzzle, finalCallback ):
+	"""Solves the given `puzzle' in a dedicated process. After the puzzle is
+	unlocked, we verify whether it was the original puzzle. If it was,
+	`callback' is called with the master key as argument."""
 
 	log.debug("Attempting to unlock puzzle in dedicated process.")
 
-	def finished( masterKey ):
-		if not const.MASTER_KEY_PREFIX in masterKey:
-			log.debug("Solved a wrong puzzle, oops!")
+	def unlockedCallback( masterKey ):
+		if not (len(masterKey) == (const.MASTER_KEY_SIZE +
+			len(const.MASTER_KEY_PREFIX))):
 			return
-		else:
-			log.debug("Right puzzle. calling back.")
-			callback(masterKey)
+		if not (const.MASTER_KEY_PREFIX in masterKey):
+			log.debug("Solved a wrong puzzle, damn it!")
+			return
+		# Looks like we finally unlocked the original puzzle!
+		finalCallback(masterKey)
 
-	log.debug("We are in: %s" % os.getcwd())
-	pp = processprotocol.MyProcessProtocol(puzzle, finished)
-	reactor.spawnProcess(pp, sys.executable, [sys.executable, 
-		# FIXME - need to use relative paths here.
-		"/home/phw/sw/pyobfsproxy/obfsproxy/transports/timelock.py"], \
+	log.debug("Current working directory: %s" % os.getcwd())
+	pp = processprotocol.MyProcessProtocol(puzzle, unlockedCallback)
+	reactor.spawnProcess(pp, sys.executable, [sys.executable, "timelock.py"], \
 		env=os.environ)
+
 
 class TimeLockPuzzle:
 	"""Implements time-lock puzzles as proposed by Rivest, Shamir and Wagner in
