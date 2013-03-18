@@ -65,6 +65,9 @@ MTU = 1460
 # Maximum payload unit of a ScrambleSuit message in bytes.
 MPU = MTU - HDR_LENGTH
 
+# The smallest 16-byte value (used to encrypt puzzles).
+MIN_16BYTE_VALUE = (1 << (8 * 15))
+
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
 

@@ -112,7 +112,8 @@ def encryptPuzzle( rawPuzzle ):
 
 	nonce = mycrypto.strong_random(const.PUZZLE_NONCE_LENGTH)
 	cntr = Counter.new(128, initial_value=long(nonce.encode('hex'), 16))
-	key = 2**120 + random.randint(0, (2 ** const.PUZZLE_OBFUSCATION_KEYSPACE) - 1)
+	key = const.MIN_16BYTE_VALUE + \
+			random.randint(0, (2 ** const.PUZZLE_OBFUSCATION_KEYSPACE) - 1)
 	cipher = AES.new(util.dump(key), AES.MODE_CTR, counter=cntr)
 
 	log.debug("Puzzle key=%x, nonce=%s." % (key, nonce.encode('hex')))
@@ -132,7 +133,8 @@ def bruteForcePuzzle( nonce, encryptedPuzzle, callback ):
 	for key in xrange(2 ** const.PUZZLE_OBFUSCATION_KEYSPACE):
 
 		cntr = Counter.new(128, initial_value=long(nonce.encode('hex'), 16))
-		cipher = AES.new(util.dump(2**120 + key), AES.MODE_CTR, counter=cntr)
+		cipher = AES.new(util.dump(const.MIN_16BYTE_VALUE + key), \
+				AES.MODE_CTR, counter=cntr)
 		assumedPuzzle = extractPuzzle(cipher.decrypt(encryptedPuzzle))
 
 		# FIXME - terminate still running processes if the puzzle was already
