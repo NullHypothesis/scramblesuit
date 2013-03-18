@@ -54,6 +54,7 @@ class RandProbDist:
 	def randomSample( self ):
 		"""Randomly samples the generated probability distribution."""
 
+		# FIXME - this assertion sometimes fails.
 		assert(len(self.sampleList) > 0)
 
 		CUM_PROB = 0
