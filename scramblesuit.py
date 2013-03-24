@@ -7,6 +7,7 @@ For more details, check out http://www.cs.kau.se/philwint/scramblesuit/
 """
 
 from twisted.internet import error
+from twisted.internet import reactor
 from twisted.application.internet import TimerService
 
 import obfsproxy.transports.base as base
@@ -54,6 +55,9 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Buffers for incoming and outgoing data.
 		self.sendBuf = self.recvBuf = ""
 
+		# Caches the outgoing data before written to the wire.
+		self.choppedPieces = []
+
 		# AES instances for incoming and outgoing data.
 		self.sendCrypter = mycrypto.PayloadCrypter()
 		self.recvCrypter = mycrypto.PayloadCrypter()
@@ -92,7 +96,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		noise = mycrypto.weak_random(random.randint(0, 1000))
 		log.debug("Generated %d bytes of noise. Sending now." % len(noise))
 		assert self.circuit
-		self.circuit.downstream.transport.writeSomeData(noise)
+		self.circuit.downstream.write(noise)
 
 
 	def _deriveSecrets( self, masterKey ):
@@ -175,7 +179,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			puzzle, nonce = timelock.encryptPuzzle( \
 					timelock.generateRawPuzzle(masterKey))
 
-			circuit.downstream.transport.writeSomeData(nonce + puzzle + padding)
+			circuit.downstream.write(nonce + puzzle + padding)
 
 			log.debug("Switching to state ST_WAIT_FOR_TICKET.")
 			self.state = const.ST_WAIT_FOR_TICKET
@@ -199,7 +203,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				self._deriveSecrets(masterKey)
 				padding = mycrypto.weak_random(random.randint(0, \
 						const.MAX_PADDING_LENGTH))
-				circuit.downstream.transport.writeSomeData(ticket + padding)
+				circuit.downstream.write(ticket + padding)
 				self.redeemedTicket = True
 
 		# Both sides start a noise generator to create and transmit randomness.
@@ -237,7 +241,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Send bridge randomness || magic value.
 		log.debug("Sending magic value to server.")
 		assert self.circuit
-		self.circuit.downstream.transport.writeSomeData(mycrypto.weak_random(
+		self.circuit.downstream.write(mycrypto.weak_random(
 				random.randint(0, const.MAX_PADDING_LENGTH)) + self.sendMagic)
 
 		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
@@ -268,16 +272,30 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				for msg in messages], '')
 
 		# Chop the encrypted blurb to fit the target probability distribution.
-		choppedBlurbs = chopper(blurb)
+		self.choppedPieces += chopper(blurb)
+		self.__flushPieces(circuit)
 
-		for blurb in choppedBlurbs:
-			# Random sleeps to obfuscate inter arrival times.
-			duration = self.iatMorpher.randomSample()
-			log.debug("Sleeping for %.4f seconds before sending data." % duration)
-			time.sleep(duration)
-			# FIXME - sometimes data is sent out-of-order when writeSomeData()
-			# is called. This does not happen with downstream.write()!
-			circuit.downstream.transport.writeSomeData(blurb)
+
+	def __flushPieces( self, circuit ):
+		"""Writes the cached and chopped data pieces to the wire using
+		`circuit'. After every write, control is given back to the reactor so
+		it has a chance to actually write the data. Shortly thereafter, this
+		function is called again if data is left to write."""
+
+		assert circuit
+
+		if len(self.choppedPieces) == 0:
+			return
+
+		if len(self.choppedPieces[0]) > 0:
+			log.debug("Writing %d bytes of data to downstream." % \
+					len(self.choppedPieces[0]))
+			circuit.downstream.write(self.choppedPieces[0])
+
+		if len(self.choppedPieces) > 1:
+			self.choppedPieces = self.choppedPieces[1:]
+			reactor.callLater(self.iatMorpher.randomSample(), \
+				self.__flushPieces, circuit)
 
 
 	def unpack( self, data, aes ):
@@ -459,10 +477,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		self.circuit = circuit
-
-		if self.state == const.ST_CONNECTED:
-			self.sendLocal(circuit, data.read())
+		if self.circuit == None:
+			self.circuit = circuit
 
 		if self.weAreClient and self.state == const.ST_WAIT_FOR_PUZZLE:
 			self._receivePuzzle(data, circuit)
@@ -470,17 +486,20 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if self.weAreServer and self.state == const.ST_WAIT_FOR_TICKET:
 			self._receiveTicket(data)
 
+		if (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
+				(self.weAreServer and self.state == const.ST_WAIT_FOR_PUZZLE):
+			log.debug("Discarding %d bytes of bogus data." % len(data.read()))
+
 		if self.weAreServer and self.state == const.ST_WAIT_FOR_MAGIC:
 			self._receiveClientMagic(data, circuit)
 
 		if self.weAreClient and self.state == const.ST_WAIT_FOR_MAGIC:
 			self._receiveServerMagic(data, circuit)
 
-		if (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
-				(self.weAreServer and self.state == const.ST_WAIT_FOR_PUZZLE):
-			log.debug("Discarding %d bytes of bogus data." % len(data.read()))
+		if self.state == const.ST_CONNECTED:
+			self.sendLocal(circuit, data.read())
 
-		log.error("Reached invalid code branch. This is probably a bug.")
+		#log.error("Reached invalid code branch. This is probably a bug.")
 
 
 	def _getSessionTicket( self, circuit ):
@@ -521,7 +540,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.error("Ehm, we should have waited for deferred to return.")
 
 		log.debug("Noise generator stopped. Now sending magic value to remote.")
-		circuit.downstream.transport.writeSomeData(mycrypto.weak_random(random.randint(0, \
+		circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
 				const.MAX_PADDING_LENGTH)) + magic)
 
 
