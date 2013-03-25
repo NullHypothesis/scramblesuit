@@ -42,3 +42,9 @@ class PacketMorpher( object ):
 		chopper = lambda data: [data[x:y] for (x, y) in breakPoints]
 
 		return (chopper, paddingLen)
+
+
+	def randomSample( self ):
+		"""Return a random sample of the stored probability distribution."""
+
+		return self.dist.randomSample()

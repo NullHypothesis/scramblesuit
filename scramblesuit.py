@@ -8,7 +8,6 @@ For more details, check out http://www.cs.kau.se/philwint/scramblesuit/
 
 from twisted.internet import error
 from twisted.internet import reactor
-from twisted.application.internet import TimerService
 
 import obfsproxy.transports.base as base
 import obfsproxy.common.serialize as pack
@@ -83,20 +82,34 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Cache the puzzle if the session ticket is not accepted by the server.
 		self.cachedPuzzle = None
 
+		# `True' when ScrambleSuit should stop sending cover traffic.
+		self.stopCoverTraffic = None
+
 		# Used by the unpack mechanism
 		self.totalLen = None
 		self.payloadLen = None
 
 
-	def generateNoise( self ):
-		"""Send random noise to the remote end point to confuse statistical
-		classifiers. The remote machine will simply discard the data."""
+	def _sendCoverTraffic( self, circuit ):
+		"""Send random cover traffic using `circuit'. This is done to make DPI
+		boxes believe that we are communicating when in fact the client is busy
+		solving the puzzle."""
 
-		# FIXME - use packet morpher oracle to determine sizes.
-		noise = mycrypto.weak_random(random.randint(0, 1000))
-		log.debug("Generated %d bytes of noise. Sending now." % len(noise))
-		assert self.circuit
-		self.circuit.downstream.write(noise)
+		if self.stopCoverTraffic == True:
+			return
+
+		coverTraffic = mycrypto.weak_random(self.pktMorpher.randomSample())
+		log.debug("Sending %d bytes of cover traffic." % len(coverTraffic))
+		circuit.downstream.write(coverTraffic)
+
+		# FIXME - Come up with something more formal than these magic values.
+		# When should we send the next chunk of bytes?
+		if random.random() > 0.3:
+			delay = self.iatMorpher.randomSample()
+		else:
+			delay = random.random() * 5
+
+		reactor.callLater(delay, self._sendCoverTraffic, circuit)
 
 
 	def _deriveSecrets( self, masterKey ):
@@ -206,12 +219,9 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				circuit.downstream.write(ticket + padding)
 				self.redeemedTicket = True
 
-		# Both sides start a noise generator to create and transmit randomness.
-		# This should ``break the silence'' while the client is solving the
-		# puzzle.
-		self.circuit = circuit
-		self.ts = TimerService(0.1, self.generateNoise)
-		self.ts.startService()
+		# Now start transmitting cover traffic.
+		self.stopCoverTraffic = False
+		reactor.callLater(0, self._sendCoverTraffic, circuit)
 
 
 	def decryptedPuzzleCallback( self, masterKey ):
@@ -231,12 +241,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 		self._deriveSecrets(masterKey)
 
-		# Make sure that noise generator has stopped before sending the
-		# magic value.
-		log.debug("Waiting for noise generator to stop.")
-		deferred = self.ts.stopService()
-		if not (deferred == None):
-			log.debug("something will break.")
+		log.debug("Stopping cover traffic generation.")
+		self.stopCoverTraffic = True
 
 		# Send bridge randomness || magic value.
 		log.debug("Sending magic value to server.")
@@ -531,15 +537,13 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 
 	def _sendMagicValue( self, circuit, magic ):
-		"""Sends the given `magic' to the remote machine. Before that, the
-		noise generator is stopped."""
+		"""Sends the given `magic' to the remote machine using `circuit'. Before
+		that, the cover traffic generator is stopped."""
 
-		log.debug("Attempting to stop noise generator.")
-		deferred = self.ts.stopService()
-		if not deferred == None: # FIXME
-			log.error("Ehm, we should have waited for deferred to return.")
+		log.debug("Stopping cover traffic generation.")
+		self.stopCoverTraffic = True
 
-		log.debug("Noise generator stopped. Now sending magic value to remote.")
+		# FIXME - Use packet morpher oracle for padding.
 		circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
 				const.MAX_PADDING_LENGTH)) + magic)
 
