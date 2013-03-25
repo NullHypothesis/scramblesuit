@@ -176,6 +176,8 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		does nothing during the handshake."""
 
 		log.debug("Entering handshake().")
+		if self.circuit == None:
+			self.circuit = circuit
 
 		# Only the server is generating and transmitting a puzzle.
 		if self.weAreServer:
@@ -482,9 +484,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
-
-		if self.circuit == None:
-			self.circuit = circuit
 
 		if self.weAreClient and self.state == const.ST_WAIT_FOR_PUZZLE:
 			self._receivePuzzle(data, circuit)
