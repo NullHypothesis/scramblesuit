@@ -51,6 +51,7 @@ KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 KEY_STORE = "ticket_keys.bin"
 
 # File which holds our session ticket.
+# FIXME - multiple session tickets for multiple servers must be supported.
 TICKET_FILE = "session_ticket.bin"
 
 # Length of ScrambleSuit's header in bytes.
