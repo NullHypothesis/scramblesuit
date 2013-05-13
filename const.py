@@ -40,6 +40,7 @@ ST_WAIT_FOR_PUZZLE = 1
 ST_SOLVING_PUZZLE = 2
 ST_WAIT_FOR_MAGIC = 3
 ST_CONNECTED = 4
+ST_WAIT_FOR_PK = 5
 
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"
@@ -55,7 +56,7 @@ KEY_STORE = "ticket_keys.bin"
 TICKET_FILE = "session_ticket.bin"
 
 # Length of ScrambleSuit's header in bytes.
-HDR_LENGTH = 16 + 2 + 2
+HDR_LENGTH = 16 + 2 + 2 + 1
 
 # Length of the HMAC-SHA256-128 in bytes.
 HMAC_LENGTH = 16
@@ -66,8 +67,14 @@ MTU = 1460
 # Maximum payload unit of a ScrambleSuit message in bytes.
 MPU = MTU - HDR_LENGTH
 
+PUBLIC_KEY_LENGTH = 192
+
 # The smallest 16-byte value (used to encrypt puzzles).
 MIN_16BYTE_VALUE = (1 << (8 * 15))
+
+FLAG_PAYLOAD = 1
+FLAG_NEW_TICKET = 2
+FLAG_CONFIRM_TICKET = 4
 
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
