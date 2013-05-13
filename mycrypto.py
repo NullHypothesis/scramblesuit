@@ -98,8 +98,6 @@ class PayloadCrypter:
 	"""Encrypts plain Tor data using AES. The encrypted data is then passed on
 	to the obfuscation component PayloadScrambler."""
 
-	# FIXME - in here we can handle authenticated encryption.
-
 	def __init__( self ):
 
 		log.debug("Initializing payload crypter.")

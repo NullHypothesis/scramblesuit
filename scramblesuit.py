@@ -102,7 +102,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.debug("Sending %d bytes of cover traffic." % len(coverTraffic))
 		circuit.downstream.write(coverTraffic)
 
-		# FIXME - Come up with something more formal than these magic values.
 		# When should we send the next chunk of bytes?
 		if random.random() > 0.3:
 			delay = self.iatMorpher.randomSample()
@@ -465,7 +464,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 	def _receiveServerMagic( self, data, circuit ):
 
 		if self._magicInData(data, self.recvMagic):
-			# FIXME - what to do in this situation?
 			assert len(data) >= const.TICKET_LENGTH
 			self._receiveEncryptedTicket(data)
 
