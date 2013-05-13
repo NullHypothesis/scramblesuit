@@ -12,6 +12,7 @@ from twisted.internet import reactor
 import obfsproxy.transports.base as base
 import obfsproxy.common.serialize as pack
 import obfsproxy.common.log as logging
+import obfsproxy.transports.obfs3_dh as obfs3_dh
 
 import os
 import sys
@@ -34,7 +35,7 @@ import sessionticket
 log = logging.get_obfslogger()
 
 
-class ScrambleSuitDaemon( base.BaseTransport ):
+class ScrambleSuitTransport( base.BaseTransport ):
 
 	def __init__( self ):
 
@@ -45,11 +46,12 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.debug("Switching to state ST_WAIT_FOR_TICKET.")
 			self.state = const.ST_WAIT_FOR_TICKET
 		elif self.weAreClient:
+			# TODO - invalid state.
 			log.debug("Switching to state ST_WAIT_FOR_PUZZLE.")
 			self.state = const.ST_WAIT_FOR_PUZZLE
 
-		# Magic values to tell when the actual communication begins.
-		self.sendMagic = self.recvMagic = None
+
+		self.dh = obfs3_dh.UniformDH()
 
 		# Buffers for incoming and outgoing data.
 		self.sendBuf = self.recvBuf = ""
@@ -67,49 +69,13 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Inter arrival time morpher to obfuscate inter arrival times.
 		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.01)
 
-		# Circuit to write data to and receive data from.
-		self.circuit = None
-
-		# Timer service to generate garbage data while puzzle is being solved.
-		self.ts = None
-
-		# When the client magic was sent to guess if the ticket was accepted.
-		self.magicSent = None
-
 		# `True' if the client used a session ticket, `False' otherwise.
 		self.redeemedTicket = None
-
-		# Cache the puzzle if the session ticket is not accepted by the server.
-		self.cachedPuzzle = None
-
-		# `True' when ScrambleSuit should stop sending cover traffic.
-		self.stopCoverTraffic = None
 
 		# Used by the unpack mechanism
 		self.totalLen = None
 		self.payloadLen = None
-
-
-	def _sendCoverTraffic( self, circuit ):
-		"""Send random cover traffic using `circuit'. This is done to make DPI
-		boxes believe that we are communicating when in fact the client is busy
-		solving the puzzle."""
-
-		if self.stopCoverTraffic == True:
-			return
-
-		coverTraffic = mycrypto.weak_random(self.pktMorpher.randomSample())
-		log.debug("Sending %d bytes of cover traffic." % len(coverTraffic))
-		circuit.downstream.write(coverTraffic)
-
-		# FIXME - Come up with something more formal than these magic values.
-		# When should we send the next chunk of bytes?
-		if random.random() > 0.3:
-			delay = self.iatMorpher.randomSample()
-		else:
-			delay = random.random() * 5
-
-		reactor.callLater(delay, self._sendCoverTraffic, circuit)
+		self.flags = None
 
 
 	def _deriveSecrets( self, masterKey ):
@@ -128,26 +94,14 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.sendCrypter.setSessionKey(okm[0:32],  okm[32:64])
 		self.recvCrypter.setSessionKey(okm[64:96], okm[96:128])
 
-		# Derive a magic value for the client as well as the server. They must
-		# be distinct to prevent fingerprinting (e.g. look for two identical
-		# 256-bit strings).
-		self.sendMagic = okm[128:160]
-		self.recvMagic = okm[160:192]
-
 		# Set the HMAC keys.
-		self.sendHMAC = okm[192:224]
-		self.recvHMAC = okm[224:256]
+		self.sendHMAC = okm[128:160]
+		self.recvHMAC = okm[160:192]
 
 		if self.weAreServer:
 			self.sendHMAC, self.recvHMAC = util.swap(self.sendHMAC, self.recvHMAC)
 			self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter, \
 					self.recvCrypter)
-			self.sendMagic, self.recvMagic = util.swap(self.sendMagic, \
-					self.recvMagic)
-
-		log.debug("Magic values derived from session key: send=0x%s, " \
-			"recv=0x%s." % (self.sendMagic.encode('hex'), \
-			self.recvMagic.encode('hex')))
 
 
 	def circuitDestroyed( self, circuit, reason, side ):
@@ -175,86 +129,49 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		generates a time-lock puzzle and sends it to the client. The client
 		does nothing during the handshake."""
 
-		log.debug("Entering handshake().")
-		if self.circuit == None:
-			self.circuit = circuit
-
-		# Only the server is generating and transmitting a puzzle.
-		if self.weAreServer:
-
-			# Generate master key and derive client -and server key.
-			masterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
-			self._deriveSecrets(masterKey)
-
-			# Append random padding to obfuscate length and transmit blurb.
-			padding = mycrypto.weak_random(random.randint(0, \
-					const.MAX_PADDING_LENGTH))
-			log.debug("Sending puzzle with %d-byte of padding." % len(padding))
-
-			puzzle, nonce = timelock.encryptPuzzle( \
-					timelock.generateRawPuzzle(masterKey))
-
-			circuit.downstream.write(nonce + puzzle + padding)
-
-			log.debug("Switching to state ST_WAIT_FOR_TICKET.")
-			self.state = const.ST_WAIT_FOR_TICKET
-
 		# Send a session ticket to the server (if we have one).
-		elif self.weAreClient:
-			stop = False
+		if self.weAreClient and os.path.exists(const.DATA_DIRECTORY + \
+				const.TICKET_FILE):
+
 			try:
 				with open(const.DATA_DIRECTORY + const.TICKET_FILE, "rb") as fd:
 					masterKey = fd.read(const.MASTER_KEY_SIZE)
 					ticket = fd.read(const.TICKET_LENGTH)
 					fd.close()
+
 			except IOError as e:
 				log.error("Could not read session ticket from \"%s\"." % \
 						(const.DATA_DIRECTORY + const.TICKET_FILE))
-				stop = True
 
-			if not stop:
-				log.debug("Trying to redeem session ticket: 0x%s..." % \
-						ticket.encode('hex')[:10])
-				self._deriveSecrets(masterKey)
-				padding = mycrypto.weak_random(random.randint(0, \
-						const.MAX_PADDING_LENGTH))
-				circuit.downstream.write(ticket + padding)
-				self.redeemedTicket = True
+			log.debug("Trying to redeem session ticket: 0x%s..." % \
+					ticket.encode('hex')[:10])
+			self._deriveSecrets(masterKey)
+			padding = mycrypto.weak_random(random.randint(0, \
+					const.MAX_PADDING_LENGTH))
+			circuit.downstream.write(ticket + padding)
+			self.redeemedTicket = True
 
-		# Now start transmitting cover traffic.
-		self.stopCoverTraffic = False
-		reactor.callLater(0, self._sendCoverTraffic, circuit)
+		# Conduct an authenticated UniformDH handshake.
+		elif self.weAreClient:
+			log.debug("No session ticket to redeem.  Running UniformDH.")
+			self.conductUniformDH(circuit)
 
 
-	def decryptedPuzzleCallback( self, masterKey ):
-		"""This method is invoked as soon as the puzzle is unlocked. The
-		argument `masterKey' is the content of the unlocked puzzle."""
+	def sendSessionTicket( self, circuit, ticket ):
 
-		log.debug("Callback invoked after solved puzzle.")
+		padding = mycryto.weak_random(random.randint(0, \
+				const.MAX_PADDING_LENGTH))
 
-		# Sanity check to verify that we solved a real puzzle.
-		if not const.MASTER_KEY_PREFIX in masterKey:
-			log.critical("No MASTER_KEY_PREFIX in puzzle. What did we just " \
-					"solve?")
-			return
+		vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, \
+				self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
+				const.HDR_LENGTH)])
 
-		masterKey = masterKey[len(const.MASTER_KEY_PREFIX):]
-		assert len(masterKey) == const.MASTER_KEY_SIZE
+		hmacInput = ticket, padding, epoch
+		hmac = mycrypto.MyHMAC_SHA256_128(self.sendHMAC, hmacInput)
 
-		self._deriveSecrets(masterKey)
 
-		log.debug("Stopping cover traffic generation.")
-		self.stopCoverTraffic = True
-
-		# Send bridge randomness || magic value.
-		log.debug("Sending magic value to server.")
-		assert self.circuit
-		self.circuit.downstream.write(mycrypto.weak_random(
-				random.randint(0, const.MAX_PADDING_LENGTH)) + self.sendMagic)
-
-		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-		self.state = const.ST_WAIT_FOR_MAGIC
-		#self._flushSendBuffer(self.circuit)
+	def _genTimeStamp( self ):
+		pass
 
 
 	def sendRemote( self, circuit, data ):
@@ -265,7 +182,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			return
 
 		# Wrap the application's data in ScrambleSuit protocol messages.
-		messages = message.createMessages(data)
+		messages = message.createDataMessages(data)
 
 		# Invoke the packet morpher and pad the last protocol message.
 		chopper, paddingLen = self.pktMorpher.morph(sum([len(msg) \
@@ -319,21 +236,23 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			if self.totalLen == None:
 				self.totalLen = pack.ntohs(aes.decrypt(self.recvBuf[16:18]))
 				self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
+				self.flags = aes.decrypt(self.recvBuf[20])
 
 				# Abort immediately if the extracted lengths do not make sense.
-				if not message.saneLengths(self.totalLen, self.payloadLen):
-					raise base.PluggableTransportError("Invalid message " \
-							"length(s): totalLen=%d, payloadLen=%d." % \
-							(self.totalLen, self.payloadLen))
-				log.debug("Message header: totalLen=%d, payloadLen=%d." % \
-					(self.totalLen, self.payloadLen))
+				if not message.saneHeader(self.totalLen, self.payloadLen, \
+						self.flags):
+					raise base.PluggableTransportError("Invalid header: " \
+							"totalLen=%d, payloadLen=%d. flags=%s" % \
+							(self.totalLen, self.payloadLen, self.flags))
+				log.debug("Message header: totalLen=%d, payloadLen=%d, flags" \
+						"=%s" % (self.totalLen, self.payloadLen, self.flags))
 
 			if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
 				return fwdBuf
 
 			# We have a full message; let's extract it.
 			else:
-				log.debug("Extracting fully received protocol message.")
+				log.debug("Extracting message of type %d." % self.flags)
 				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
 				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, \
 						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
@@ -346,13 +265,20 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 				fwdBuf += aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
 						(self.totalLen+const.HDR_LENGTH)])[:self.payloadLen]
 
+				# check type here and do according stuff.
+
 				self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
 				# Protocol message extracted - resetting length fields.
-				self.totalLen = self.payloadLen = None
+				self.totalLen = self.payloadLen = self.flags = None
 
 		log.debug("Unpacked %d bytes of data: 0x%s..." % \
 				(len(fwdBuf), fwdBuf[:10].encode('hex')))
 		return fwdBuf
+
+
+	def getNewTicket( self, ticket ):
+
+		assert len(ticket) == const.TICKET_LENGTH
 
 
 	def sendLocal( self, circuit, data ):
@@ -369,54 +295,25 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		circuit.upstream.write(self.unpack(data, self.recvCrypter))
 
 
-	def _receivePuzzle( self, data, circuit ):
-
-		if len(data) < (const.PUZZLE_LENGTH + const.PUZZLE_NONCE_LENGTH):
-			log.debug("Puzzle not yet fully received.")
-			return
-
-		nonce = data.read(const.PUZZLE_NONCE_LENGTH)
-		#puzzle = timelock.extractPuzzle(data.read(const.PUZZLE_LENGTH))
-		puzzle = data.read(const.PUZZLE_LENGTH)
-
-		# Cache puzzle when we try our luck with the session ticket.
-		if self.redeemedTicket:
-			log.debug("Caching puzzle because we are using a session ticket.")
-			self.cachedPuzzle = puzzle
-
-			self._sendMagicValue(circuit, self.sendMagic)
-			self.magicSent = time.time()
-			#self._flushSendBuffer(circuit)
-
-			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-			self.state = const.ST_WAIT_FOR_MAGIC
-		else:
-			# Prevents us from mistakenly accepting another puzzle.
-			log.debug("Switching to state ST_SOLVING_PUZZLE.")
-			self.state = const.ST_SOLVING_PUZZLE
-			#self._solvePuzzleInProcess(puzzle)
-			timelock.bruteForcePuzzle(nonce, puzzle, \
-					self.decryptedPuzzleCallback)
-
-
 	def _receiveTicket( self, data ):
 
 		if len(data) < const.TICKET_LENGTH:
 			log.debug("Missing %d bytes of ticket." % \
-				(const.TICKET_LENGTH - len(data)))
+					(const.TICKET_LENGTH - len(data)))
 			return
 
-		potentialTicket = data.read(const.TICKET_LENGTH)
+		#potentialTicket = data.read(const.TICKET_LENGTH)
+		potentialTicket = data.peek(const.TICKET_LENGTH)
 		log.debug("Read a potential session ticket: 0x%s..." % \
 				potentialTicket.encode('hex')[:10])
 
 		ticket = sessionticket.decryptTicket(potentialTicket)
 		if ticket != None and ticket.isValid():
 			log.debug("The ticket is valid. Now deriving keys.")
+			data.drain(const.TICKET_LENGTH)
 			self._deriveSecrets(ticket.masterKey)
-
-		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-		self.state = const.ST_WAIT_FOR_MAGIC
+		else:
+			return False
 
 
 	def _receiveEncryptedTicket( self, data ):
@@ -426,7 +323,7 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		assert len(data) >= expected
 		data = data.read(expected)
 
-		decrypted = self.recvCrypter.decrypt(data[:expected])
+		#decrypted = self.recvCrypter.decrypt(data[:expected])
 		ticket = decrypted[:const.TICKET_LENGTH]
 		nextMasterKey = decrypted[const.TICKET_LENGTH : expected]
 
@@ -446,65 +343,50 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.debug("Empty buffer: no data to flush.")
 
 
-	def _receiveClientMagic( self, data, circuit ):
+	def conductUniformDH( self, circuit ):
+		log.debug("Sending UniformDH public key.")
+		self.dh = obfs3_dh.UniformDH()
+		padLen = random.randint(0, const.MAX_PADDING_LENGTH)
+		handshakeMsg = self.dh.get_public() + \
+				mycrypto.weak_random(const.MAX_PADDING_LENGTH)
+		circuit.downstream.write(handshakeMsg)
 
-		if not self._magicInData(data, self.recvMagic):
-			return
+		# Calculate MAC over as fds 
+		# mac = mycrypto.MyHMAC_SHA256_128(key, msg)
 
-		# Send server magic and next session ticket + master key.
-		rawTicket, nextMasterKey = self._getSessionTicket(circuit)
-		self._sendMagicValue(circuit, self.sendMagic + \
-				self.sendCrypter.encrypt(rawTicket + nextMasterKey))
-		self._flushSendBuffer(circuit)
-
-		log.debug("Switching to state ST_CONNECTED.")
-		self.state = const.ST_CONNECTED
-		self.sendLocal(circuit, data.read())
-
-
-	def _receiveServerMagic( self, data, circuit ):
-
-		if self._magicInData(data, self.recvMagic):
-			# FIXME - what to do in this situation?
-			assert len(data) >= const.TICKET_LENGTH
-			self._receiveEncryptedTicket(data)
-
-			log.debug("Switching to state ST_CONNECTED.")
-			self.state = const.ST_CONNECTED
-
-			self._flushSendBuffer(circuit)
-			self.sendLocal(circuit, data.read())
-
-		elif self.redeemedTicket and ((time.time() - self.magicSent) >= 5):
-			log.debug("Ticket probably not accepted. Solving the puzzle, then.")
-			self._solvePuzzleInProcess(self.cachedPuzzle)
-		else:
-			return
+		self.state = const.ST_WAIT_FOR_PK
 
 
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		if self.weAreClient and self.state == const.ST_WAIT_FOR_PUZZLE:
-			self._receivePuzzle(data, circuit)
+		log.debug("Incoming stuff.")
 
 		if self.weAreServer and self.state == const.ST_WAIT_FOR_TICKET:
-			self._receiveTicket(data)
+			if self._receiveTicket(data) == False:
+				self.conductUniformDH(circuit)
 
-		if (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
-				(self.weAreServer and self.state == const.ST_WAIT_FOR_PUZZLE):
-			log.debug("Discarding %d bytes of bogus data." % len(data.read()))
+		if self.state == const.ST_WAIT_FOR_PK:
+			log.debug("other PK?")
+			otherPK = data.read(const.PUBLIC_KEY_LENGTH)
+			log.debug("Received other public key.  Now deriving master key.")
+			try:
+				masterKey = self.dh.get_secret(otherPK)
+			except ValueError:
+				raise base.PluggableTransportError("corrupted public key")
 
-		if self.weAreServer and self.state == const.ST_WAIT_FOR_MAGIC:
-			self._receiveClientMagic(data, circuit)
+			self._deriveSecrets(masterKey)
+			self.state = const.ST_CONNECTED
 
-		if self.weAreClient and self.state == const.ST_WAIT_FOR_MAGIC:
-			self._receiveServerMagic(data, circuit)
+		if self.weAreClient and self.state == const.ST_WAIT_FOR_PK:
+			if len(data) < const.PUBLIC_KEY_LENGTH:
+				log.debug("Missing bytes for PK.")
+			else:
+				data.read(const.PUBLIC_KEY_LENGTH)
+				log.debug("Received public key of remote machine.")
 
 		if self.state == const.ST_CONNECTED:
 			self.sendLocal(circuit, data.read())
-
-		#log.error("Reached invalid code branch. This is probably a bug.")
 
 
 	def _getSessionTicket( self, circuit ):
@@ -516,35 +398,6 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		rawTicket = ticket.issue()
 
 		return rawTicket, nextMasterKey
-
-
-	def _magicInData( self, data, magic ):
-		"""Returns True if the given `magic' is found in `data'. If not, False
-		is returned."""
-
-		preview = data.peek()
-
-		magicIndex = preview.find(magic)
-		if magicIndex == -1:
-			log.debug("Found no magic value in %d-byte buffer." % len(preview))
-			return False
-
-		log.debug("Found the remote's magic value.")
-		data.drain(magicIndex + const.MAGIC_LENGTH)
-
-		return True
-
-
-	def _sendMagicValue( self, circuit, magic ):
-		"""Sends the given `magic' to the remote machine using `circuit'. Before
-		that, the cover traffic generator is stopped."""
-
-		log.debug("Stopping cover traffic generation.")
-		self.stopCoverTraffic = True
-
-		# FIXME - Use packet morpher oracle for padding.
-		circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
-				const.MAX_PADDING_LENGTH)) + magic)
 
 
 	def receivedUpstream( self, data, circuit ):
@@ -562,17 +415,17 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.debug("%d bytes of outgoing data buffered." % len(self.sendBuf))
 
 
-class ScrambleSuitClient( ScrambleSuitDaemon ):
+class ScrambleSuitClient( ScrambleSuitTransport ):
 
 	def __init__( self ):
 		self.weAreClient = True
 		self.weAreServer = False
-		ScrambleSuitDaemon.__init__(self)
+		ScrambleSuitTransport.__init__(self)
 
 
-class ScrambleSuitServer( ScrambleSuitDaemon ):
+class ScrambleSuitServer( ScrambleSuitTransport ):
 
 	def __init__( self ):
 		self.weAreServer = True
 		self.weAreClient = False
-		ScrambleSuitDaemon.__init__(self)
+		ScrambleSuitTransport.__init__(self)
