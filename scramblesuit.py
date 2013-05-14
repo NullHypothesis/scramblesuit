@@ -38,6 +38,9 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 	def __init__( self ):
 
+		log.warning("\n+++ Note that ScrambleSuit is still under " \
+				"development and is NOT safe for practical use. +++\n")
+
 		log.info("Initializing %s." % const.TRANSPORT_NAME)
 
 		# Initialize the protocol's state machine.
