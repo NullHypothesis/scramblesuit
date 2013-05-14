@@ -39,7 +39,7 @@ class RandProbDist:
 		cum_p = 0
 		flatness = random.randint(1, 3)
 
-		for b in xrange(bins - 1):
+		for b in xrange(bins):
 			p = random.uniform(0, (1 - cum_p) / float(flatness))
 			cum_p += p
 			singleton = self.genSingleton()
@@ -54,7 +54,6 @@ class RandProbDist:
 	def randomSample( self ):
 		"""Randomly samples the generated probability distribution."""
 
-		# FIXME - this assertion sometimes fails.
 		assert(len(self.sampleList) > 0)
 
 		CUM_PROB = 0
