@@ -29,7 +29,7 @@ import const
 import util
 import packetmorpher
 import processprotocol
-import sessionticket
+import ticket
 
 
 log = logging.get_obfslogger()
@@ -335,7 +335,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		# Now try to decrypt and parse ticket.
 		log.debug("Attempting to decrypt potential session ticket.")
-		ticket = sessionticket.decryptTicket(potentialTicket[:const.TICKET_LENGTH])
+		ticket = ticket.decryptTicket(potentialTicket[:const.TICKET_LENGTH])
 
 		if ticket != None and ticket.isValid():
 			log.debug("The ticket is valid.  Now deriving keys.")
@@ -433,7 +433,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		log.debug("Generating new session ticket and master key.")
 		nextMasterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
 
-		ticket = sessionticket.new(nextMasterKey)
+		ticket = ticket.new(nextMasterKey)
 		rawTicket = ticket.issue()
 
 		return rawTicket, nextMasterKey
