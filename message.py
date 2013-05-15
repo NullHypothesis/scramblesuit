@@ -38,7 +38,7 @@ def saneHeader( totalLen, payloadLen, flags ):
 		const.FLAG_PAYLOAD + const.FLAG_CONFIRM_TICKET
 	]
 
-	return ok(totalLen) and ok(payloadLen) and (flags in validFlags)
+	return ok(totalLen) and ok(payloadLen) and (ord(flags) in validFlags)
 
 
 class ProtocolMessage( object ):
@@ -54,7 +54,7 @@ class ProtocolMessage( object ):
 		self.totalLen = payloadLen + paddingLen
 		self.payloadLen = payloadLen
 		self.payload = payload
-		self.flags = flags
+		self.flags = chr(flags)
 
 
 	def encryptAndHMAC( self, crypter, HMACKey ):
