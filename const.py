@@ -35,7 +35,7 @@ PUZZLE_NONCE_LENGTH = 8
 MAGIC_LENGTH = 32
 
 # States which are used for the protocol state machine.
-ST_WAIT_FOR_TICKET = 0
+ST_WAIT_FOR_AUTH = 0
 ST_WAIT_FOR_PUZZLE = 1
 ST_SOLVING_PUZZLE = 2
 ST_WAIT_FOR_MAGIC = 3
@@ -44,6 +44,10 @@ ST_WAIT_FOR_PK = 5
 
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"
+
+# Divisor (in seconds) for the UNIX epoch used to defend against replay
+# attacks.
+EPOCH_GRANULARITY = 3600
 
 # Key rotation time for session ticket keys in seconds.
 KEY_ROTATION_TIME = 60 * 60 * 24 * 7
