@@ -63,7 +63,7 @@ class ProtocolMessage( object ):
 				serialize.htons(self.payloadLen) + self.flags + \
 				self.payload + (self.totalLen - self.payloadLen) * '\0')
 
-		hmac = mycrypto.MyHMAC_SHA256_128(HMACKey, encrypted)
+		hmac = mycrypto.HMAC_SHA256_128(HMACKey, encrypted)
 
 		return hmac + encrypted
 

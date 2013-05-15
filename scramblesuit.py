@@ -156,12 +156,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		padding = mycryto.weak_random(random.randint(0, \
 				const.MAX_PADDING_LENGTH))
 
-		vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, \
+		vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
 				self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
 				const.HDR_LENGTH)])
 
 		hmacInput = ticket, padding, epoch
-		hmac = mycrypto.MyHMAC_SHA256_128(self.sendHMAC, hmacInput)
+		hmac = mycrypto.HMAC_SHA256_128(self.sendHMAC, hmacInput)
 
 
 
@@ -246,7 +246,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			else:
 				log.debug("Extracting message of type %d." % ord(self.flags))
 				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
-				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, \
+				vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
 						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
 						const.HDR_LENGTH)])
 
@@ -325,7 +325,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		# Verify HMAC before touching the icky data.
 		potentialTicket = data.peek()
 		key = "A" * 32
-		mac = mycrypto.MyHMAC_SHA256_128(key, \
+		mac = mycrypto.HMAC_SHA256_128(key, \
 				potentialTicket[:-const.HMAC_LENGTH] + self._epoch())
 		if mac == potentialTicket[-const.HMAC_LENGTH:]:
 			log.debug("HMAC of session ticket is valid.")
@@ -353,7 +353,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		# Verify HMAC before touching the icky data.
 		handshake = data.peek()
 		key = "U" * 32
-		mac = mycrypto.MyHMAC_SHA256_128(key, \
+		mac = mycrypto.HMAC_SHA256_128(key, \
 				handshake[:-const.HMAC_LENGTH] + self._epoch())
 		if mac == handshake[-const.HMAC_LENGTH:]:
 			log.debug("HMAC of UniformDH public key is valid.")
@@ -391,7 +391,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		padding = mycrypto.weak_random(random.randint(0, 123)) # TODO
 
 		# Authenticate the handshake including the current approximate epoch.
-		mac = mycrypto.MyHMAC_SHA256_128(key, publicKey + padding + \
+		mac = mycrypto.HMAC_SHA256_128(key, publicKey + padding + \
 				self._epoch())
 
 		# TODO - use packet morpher for handshake.

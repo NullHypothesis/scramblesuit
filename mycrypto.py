@@ -66,7 +66,7 @@ class HKDF_SHA256( object ):
 
 
 
-def MyHMAC_SHA256_128( key, msg ):
+def HMAC_SHA256_128( key, msg ):
 	"""Returns the HMAC-SHA256-128 of the given `key' and `msg'."""
 
 	assert(len(key) == const.SHA256_DIGEST_SIZE)
