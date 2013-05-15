@@ -42,16 +42,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		log.info("Initializing %s." % const.TRANSPORT_NAME)
 
 		# Initialize the protocol's state machine.
-		if self.weAreServer:
-			log.debug("Switching to state ST_WAIT_FOR_TICKET.")
-			self.state = const.ST_WAIT_FOR_TICKET
-		elif self.weAreClient:
-			# TODO - invalid state.
-			log.debug("Switching to state ST_WAIT_FOR_PUZZLE.")
-			self.state = const.ST_WAIT_FOR_PUZZLE
+		log.debug("Switching to state ST_WAIT_FOR_AUTH.")
+		self.state = const.ST_WAIT_FOR_AUTH
 
-
-		self.dh = obfs3_dh.UniformDH()
+		self.dh = None
 
 		# Buffers for incoming and outgoing data.
 		self.sendBuf = self.recvBuf = ""
@@ -154,7 +148,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		# Conduct an authenticated UniformDH handshake.
 		elif self.weAreClient:
 			log.debug("No session ticket to redeem.  Running UniformDH.")
-			self.conductUniformDH(circuit)
+			self._sendUniformDHPK(circuit)
 
 
 	def sendSessionTicket( self, circuit, ticket ):
@@ -170,8 +164,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		hmac = mycrypto.MyHMAC_SHA256_128(self.sendHMAC, hmacInput)
 
 
-	def _genTimeStamp( self ):
-		pass
 
 
 	def sendRemote( self, circuit, data ):
@@ -242,17 +234,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				if not message.saneHeader(self.totalLen, self.payloadLen, \
 						self.flags):
 					raise base.PluggableTransportError("Invalid header: " \
-							"totalLen=%d, payloadLen=%d. flags=%s" % \
-							(self.totalLen, self.payloadLen, self.flags))
+							"totalLen=%d, payloadLen=%d. flags=%d" % \
+							(self.totalLen, self.payloadLen, ord(self.flags)))
 				log.debug("Message header: totalLen=%d, payloadLen=%d, flags" \
-						"=%s" % (self.totalLen, self.payloadLen, self.flags))
+						"=%d" % (self.totalLen, self.payloadLen, ord(self.flags)))
 
 			if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
 				return fwdBuf
 
 			# We have a full message; let's extract it.
 			else:
-				log.debug("Extracting message of type %d." % self.flags)
+				log.debug("Extracting message of type %d." % ord(self.flags))
 				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
 				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, \
 						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
@@ -295,26 +287,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		circuit.upstream.write(self.unpack(data, self.recvCrypter))
 
 
-	def _receiveTicket( self, data ):
-
-		if len(data) < const.TICKET_LENGTH:
-			log.debug("Missing %d bytes of ticket." % \
-					(const.TICKET_LENGTH - len(data)))
-			return
-
-		#potentialTicket = data.read(const.TICKET_LENGTH)
-		potentialTicket = data.peek(const.TICKET_LENGTH)
-		log.debug("Read a potential session ticket: 0x%s..." % \
-				potentialTicket.encode('hex')[:10])
-
-		ticket = sessionticket.decryptTicket(potentialTicket)
-		if ticket != None and ticket.isValid():
-			log.debug("The ticket is valid. Now deriving keys.")
-			data.drain(const.TICKET_LENGTH)
-			self._deriveSecrets(ticket.masterKey)
-		else:
-			return False
-
+	def _epoch( self ):
+		return str(int(time.time()) / const.EPOCH_GRANULARITY)
 
 	def _receiveEncryptedTicket( self, data ):
 
@@ -343,47 +317,112 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			log.debug("Empty buffer: no data to flush.")
 
 
-	def conductUniformDH( self, circuit ):
+	def _receiveTicket( self, data ):
+
+		if len(data) < (const.TICKET_LENGTH + const.HMAC_LENGTH):
+			return False
+
+		# Verify HMAC before touching the icky data.
+		potentialTicket = data.peek()
+		key = "A" * 32
+		mac = mycrypto.MyHMAC_SHA256_128(key, \
+				potentialTicket[:-const.HMAC_LENGTH] + self._epoch())
+		if mac == potentialTicket[-const.HMAC_LENGTH:]:
+			log.debug("HMAC of session ticket is valid.")
+			data.drain()
+		else:
+			return False
+
+		# Now try to decrypt and parse ticket.
+		log.debug("Attempting to decrypt potential session ticket.")
+		ticket = sessionticket.decryptTicket(potentialTicket[:const.TICKET_LENGTH])
+
+		if ticket != None and ticket.isValid():
+			log.debug("The ticket is valid.  Now deriving keys.")
+			data.drain(const.TICKET_LENGTH)
+			self._deriveSecrets(ticket.masterKey)
+		else:
+			return False
+
+
+	def _receiveUniformDHPK( self, data ):
+
+		if len(data) < (const.PUBLIC_KEY_LENGTH + const.HMAC_LENGTH):
+			return False
+
+		# Verify HMAC before touching the icky data.
+		handshake = data.peek()
+		key = "U" * 32
+		mac = mycrypto.MyHMAC_SHA256_128(key, \
+				handshake[:-const.HMAC_LENGTH] + self._epoch())
+		if mac == handshake[-const.HMAC_LENGTH:]:
+			log.debug("HMAC of UniformDH public key is valid.")
+			data.drain()
+		else:
+			return False
+
+		# Now try to finish UniformDH handshake.
+		otherPK = handshake[:const.PUBLIC_KEY_LENGTH]
+		log.debug("Received UniformDH public key.  Now deriving session keys.")
+
+		if self.weAreServer:
+			self.dh = obfs3_dh.UniformDH()
+
+		try:
+			masterKey = self.dh.get_secret(otherPK)
+		except ValueError:
+			raise base.PluggableTransportError("Corrupted public key.")
+
+		self._deriveSecrets(masterKey)
+
+		return self.dh.get_public()
+
+
+	def _sendUniformDHPK( self, circuit, publicKey=None ):
+
+		# TODO - where does key come from?
+		key = "U" * 32
+
 		log.debug("Sending UniformDH public key.")
-		self.dh = obfs3_dh.UniformDH()
-		padLen = random.randint(0, const.MAX_PADDING_LENGTH)
-		handshakeMsg = self.dh.get_public() + \
-				mycrypto.weak_random(const.MAX_PADDING_LENGTH)
-		circuit.downstream.write(handshakeMsg)
 
-		# Calculate MAC over as fds 
-		# mac = mycrypto.MyHMAC_SHA256_128(key, msg)
+		if not publicKey:
+			self.dh = obfs3_dh.UniformDH()
+			publicKey = self.dh.get_public()
+		padding = mycrypto.weak_random(random.randint(0, 123)) # TODO
 
-		self.state = const.ST_WAIT_FOR_PK
+		# Authenticate the handshake including the current approximate epoch.
+		mac = mycrypto.MyHMAC_SHA256_128(key, publicKey + padding + \
+				self._epoch())
+
+		# TODO - use packet morpher for handshake.
+		circuit.downstream.write(publicKey + padding + mac)
+
 
 
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		log.debug("Incoming stuff.")
+		if self.weAreServer and self.state == const.ST_WAIT_FOR_AUTH:
+			if not self._receiveTicket(data):
+				log.debug("Unable to read session ticket at this point.")
 
-		if self.weAreServer and self.state == const.ST_WAIT_FOR_TICKET:
-			if self._receiveTicket(data) == False:
-				self.conductUniformDH(circuit)
+			publicKey = self._receiveUniformDHPK(data)
+			if publicKey == False:
+				log.debug("Unable to read UniformDH public key at this point.")
+				return
+			else:
+				self._sendUniformDHPK(circuit, publicKey)
 
-		if self.state == const.ST_WAIT_FOR_PK:
-			log.debug("other PK?")
-			otherPK = data.read(const.PUBLIC_KEY_LENGTH)
-			log.debug("Received other public key.  Now deriving master key.")
-			try:
-				masterKey = self.dh.get_secret(otherPK)
-			except ValueError:
-				raise base.PluggableTransportError("corrupted public key")
-
-			self._deriveSecrets(masterKey)
+			log.debug("Switching to state ST_CONNECTED.")
 			self.state = const.ST_CONNECTED
 
-		if self.weAreClient and self.state == const.ST_WAIT_FOR_PK:
-			if len(data) < const.PUBLIC_KEY_LENGTH:
-				log.debug("Missing bytes for PK.")
-			else:
-				data.read(const.PUBLIC_KEY_LENGTH)
-				log.debug("Received public key of remote machine.")
+		if self.weAreClient and self.state == const.ST_WAIT_FOR_AUTH:
+			if not self._receiveUniformDHPK(data):
+				log.debug("Unable to read UniformDH public key at this point.")
+				return
+
+			log.debug("Switching to state ST_CONNECTED.")
+			self.state = const.ST_CONNECTED
 
 		if self.state == const.ST_CONNECTED:
 			self.sendLocal(circuit, data.read())
