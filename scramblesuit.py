@@ -378,12 +378,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		return self.dh.get_public()
 
 
-	def _sendUniformDHPK( self, circuit, publicKey=None ):
+	def __createUniformDHPK( self, publicKey ):
 
 		# TODO - where does key come from?
 		key = "U" * 32
-
-		log.debug("Sending UniformDH public key.")
 
 		if not publicKey:
 			self.dh = obfs3_dh.UniformDH()
@@ -394,9 +392,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		mac = mycrypto.HMAC_SHA256_128(key, publicKey + padding + \
 				self._epoch())
 
-		# TODO - use packet morpher for handshake.
-		circuit.downstream.write(publicKey + padding + mac)
+		return publicKey + padding + mac
 
+
+	def _sendUniformDHPK( self, circuit, publicKey=None ):
+
+		log.debug("Sending UniformDH public key.")
+
+		handshakeMsg = self.__createUniformDHPK(publicKey)
+
+		# TODO - use packet morpher for handshake.
+		circuit.downstream.write(handshakeMsg)
 
 
 	def receivedDownstream( self, data, circuit ):
@@ -411,7 +417,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				log.debug("Unable to read UniformDH public key at this point.")
 				return
 			else:
-				self._sendUniformDHPK(circuit, publicKey)
+				ticket, masterKey = self._getSessionTicket()
+
+				ticketMsg = message.ProtocolMessage(payload=ticket + masterKey, \
+						flags=const.FLAG_NEW_TICKET)
+				ticketMsg = ticketMsg.encryptAndHMAC(self.sendCrypter, \
+						self.sendHMAC)
+				handshakeMsg = self.__createUniformDHPK(publicKey)
+				circuit.downstream.write(handshakeMsg + ticketMsg)
 
 			log.debug("Switching to state ST_CONNECTED.")
 			self.state = const.ST_CONNECTED
@@ -428,15 +441,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			self.sendLocal(circuit, data.read())
 
 
-	def _getSessionTicket( self, circuit ):
+	def _getSessionTicket( self ):
 
 		log.debug("Generating new session ticket and master key.")
-		nextMasterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
+		masterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
 
-		ticket = ticket.new(nextMasterKey)
-		rawTicket = ticket.issue()
+		newTicket = ticket.new(masterKey)
+		rawTicket = newTicket.issue()
 
-		return rawTicket, nextMasterKey
+		return rawTicket, masterKey
 
 
 	def receivedUpstream( self, data, circuit ):
