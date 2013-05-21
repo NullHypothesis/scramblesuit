@@ -38,7 +38,7 @@ def saneHeader( totalLen, payloadLen, flags ):
 		const.FLAG_PAYLOAD + const.FLAG_CONFIRM_TICKET
 	]
 
-	return ok(totalLen) and ok(payloadLen) and (ord(flags) in validFlags)
+	return ok(totalLen) and ok(payloadLen) and (flags in validFlags)
 
 
 class ProtocolMessage( object ):
