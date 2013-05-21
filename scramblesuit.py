@@ -100,23 +100,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def circuitDestroyed( self, circuit, reason, side ):
+		"""This method is called by obfsproxy when the TCP connection to the
+		remote end was destroyed; either cleanly or in a non-clean fashion."""
 
-		if reason == None or side == None:
-			log.debug("No reason given why circuit died.")
-			return
-
-		# reason is an instance of twisted.python.failure.Failure
-		log.debug("Circuit on %s side died because of: %s" % \
-			(side, reason.getErrorMessage()))
-		log.debug("Responsible value: %s." % type(reason.value))
-		log.debug("Responsible type: %s." % str(reason.type))
-
-		# For established TCP connections, twisted only tells us whether it was
-		# closed in a clean or non-clean way. We could use our protocol state
-		# machine to get some idea whether this is due to networking or
-		# censorship effects.
+		# This is only printed because the user might be interested in it.
 		if reason.check(error.ConnectionLost):
-			log.debug("The connection was lost due to a blacklisted error!")
+			log.info("The connection was lost in a non-clean fashion.")
 
 
 	def handshake( self, circuit ):
