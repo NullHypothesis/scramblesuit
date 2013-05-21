@@ -22,6 +22,10 @@ PUZZLE_LENGTH = 128
 # The length of the puzzle's modulus `n' in bits.
 PUZZLE_MODULUS_LENGTH = 512
 
+# Magic value used to easily locate the HMAC authenticating handshake messages
+# in bytes.
+MAGIC_LENGTH = 16
+
 # Approximate CPU time in seconds necessary to solve the puzzle.
 PUZZLE_UNLOCK_TIME = 120
 
@@ -30,9 +34,6 @@ PUZZLE_OBFUSCATION_KEYSPACE = 7
 
 # Nonce size prepended to encrypted puzzle in bytes.
 PUZZLE_NONCE_LENGTH = 8
-
-# Length of the magic values in bytes.
-MAGIC_LENGTH = 32
 
 # States which are used for the protocol state machine.
 ST_WAIT_FOR_AUTH = 0
