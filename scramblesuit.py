@@ -279,10 +279,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def _epoch( self ):
+		"""Return a coarse-grained Unix time stamp which is divided by
+		EPOCH_GRANULARITY."""
+
 		return str(int(time.time()) / const.EPOCH_GRANULARITY)
 
 
 	def _flushSendBuffer( self, circuit ):
+		"""Flushes the send buffer which could have been filled by the
+		application while ScrambleSuit was still busy handling
+		authentication."""
+
 		# FIXME - this method is not called anywhere.
 
 		# Flush the buffered data, Tor wanted to send in the meantime.
