@@ -68,7 +68,7 @@ def rotateKeys( ):
 def loadKeys( ):
 	"""Try to load the AES and HMAC key from the key store."""
 
-	log.debug("Reading session ticket keys from file.")
+	log.debug("Reading session ticket keys k_S from file.")
 
 	global HMACKey
 	global AESKey
