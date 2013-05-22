@@ -20,6 +20,7 @@ import random
 import struct
 import string
 import time
+import argparse
 
 import probdist
 import timelock
@@ -66,6 +67,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		# `True' if the client used a session ticket, `False' otherwise.
 		self.redeemedTicket = None
+
+		# Shared secret k_B which is only used for UniformDH.
+		if not hasattr(self, 'uniformDHSecret'):
+			self.uniformDHSecret = None
+		if self.uniformDHSecret:
+			log.debug("UniformDH shared secret: %s." % self.uniformDHSecret)
 
 		# Used by the unpack mechanism
 		self.totalLen = None
@@ -292,14 +299,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		# FIXME - this method is not called anywhere.
 
-		# Flush the buffered data, Tor wanted to send in the meantime.
+		# Flush the buffered data, the application wanted to send before.
 		if len(self.sendBuf):
 			log.debug("Flushing %d bytes of buffered data from local Tor." % \
 				len(self.sendBuf))
 			self.sendRemote(circuit, self.sendBuf)
 			self.sendBuf = ""
-		else:
-			log.debug("Empty buffer: no data to flush.")
 
 
 	def _receiveTicket( self, data ):
@@ -528,6 +533,51 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		else:
 			self.sendBuf += data.read()
 			log.debug("%d bytes of outgoing data buffered." % len(self.sendBuf))
+
+
+	@classmethod
+	def register_external_mode_cli( cls, subparser ):
+		"""Register a ScrambleSuit-specific command line argument for obfsproxy
+		which can be used to pass the UniformDH shared secret to
+		ScrambleSuit."""
+
+		subparser.add_argument('--shared-secret', type=str, \
+				help='Shared secret for UniformDH', dest="uniformDHSecret")
+
+		super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
+
+
+	@classmethod
+	def validate_external_mode_cli(cls, args):
+
+		if args.uniformDHSecret:
+			cls.uniformDHSecret = args.uniformDHSecret
+
+		super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
+
+
+	def handle_socks_args( self, args ):
+		"""This method is called with arguments which are received over the
+		SOCKS handshake.  That way, the UniformDH shared secret can reach
+		ScrambleSuit over SOCKS."""
+
+		log.debug("Received the following arguments over SOCKS: %s." % args)
+
+		# A shared secret might already be set if obfsproxy is in
+		# external mode.
+		if self.uniformDHSecret:
+			log.info("A UniformDH shared secret was already specified over" \
+					"the command line.  Using the SOCKS secret.")
+
+		if len(args) != 1:
+			raise base.SOCKSArgsError("Too many SOCKS arguments " \
+					"(expected 1 but got %d)." % len(args))
+
+		if not args[0].startswith("shared-secret="):
+			raise base.SOCKSArgsError("The SOCKS argument should start with" \
+					"`shared-secret='.")
+
+		self.uniformDHSecret = args[0][14:]
 
 
 class ScrambleSuitClient( ScrambleSuitTransport ):
