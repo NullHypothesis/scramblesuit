@@ -111,7 +111,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		remote end was destroyed; either cleanly or in a non-clean fashion."""
 
 		# This is only printed because the user might be interested in it.
-		if reason.check(error.ConnectionLost):
+		if reason and reason.check(error.ConnectionLost):
 			log.info("The connection was lost in a non-clean fashion.")
 
 
