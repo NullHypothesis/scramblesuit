@@ -87,6 +87,9 @@ TICKET_LENGTH = 112
 # Life time of session tickets in seconds.
 SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
 
+# The length of the UniformDH shared secret in bytes.
+SHARED_SECRET_LENGTH = 32
+
 # The prefix prepended to the master key which is locked inside the time-lock
 # puzzle. The client looks for this prefix to verify that the puzzle was
 # unlocked successfully.

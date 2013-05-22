@@ -553,6 +553,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if args.uniformDHSecret:
 			cls.uniformDHSecret = args.uniformDHSecret
 
+		if len(args.uniformDHSecret) != const.SHARED_SECRET_LENGTH:
+			raise base.PluggableTransportError("The UniformDH shared secret " \
+					"must be %d bytes in length but %d bytes given." % \
+					(const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
+
 		super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
 
 
@@ -578,6 +583,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 					"`shared-secret='.")
 
 		self.uniformDHSecret = args[0][14:]
+
+		if len(args.uniformDHSecret) != const.SHARED_SECRET_LENGTH:
+			raise base.PluggableTransportError("The UniformDH shared secret " \
+					"must be %d bytes in length but %d bytes given." % \
+					(const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
 
 
 class ScrambleSuitClient( ScrambleSuitTransport ):
