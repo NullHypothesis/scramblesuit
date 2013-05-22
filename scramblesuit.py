@@ -72,7 +72,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if not hasattr(self, 'uniformDHSecret'):
 			self.uniformDHSecret = None
 		if self.uniformDHSecret:
-			log.debug("UniformDH shared secret: %s." % self.uniformDHSecret)
+			log.info("UniformDH shared secret: %s." % self.uniformDHSecret)
 
 		# Used by the unpack mechanism
 		self.totalLen = None
@@ -426,8 +426,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 	def __receiveUniformDHPK( self, data ):
 
-		# FIXME - The key must come from BridgeDB.
-		key = "U" * 32
+		assert self.uniformDHSecret is not None
 
 		# Do we already have the minimum amount of data?
 		if len(data) < (const.PUBLIC_KEY_LENGTH + const.MAGIC_LENGTH + \
@@ -437,8 +436,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		handshake = data.peek()
 
 		# Look for the magic value to easily locate the HMAC.
-		magic = mycrypto.HMAC_SHA256_128(key, key + \
-				handshake[:const.PUBLIC_KEY_LENGTH])
+		magic = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+				self.uniformDHSecret + handshake[:const.PUBLIC_KEY_LENGTH])
 		index = handshake.find(magic)
 		if (index < 0) or ((len(handshake) - index - \
 				const.MAGIC_LENGTH) < const.HMAC_LENGTH):
@@ -448,7 +447,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		# Verify HMAC before touching the icky data.
 		existingMAC = handshake[index + const.MAGIC_LENGTH : index +
 				const.MAGIC_LENGTH + const.HMAC_LENGTH]
-		newMAC = mycrypto.HMAC_SHA256_128(key, \
+		newMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
 				handshake[0 : index + const.MAGIC_LENGTH] + self._epoch())
 
 		if newMAC == existingMAC:
@@ -464,8 +463,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 	# TODO - bad method name
 	def __createUniformDHPK( self, publicKey=None ):
 
-		# TODO - where does key come from?
-		key = "U" * 32
+		assert self.uniformDHSecret is not None
 
 		if not publicKey:
 			self.dh = obfs3_dh.UniformDH()
@@ -473,11 +471,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		padding = mycrypto.weak_random(random.randint(0, 123)) # TODO
 
 		# Generate magic value to make it easier to locate the HMAC.
-		magic = mycrypto.HMAC_SHA256_128(key, key + publicKey)
+		magic = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+				self.uniformDHSecret + publicKey)
 
 		# Authenticate the handshake including the current approximate epoch.
-		mac = mycrypto.HMAC_SHA256_128(key, publicKey + padding + magic + \
-				self._epoch())
+		mac = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, publicKey + \
+				padding + magic + self._epoch())
 
 		return publicKey + padding + magic + mac
 
@@ -496,7 +495,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				log.debug("UniformDH authentication succeeded.")
 
 			else:
-				log.debug("Authentication failed.  Waiting for more data.")
+				log.debug("Authentication unsuccessful so far.  " \
+						"Waiting for more data.")
 				return
 
 		if self.weAreClient and (self.state == const.ST_WAIT_FOR_AUTH):
