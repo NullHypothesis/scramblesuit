@@ -111,10 +111,10 @@ class PayloadCrypter:
 	def setSessionKey( self, key, iv ):
 		"""Set the AES session key and initialize counter mode."""
 
-		log.debug("Setting session key for payload crypter: 0x%s." % \
-			key.encode('hex'))
-		log.debug("Setting IV for payload crypter: 0x%s." % \
-			iv.encode('hex'))
+		log.debug("Setting session key for AES-CTR 0x%s..." % \
+				key.encode('hex')[:10])
+		log.debug("Setting IV for AES-CTR 0x%s..." % \
+				iv.encode('hex')[:10])
 		self.sessionKey = key
 		self.counter = Crypto.Util.Counter.new(128,
 				initial_value=long(iv.encode('hex'), 16))

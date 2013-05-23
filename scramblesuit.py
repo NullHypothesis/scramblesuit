@@ -89,7 +89,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		the given master key.  All key material is derived using
 		HKDF-SHA256."""
 
-		log.debug("Master key: 0x%s." % masterKey.encode('hex'))
+		log.debug("Deriving session keys from master key 0x%s..." % \
+				masterKey.encode('hex')[:10])
 
 		# We need key material for two magic values, symmetric keys, nonces and
 		# HMACs. All of them are 32 bytes in size.
@@ -134,7 +135,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			ticket = blob[const.MASTER_KEY_LENGTH: \
 					const.MASTER_KEY_LENGTH + const.TICKET_LENGTH]
 
-			log.debug("Trying to redeem session ticket: 0x%s..." % \
+			log.debug("Redeeming session ticket 0x%s..." % \
 					ticket.encode('hex')[:10])
 			self._deriveSecrets(masterKey)
 			padding = mycrypto.weak_random(random.randint(0, \
@@ -239,7 +240,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 			# We have a full message; let's extract it.
 			else:
-				log.debug("Extracting message of type %d." % self.flags)
 				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
 				vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
 						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
