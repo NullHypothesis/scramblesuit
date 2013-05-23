@@ -7,9 +7,6 @@ The values below are not supposed to be changed. If you don't obey, be at least
 careful because things could break easily.
 """
 
-# Key size for the AES session key and its IV in bytes.
-SESSION_KEY_SIZE = IV_SIZE = 32
-
 # Key size for the master key in bytes.
 MASTER_KEY_SIZE = 32
 
