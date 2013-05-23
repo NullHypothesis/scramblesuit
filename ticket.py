@@ -176,7 +176,7 @@ class SessionTicket( object ):
 		parameter `symmTicketKey' is used to encrypt the ticket and
 		`hmacTicketKey' is used to authenticate the ticket when issued."""
 
-		assert len(masterKey) == const.MASTER_KEY_SIZE
+		assert len(masterKey) == const.MASTER_KEY_LENGTH
 
 		checkKeys()
 

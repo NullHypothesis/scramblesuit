@@ -35,8 +35,8 @@ KEY_STORE = DATA_DIRECTORY + "ticket_keys.bin"
 # in bytes.
 MAGIC_LENGTH = 16
 
-# Key size for the master key in bytes.
-MASTER_KEY_SIZE = 32
+# Key length for the master key in bytes.
+MASTER_KEY_LENGTH = 32
 
 # The maximum padding length to be appended to the puzzle in bytes.
 MAX_PADDING_LENGTH = 4096
@@ -53,8 +53,8 @@ PUBLIC_KEY_LENGTH = 192
 # Life time of session tickets in seconds.
 SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
 
-# SHA256's digest size in bytes.
-SHA256_DIGEST_SIZE = 32
+# SHA256's digest length in bytes.
+SHA256_DIGEST_LENGTH = 32
 
 # The length of the UniformDH shared secret in bytes.
 SHARED_SECRET_LENGTH = 32

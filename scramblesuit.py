@@ -23,7 +23,6 @@ import time
 import argparse
 
 import probdist
-import timelock
 import mycrypto
 import message
 import const
@@ -131,11 +130,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if self.weAreClient and os.path.exists(const.TICKET_FILE):
 
 			blob = util.readFromFile(const.TICKET_FILE, \
-					const.MASTER_KEY_SIZE + const.TICKET_LENGTH)
+					const.MASTER_KEY_LENGTH + const.TICKET_LENGTH)
 
-			masterKey = blob[:const.MASTER_KEY_SIZE]
-			ticket = blob[const.MASTER_KEY_SIZE: \
-					const.MASTER_KEY_SIZE + const.TICKET_LENGTH]
+			masterKey = blob[:const.MASTER_KEY_LENGTH]
+			ticket = blob[const.MASTER_KEY_LENGTH: \
+					const.MASTER_KEY_LENGTH + const.TICKET_LENGTH]
 
 			log.debug("Trying to redeem session ticket: 0x%s..." % \
 					ticket.encode('hex')[:10])
@@ -258,9 +257,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 				# Store tickets instead of handing them to the application.
 				if self.flags == const.FLAG_NEW_TICKET:
-					self._storeNewTicket(fwdBuf[0:const.MASTER_KEY_SIZE], \
-							fwdBuf[const.MASTER_KEY_SIZE: \
-							const.MASTER_KEY_SIZE + const.TICKET_LENGTH])
+					self._storeNewTicket(fwdBuf[0:const.MASTER_KEY_LENGTH], \
+							fwdBuf[const.MASTER_KEY_LENGTH: \
+							const.MASTER_KEY_LENGTH + const.TICKET_LENGTH])
 					self.totalLen = self.payloadLen = self.flags = None
 					return None
 
@@ -361,7 +360,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		"""Store a new session ticket and the according master key for future
 		use."""
 
-		assert len(masterKey) == const.MASTER_KEY_SIZE
+		assert len(masterKey) == const.MASTER_KEY_LENGTH
 		assert len(ticket) == const.TICKET_LENGTH
 
 		util.writeToFile(masterKey + ticket, const.TICKET_FILE)
@@ -514,7 +513,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 	def _getSessionTicket( self ):
 
 		log.debug("Generating new session ticket and master key.")
-		masterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
+		masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
 
 		newTicket = ticket.new(masterKey)
 		rawTicket = newTicket.issue()
