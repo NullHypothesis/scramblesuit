@@ -4,13 +4,16 @@
 """
 Implements a subset of session tickets as proposed for TLS in RFC 5077:
 https://tools.ietf.org/html/rfc5077
+
+The format of a 112-byte ticket:
+    +------------+------------------+--------------+
+    | 16-byte IV | 64-byte E(state) | 32-byte HMAC |
+    +------------+------------------+--------------+
 """
 
 import os
-import random
 import time
 import const
-import sys
 import pickle
 
 from Crypto.Cipher import AES
@@ -23,35 +26,31 @@ import mycrypto
 
 log = logging.get_obfslogger()
 
-# Length of the ticket's name which is used to quickly identify issued tickets.
-NAME_LENGTH = 16
-
 # Length of the IV which is used for AES-CBC.
 IV_LENGTH = 16
 
+# Length of the HMAC used to authenticate the ticket.
 HMAC_KEY_LENGTH = 32
+
+# Length of the AES key used to encrypt the ticket.
 AES_KEY_LENGTH = 16
 
 # Must be a multiple of 16 bytes due to AES' block size.
 IDENTIFIER = "ScrambleSuitTicket"
 
-# +------------+------------------+--------------+
-# | 16-byte IV | 64-byte E(state) | 32-byte HMAC |
-# +------------+------------------+--------------+
-
-
-HMACKey = None
-AESKey = None
-creationTime = None
+HMACKey = AESKey = creationTime = None
 
 
 def rotateKeys( ):
-
-	log.debug("Rotating session ticket keys.")
+	"""The keys used to encrypt and authenticate tickets are rotated
+	periodically.  New keys are created but the old keys are still cached for
+	the next period to validate previously issued tickets."""
 
 	global HMACKey
 	global AESKey
 	global creationTime
+
+	log.info("Rotating session ticket keys.")
 
 	HMACKey = mycrypto.strong_random(HMAC_KEY_LENGTH)
 	AESKey = mycrypto.strong_random(AES_KEY_LENGTH)
@@ -66,14 +65,16 @@ def rotateKeys( ):
 
 
 def loadKeys( ):
-	"""Try to load the AES and HMAC key from the key store."""
-
-	log.debug("Reading session ticket keys k_S from file.")
+	"""Try to load the AES and HMAC key used to encrypt and authenticate
+	tickets from the key store."""
 
 	global HMACKey
 	global AESKey
 	global creationTime
 
+	log.info("Reading session ticket keys k_S from `%s'." % const.KEY_STORE)
+
+	# If the key store does not exist (yet), it must be created.
 	if not os.path.exists(const.KEY_STORE):
 		rotateKeys()
 		return
@@ -87,7 +88,7 @@ def loadKeys( ):
 
 
 def checkKeys( ):
-	"""Load the AES and the HMAC key if they are not defined yet. If they are
+	"""Load the AES and the HMAC key if they are not defined yet.  If they are
 	expired, rotate the keys."""
 
 	if (HMACKey is None) or (AESKey is None):
@@ -99,7 +100,7 @@ def checkKeys( ):
 
 def decryptTicket( ticket ):
 	"""Verifies the validity, decrypts and finally returns the given potential
-	ticket as a ProtocolState object. If the ticket is invalid, `None' is
+	ticket as a ProtocolState object.  If the ticket is invalid, `None' is
 	returned."""
 
 	assert len(ticket) == const.TICKET_LENGTH
@@ -112,10 +113,10 @@ def decryptTicket( ticket ):
 
 	checkKeys()
 
-	# Verify if HMAC is correct.
+	# Verify if the HMAC is correct.
 	hmac = HMAC.new(HMACKey, ticket[0:80], digestmod=SHA256).digest()
 	if hmac != ticket[80:const.TICKET_LENGTH]:
-		log.debug("Invalid HMAC. Probably no ticket.")
+		log.debug("Invalid HMAC.  Probably no ticket.")
 		return None
 
 	# Decrypt ticket to obtain state.
@@ -135,22 +136,20 @@ def decryptTicket( ticket ):
 
 class ProtocolState( object ):
 	"""Describes the protocol state of a ScrambleSuit server which is part of a
-	session ticket. The state can be used to bootstrap a ScrambleSuit session
+	session ticket.  The state can be used to bootstrap a ScrambleSuit session
 	without the client unlocking the puzzle."""
 
 	def __init__( self, masterKey, issueDate=int(time.time()) ):
 		self.identifier = IDENTIFIER
-		#self.protocolVersion = None
 		self.masterKey = masterKey
-		#self.clientIdentity = None
 		self.issueDate = issueDate
 		# Pad to multiple of 16 bytes due to AES' block size.
 		self.pad = "\0\0\0\0"
 
 
 	def isValid( self ):
-		"""Returns `True' if the protocol state is valid, i.e., if the life time
-		has not expired yet. Otherwise, `False' is returned."""
+		"""Returns `True' if the protocol state is valid, i.e., if the life
+		time has not expired yet.  Otherwise, `False' is returned."""
 
 		assert self.issueDate
 		now = int(time.time())
@@ -179,9 +178,6 @@ class SessionTicket( object ):
 		assert len(masterKey) == const.MASTER_KEY_LENGTH
 
 		checkKeys()
-
-		# The random name is used to recognize previously issued tickets.
-		#self.keyName = mycrypto.weak_random(NAME_LENGTH)
 
 		# Initialization vector for AES-CBC.
 		self.IV = mycrypto.strong_random(IV_LENGTH)

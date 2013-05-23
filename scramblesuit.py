@@ -169,6 +169,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if (data is None) or (len(data) == 0):
 			return
 
+		log.info("Processing %d bytes of outgoing data." % len(data))
+
 		# Wrap the application's data in ScrambleSuit protocol messages.
 		messages = message.createDataMessages(data)
 
@@ -277,7 +279,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if len(data) == 0 or not data:
 			return
 
-		log.debug("Processing %d bytes of incoming data." % len(data))
+		log.info("Processing %d bytes of incoming data." % len(data))
 
 		finalData = self.unpack(data, self.recvCrypter)
 		if finalData is not None:
@@ -360,6 +362,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		assert len(masterKey) == const.MASTER_KEY_LENGTH
 		assert len(ticket) == const.TICKET_LENGTH
+
+		log.debug("Storing newly received session ticket.")
 
 		util.writeToFile(masterKey + ticket, const.TICKET_FILE)
 
