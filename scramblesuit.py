@@ -85,8 +85,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def _deriveSecrets( self, masterKey ):
-		"""Derives session keys (AES keys, counter nonces, HMAC keys and magic
-		values) from the given master secret. All key material is derived using
+		"""Derives session keys (AES keys, counter nonces and HMAC keys) from
+		the given master key.  All key material is derived using
 		HKDF-SHA256."""
 
 		log.debug("Master key: 0x%s." % masterKey.encode('hex'))
@@ -120,9 +120,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def handshake( self, circuit ):
-		"""This function is invoked after a circuit was established. The server
-		generates a time-lock puzzle and sends it to the client. The client
-		does nothing during the handshake."""
+		"""This function is invoked after a circuit was established.  If a
+		ticket is available, the client redeems it.  Otherwise, the client
+		tries to start a UniformDH handshake."""
 
 		# Send a session ticket to the server (if we have one).
 		if self.weAreClient and os.path.exists(const.TICKET_FILE):
@@ -162,8 +162,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def sendRemote( self, circuit, data ):
-		"""Encrypt, then obfuscate the given data and send it to the remote
-		bridge."""
+		"""Encrypt, then chop the given data into pieces and send it to the
+		remote end."""
 
 		if (data is None) or (len(data) == 0):
 			return
