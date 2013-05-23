@@ -58,7 +58,7 @@ def rotateKeys( ):
 	creationTime = int(time.time())
 
 	try:
-		with open(const.DATA_DIRECTORY + const.KEY_STORE, "wb") as fd:
+		with open(const.KEY_STORE, "wb") as fd:
 			pickle.dump([creationTime, HMACKey, AESKey], fd)
 			fd.close()
 	except IOError as e:
@@ -74,12 +74,12 @@ def loadKeys( ):
 	global AESKey
 	global creationTime
 
-	if not os.path.exists(const.DATA_DIRECTORY + const.KEY_STORE):
+	if not os.path.exists(const.KEY_STORE):
 		rotateKeys()
 		return
 
 	try:
-		with open(const.DATA_DIRECTORY + const.KEY_STORE, "rb") as fd:
+		with open(const.KEY_STORE, "rb") as fd:
 			creationTime, HMACKey, AESKey = pickle.load(fd)
 			fd.close()
 	except IOError as e:
