@@ -74,6 +74,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if self.uniformDHSecret:
 			log.info("UniformDH shared secret: %s." % self.uniformDHSecret)
 
+		# Path to a file which contains a master key and the according ticket.
+		if not hasattr(self, "ticketFile"):
+			self.ticketFile = None
+		if self.ticketFile:
+			log.info("Using session ticket file `%s'." % self.ticketFile)
+			const.TICKET_FILE = self.ticketFile
+
 		# Used by the unpack mechanism
 		self.totalLen = None
 		self.payloadLen = None
@@ -121,18 +128,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		does nothing during the handshake."""
 
 		# Send a session ticket to the server (if we have one).
-		if self.weAreClient and os.path.exists(const.DATA_DIRECTORY + \
-				const.TICKET_FILE):
+		if self.weAreClient and os.path.exists(const.TICKET_FILE):
 
-			try:
-				with open(const.DATA_DIRECTORY + const.TICKET_FILE, "rb") as fd:
-					masterKey = fd.read(const.MASTER_KEY_SIZE)
-					ticket = fd.read(const.TICKET_LENGTH)
-					fd.close()
+			blob = util.readFromFile(const.TICKET_FILE, \
+					const.MASTER_KEY_SIZE + const.TICKET_LENGTH)
 
-			except IOError as e:
-				log.error("Could not read session ticket from \"%s\"." % \
-						(const.DATA_DIRECTORY + const.TICKET_FILE))
+			masterKey = blob[:const.MASTER_KEY_SIZE]
+			ticket = blob[const.MASTER_KEY_SIZE: \
+					const.MASTER_KEY_SIZE + const.TICKET_LENGTH]
 
 			log.debug("Trying to redeem session ticket: 0x%s..." % \
 					ticket.encode('hex')[:10])
@@ -361,8 +364,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		assert len(masterKey) == const.MASTER_KEY_SIZE
 		assert len(ticket) == const.TICKET_LENGTH
 
-		util.writeToFile(masterKey + ticket, \
-				const.DATA_DIRECTORY + const.TICKET_FILE)
+		util.writeToFile(masterKey + ticket, const.TICKET_FILE)
 
 
 	def _receiveClientsUniformDHPK( self, data, circuit ):
@@ -544,6 +546,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		subparser.add_argument('--shared-secret', type=str, \
 				help='Shared secret for UniformDH', dest="uniformDHSecret")
 
+		subparser.add_argument('--ticket-file', type=str, help='Path to a ' \
+				'session ticket (only for client)', dest="ticketFile")
+
 		super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
 
 
@@ -553,7 +558,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if args.uniformDHSecret:
 			cls.uniformDHSecret = args.uniformDHSecret
 
-		if len(args.uniformDHSecret) != const.SHARED_SECRET_LENGTH:
+		if args.ticketFile:
+			cls.ticketFile = args.ticketFile
+
+		if args.uniformDHSecret and len(args.uniformDHSecret) != \
+				const.SHARED_SECRET_LENGTH:
 			raise base.PluggableTransportError("The UniformDH shared secret " \
 					"must be %d bytes in length but %d bytes given." % \
 					(const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
