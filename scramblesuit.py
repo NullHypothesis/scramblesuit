@@ -15,9 +15,7 @@ import obfsproxy.common.log as logging
 import obfsproxy.transports.obfs3_dh as obfs3_dh
 
 import os
-import sys
 import random
-import struct
 import string
 import time
 import argparse
