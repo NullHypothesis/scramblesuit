@@ -125,6 +125,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		ticket is available, the client redeems it.  Otherwise, the client
 		tries to start a UniformDH handshake."""
 
+		if self.weAreClient:
+			if (not self.uniformDHSecret) and (not self.ticketFile):
+				raise base.PluggableTransportError("Neither a UniformDH " \
+						"secret nor a ticket is available.  ScrambleSuite " \
+						"needs at least one of these two for authentication.")
+
 		# Send a session ticket to the server (if we have one).
 		if self.weAreClient and os.path.exists(const.TICKET_FILE):
 
