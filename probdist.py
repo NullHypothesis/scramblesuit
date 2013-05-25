@@ -24,10 +24,6 @@ class RandProbDist:
 		self.sampleList = []
 		self.dist = self._generateDistribution()
 
-		log.debug("Packet size distribution:")
-		for key in self.dist.keys():
-			log.debug("%d: %f%%" % (key, self.dist[key]))
-
 
 	def _generateDistribution( self ):
 		"""Generates a random probability distribution."""

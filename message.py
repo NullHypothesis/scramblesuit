@@ -11,7 +11,7 @@ import const
 log = logging.get_obfslogger()
 
 
-def createMessages( data ):
+def createDataMessages( data ):
 
 	messages = []
 
@@ -26,19 +26,26 @@ def createMessages( data ):
 	return messages
 
 
-def saneLengths( totalLen, payloadLen ):
+def saneHeader( totalLen, payloadLen, flags ):
 
 	def ok( length ):
 		return True if (0 <= length <= const.MPU) else False
 
-	return ok(totalLen) and ok(payloadLen)
+	validFlags = [
+		const.FLAG_PAYLOAD,
+		const.FLAG_NEW_TICKET,
+		const.FLAG_CONFIRM_TICKET,
+		const.FLAG_PAYLOAD + const.FLAG_CONFIRM_TICKET
+	]
+
+	return ok(totalLen) and ok(payloadLen) and (flags in validFlags)
 
 
 class ProtocolMessage( object ):
 	"""Provides an abstraction of ScrambleSuit protocol messages. The class
 	provides methods to build, encrypt and pad protocol messages."""
 
-	def __init__( self, payload="", paddingLen=0 ):
+	def __init__( self, payload="", paddingLen=0, flags=const.FLAG_PAYLOAD ):
 
 		payloadLen = len(payload)
 		assert((payloadLen + paddingLen) <= (const.MPU))
@@ -47,15 +54,16 @@ class ProtocolMessage( object ):
 		self.totalLen = payloadLen + paddingLen
 		self.payloadLen = payloadLen
 		self.payload = payload
+		self.flags = chr(flags)
 
 
 	def encryptAndHMAC( self, crypter, HMACKey ):
 
 		encrypted = crypter.encrypt(serialize.htons(self.totalLen) + \
-				serialize.htons(self.payloadLen) + self.payload + \
-				(self.totalLen - self.payloadLen) * '\0')
+				serialize.htons(self.payloadLen) + self.flags + \
+				self.payload + (self.totalLen - self.payloadLen) * '\0')
 
-		hmac = mycrypto.MyHMAC_SHA256_128(HMACKey, encrypted)
+		hmac = mycrypto.HMAC_SHA256_128(HMACKey, encrypted)
 
 		return hmac + encrypted
 

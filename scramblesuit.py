@@ -12,29 +12,28 @@ from twisted.internet import reactor
 import obfsproxy.transports.base as base
 import obfsproxy.common.serialize as pack
 import obfsproxy.common.log as logging
+import obfsproxy.transports.obfs3_dh as obfs3_dh
 
 import os
-import sys
 import random
-import struct
 import string
 import time
+import argparse
 
 import probdist
-import timelock
 import mycrypto
 import message
 import const
 import util
 import packetmorpher
 import processprotocol
-import sessionticket
+import ticket
 
 
 log = logging.get_obfslogger()
 
 
-class ScrambleSuitDaemon( base.BaseTransport ):
+class ScrambleSuitTransport( base.BaseTransport ):
 
 	def __init__( self ):
 
@@ -44,15 +43,11 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		log.info("Initializing %s." % const.TRANSPORT_NAME)
 
 		# Initialize the protocol's state machine.
-		if self.weAreServer:
-			log.debug("Switching to state ST_WAIT_FOR_TICKET.")
-			self.state = const.ST_WAIT_FOR_TICKET
-		elif self.weAreClient:
-			log.debug("Switching to state ST_WAIT_FOR_PUZZLE.")
-			self.state = const.ST_WAIT_FOR_PUZZLE
+		log.debug("Switching to state ST_WAIT_FOR_AUTH.")
+		self.state = const.ST_WAIT_FOR_AUTH
 
-		# Magic values to tell when the actual communication begins.
-		self.sendMagic = self.recvMagic = None
+		# UniformDH object.
+		self.dh = None
 
 		# Buffers for incoming and outgoing data.
 		self.sendBuf = self.recvBuf = ""
@@ -70,56 +65,35 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		# Inter arrival time morpher to obfuscate inter arrival times.
 		self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.01)
 
-		# Circuit to write data to and receive data from.
-		self.circuit = None
-
-		# Timer service to generate garbage data while puzzle is being solved.
-		self.ts = None
-
-		# When the client magic was sent to guess if the ticket was accepted.
-		self.magicSent = None
-
 		# `True' if the client used a session ticket, `False' otherwise.
 		self.redeemedTicket = None
 
-		# Cache the puzzle if the session ticket is not accepted by the server.
-		self.cachedPuzzle = None
+		# Shared secret k_B which is only used for UniformDH.
+		if not hasattr(self, 'uniformDHSecret'):
+			self.uniformDHSecret = None
+		if self.uniformDHSecret:
+			log.info("UniformDH shared secret: %s." % self.uniformDHSecret)
 
-		# `True' when ScrambleSuit should stop sending cover traffic.
-		self.stopCoverTraffic = None
+		# Path to a file which contains a master key and the according ticket.
+		if not hasattr(self, "ticketFile"):
+			self.ticketFile = None
+		if self.ticketFile:
+			log.info("Using session ticket file `%s'." % self.ticketFile)
+			const.TICKET_FILE = self.ticketFile
 
 		# Used by the unpack mechanism
 		self.totalLen = None
 		self.payloadLen = None
-
-
-	def _sendCoverTraffic( self, circuit ):
-		"""Send random cover traffic using `circuit'. This is done to make DPI
-		boxes believe that we are communicating when in fact the client is busy
-		solving the puzzle."""
-
-		if self.stopCoverTraffic == True:
-			return
-
-		coverTraffic = mycrypto.weak_random(self.pktMorpher.randomSample())
-		log.debug("Sending %d bytes of cover traffic." % len(coverTraffic))
-		circuit.downstream.write(coverTraffic)
-
-		# When should we send the next chunk of bytes?
-		if random.random() > 0.3:
-			delay = self.iatMorpher.randomSample()
-		else:
-			delay = random.random() * 5
-
-		reactor.callLater(delay, self._sendCoverTraffic, circuit)
+		self.flags = None
 
 
 	def _deriveSecrets( self, masterKey ):
-		"""Derives session keys (AES keys, counter nonces, HMAC keys and magic
-		values) from the given master secret. All key material is derived using
+		"""Derives session keys (AES keys, counter nonces and HMAC keys) from
+		the given master key.  All key material is derived using
 		HKDF-SHA256."""
 
-		log.debug("Master key: 0x%s." % masterKey.encode('hex'))
+		log.debug("Deriving session keys from master key 0x%s..." % \
+				masterKey.encode('hex')[:10])
 
 		# We need key material for two magic values, symmetric keys, nonces and
 		# HMACs. All of them are 32 bytes in size.
@@ -130,144 +104,84 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		self.sendCrypter.setSessionKey(okm[0:32],  okm[32:64])
 		self.recvCrypter.setSessionKey(okm[64:96], okm[96:128])
 
-		# Derive a magic value for the client as well as the server. They must
-		# be distinct to prevent fingerprinting (e.g. look for two identical
-		# 256-bit strings).
-		self.sendMagic = okm[128:160]
-		self.recvMagic = okm[160:192]
-
 		# Set the HMAC keys.
-		self.sendHMAC = okm[192:224]
-		self.recvHMAC = okm[224:256]
+		self.sendHMAC = okm[128:160]
+		self.recvHMAC = okm[160:192]
 
 		if self.weAreServer:
 			self.sendHMAC, self.recvHMAC = util.swap(self.sendHMAC, self.recvHMAC)
 			self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter, \
 					self.recvCrypter)
-			self.sendMagic, self.recvMagic = util.swap(self.sendMagic, \
-					self.recvMagic)
-
-		log.debug("Magic values derived from session key: send=0x%s, " \
-			"recv=0x%s." % (self.sendMagic.encode('hex'), \
-			self.recvMagic.encode('hex')))
 
 
 	def circuitDestroyed( self, circuit, reason, side ):
+		"""This method is called by obfsproxy when the TCP connection to the
+		remote end was destroyed; either cleanly or in a non-clean fashion."""
 
-		if reason == None or side == None:
-			log.debug("No reason given why circuit died.")
-			return
-
-		# reason is an instance of twisted.python.failure.Failure
-		log.debug("Circuit on %s side died because of: %s" % \
-			(side, reason.getErrorMessage()))
-		log.debug("Responsible value: %s." % type(reason.value))
-		log.debug("Responsible type: %s." % str(reason.type))
-
-		# For established TCP connections, twisted only tells us whether it was
-		# closed in a clean or non-clean way. We could use our protocol state
-		# machine to get some idea whether this is due to networking or
-		# censorship effects.
-		if reason.check(error.ConnectionLost):
-			log.debug("The connection was lost due to a blacklisted error!")
+		# This is only printed because the user might be interested in it.
+		if reason and reason.check(error.ConnectionLost):
+			log.info("The connection was lost in a non-clean fashion.")
 
 
 	def handshake( self, circuit ):
-		"""This function is invoked after a circuit was established. The server
-		generates a time-lock puzzle and sends it to the client. The client
-		does nothing during the handshake."""
+		"""This function is invoked after a circuit was established.  If a
+		ticket is available, the client redeems it.  Otherwise, the client
+		tries to start a UniformDH handshake."""
 
-		log.debug("Entering handshake().")
-		if self.circuit == None:
-			self.circuit = circuit
-
-		# Only the server is generating and transmitting a puzzle.
-		if self.weAreServer:
-
-			# Generate master key and derive client -and server key.
-			masterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
-			self._deriveSecrets(masterKey)
-
-			# Append random padding to obfuscate length and transmit blurb.
-			padding = mycrypto.weak_random(random.randint(0, \
-					const.MAX_PADDING_LENGTH))
-			log.debug("Sending puzzle with %d-byte of padding." % len(padding))
-
-			puzzle, nonce = timelock.encryptPuzzle( \
-					timelock.generateRawPuzzle(masterKey))
-
-			circuit.downstream.write(nonce + puzzle + padding)
-
-			log.debug("Switching to state ST_WAIT_FOR_TICKET.")
-			self.state = const.ST_WAIT_FOR_TICKET
+		if self.weAreClient:
+			if (not self.uniformDHSecret) and (not self.ticketFile):
+				raise base.PluggableTransportError("Neither a UniformDH " \
+						"secret nor a ticket is available.  ScrambleSuite " \
+						"needs at least one of these two for authentication.")
 
 		# Send a session ticket to the server (if we have one).
+		if self.weAreClient and os.path.exists(const.TICKET_FILE):
+
+			blob = util.readFromFile(const.TICKET_FILE, \
+					const.MASTER_KEY_LENGTH + const.TICKET_LENGTH)
+
+			masterKey = blob[:const.MASTER_KEY_LENGTH]
+			ticket = blob[const.MASTER_KEY_LENGTH: \
+					const.MASTER_KEY_LENGTH + const.TICKET_LENGTH]
+
+			log.debug("Redeeming session ticket 0x%s..." % \
+					ticket.encode('hex')[:10])
+			self._deriveSecrets(masterKey)
+			padding = mycrypto.weak_random(random.randint(0, \
+					const.MAX_PADDING_LENGTH))
+
+			key = "A" * 32
+			magic = mycrypto.HMAC_SHA256_128(key, key + ticket)
+			mac = mycrypto.HMAC_SHA256_128(key, ticket + padding + magic + \
+					self._epoch())
+
+			circuit.downstream.write(ticket + padding + magic + mac)
+			self.redeemedTicket = True
+
+			# TODO - The client can't know at this point whether the server
+			# accepted the ticket.
+			log.debug("Switching to state ST_CONNECTED.")
+			self.state = const.ST_CONNECTED
+
+		# Conduct an authenticated UniformDH handshake if there's no ticket.
 		elif self.weAreClient:
-			stop = False
-			try:
-				with open(const.DATA_DIRECTORY + const.TICKET_FILE, "rb") as fd:
-					masterKey = fd.read(const.MASTER_KEY_SIZE)
-					ticket = fd.read(const.TICKET_LENGTH)
-					fd.close()
-			except IOError as e:
-				log.error("Could not read session ticket from \"%s\"." % \
-						(const.DATA_DIRECTORY + const.TICKET_FILE))
-				stop = True
+			log.debug("No session ticket to redeem.  Running UniformDH.")
 
-			if not stop:
-				log.debug("Trying to redeem session ticket: 0x%s..." % \
-						ticket.encode('hex')[:10])
-				self._deriveSecrets(masterKey)
-				padding = mycrypto.weak_random(random.randint(0, \
-						const.MAX_PADDING_LENGTH))
-				circuit.downstream.write(ticket + padding)
-				self.redeemedTicket = True
-
-		# Now start transmitting cover traffic.
-		self.stopCoverTraffic = False
-		reactor.callLater(0, self._sendCoverTraffic, circuit)
-
-
-	def decryptedPuzzleCallback( self, masterKey ):
-		"""This method is invoked as soon as the puzzle is unlocked. The
-		argument `masterKey' is the content of the unlocked puzzle."""
-
-		log.debug("Callback invoked after solved puzzle.")
-
-		# Sanity check to verify that we solved a real puzzle.
-		if not const.MASTER_KEY_PREFIX in masterKey:
-			log.critical("No MASTER_KEY_PREFIX in puzzle. What did we just " \
-					"solve?")
-			return
-
-		masterKey = masterKey[len(const.MASTER_KEY_PREFIX):]
-		assert len(masterKey) == const.MASTER_KEY_SIZE
-
-		self._deriveSecrets(masterKey)
-
-		log.debug("Stopping cover traffic generation.")
-		self.stopCoverTraffic = True
-
-		# Send bridge randomness || magic value.
-		log.debug("Sending magic value to server.")
-		assert self.circuit
-		self.circuit.downstream.write(mycrypto.weak_random(
-				random.randint(0, const.MAX_PADDING_LENGTH)) + self.sendMagic)
-
-		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-		self.state = const.ST_WAIT_FOR_MAGIC
-		#self._flushSendBuffer(self.circuit)
+			# TODO - use packet morpher for handshake.
+			circuit.downstream.write(self.__createUniformDHPK())
 
 
 	def sendRemote( self, circuit, data ):
-		"""Encrypt, then obfuscate the given data and send it to the remote
-		bridge."""
+		"""Encrypt, then chop the given data into pieces and send it to the
+		remote end."""
 
 		if (data is None) or (len(data) == 0):
 			return
 
+		log.info("Processing %d bytes of outgoing data." % len(data))
+
 		# Wrap the application's data in ScrambleSuit protocol messages.
-		messages = message.createMessages(data)
+		messages = message.createDataMessages(data)
 
 		# Invoke the packet morpher and pad the last protocol message.
 		chopper, paddingLen = self.pktMorpher.morph(sum([len(msg) \
@@ -321,23 +235,24 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			if self.totalLen == None:
 				self.totalLen = pack.ntohs(aes.decrypt(self.recvBuf[16:18]))
 				self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
+				self.flags = ord(aes.decrypt(self.recvBuf[20]))
 
 				# Abort immediately if the extracted lengths do not make sense.
-				if not message.saneLengths(self.totalLen, self.payloadLen):
-					raise base.PluggableTransportError("Invalid message " \
-							"length(s): totalLen=%d, payloadLen=%d." % \
-							(self.totalLen, self.payloadLen))
-				log.debug("Message header: totalLen=%d, payloadLen=%d." % \
-					(self.totalLen, self.payloadLen))
+				if not message.saneHeader(self.totalLen, self.payloadLen, \
+						self.flags):
+					raise base.PluggableTransportError("Invalid header: " \
+							"totalLen=%d, payloadLen=%d. flags=%d" % \
+							(self.totalLen, self.payloadLen, self.flags))
+				log.debug("Message header: totalLen=%d, payloadLen=%d, flags" \
+						"=%d" % (self.totalLen, self.payloadLen, self.flags))
 
 			if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
 				return fwdBuf
 
 			# We have a full message; let's extract it.
 			else:
-				log.debug("Extracting fully received protocol message.")
 				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
-				vrfyHMAC = mycrypto.MyHMAC_SHA256_128(self.recvHMAC, \
+				vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
 						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
 						const.HDR_LENGTH)])
 
@@ -347,10 +262,18 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 
 				fwdBuf += aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
 						(self.totalLen+const.HDR_LENGTH)])[:self.payloadLen]
-
 				self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
+
+				# Store tickets instead of handing them to the application.
+				if self.flags == const.FLAG_NEW_TICKET:
+					self._storeNewTicket(fwdBuf[0:const.MASTER_KEY_LENGTH], \
+							fwdBuf[const.MASTER_KEY_LENGTH: \
+							const.MASTER_KEY_LENGTH + const.TICKET_LENGTH])
+					self.totalLen = self.payloadLen = self.flags = None
+					return None
+
 				# Protocol message extracted - resetting length fields.
-				self.totalLen = self.payloadLen = None
+				self.totalLen = self.payloadLen = self.flags = None
 
 		log.debug("Unpacked %d bytes of data: 0x%s..." % \
 				(len(fwdBuf), fwdBuf[:10].encode('hex')))
@@ -365,187 +288,248 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 		if len(data) == 0 or not data:
 			return
 
-		log.debug("Processing %d bytes of incoming data." % len(data))
+		log.info("Processing %d bytes of incoming data." % len(data))
 
-		# Send encrypted and obfuscated data.
-		circuit.upstream.write(self.unpack(data, self.recvCrypter))
-
-
-	def _receivePuzzle( self, data, circuit ):
-
-		if len(data) < (const.PUZZLE_LENGTH + const.PUZZLE_NONCE_LENGTH):
-			log.debug("Puzzle not yet fully received.")
-			return
-
-		nonce = data.read(const.PUZZLE_NONCE_LENGTH)
-		#puzzle = timelock.extractPuzzle(data.read(const.PUZZLE_LENGTH))
-		puzzle = data.read(const.PUZZLE_LENGTH)
-
-		# Cache puzzle when we try our luck with the session ticket.
-		if self.redeemedTicket:
-			log.debug("Caching puzzle because we are using a session ticket.")
-			self.cachedPuzzle = puzzle
-
-			self._sendMagicValue(circuit, self.sendMagic)
-			self.magicSent = time.time()
-			#self._flushSendBuffer(circuit)
-
-			log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-			self.state = const.ST_WAIT_FOR_MAGIC
-		else:
-			# Prevents us from mistakenly accepting another puzzle.
-			log.debug("Switching to state ST_SOLVING_PUZZLE.")
-			self.state = const.ST_SOLVING_PUZZLE
-			#self._solvePuzzleInProcess(puzzle)
-			timelock.bruteForcePuzzle(nonce, puzzle, \
-					self.decryptedPuzzleCallback)
+		finalData = self.unpack(data, self.recvCrypter)
+		if finalData is not None:
+			# Send encrypted and obfuscated data.
+			circuit.upstream.write(finalData)
 
 
-	def _receiveTicket( self, data ):
+	def _epoch( self ):
+		"""Return a coarse-grained Unix time stamp which is divided by
+		EPOCH_GRANULARITY."""
 
-		if len(data) < const.TICKET_LENGTH:
-			log.debug("Missing %d bytes of ticket." % \
-				(const.TICKET_LENGTH - len(data)))
-			return
-
-		potentialTicket = data.read(const.TICKET_LENGTH)
-		log.debug("Read a potential session ticket: 0x%s..." % \
-				potentialTicket.encode('hex')[:10])
-
-		ticket = sessionticket.decryptTicket(potentialTicket)
-		if ticket != None and ticket.isValid():
-			log.debug("The ticket is valid. Now deriving keys.")
-			self._deriveSecrets(ticket.masterKey)
-
-		log.debug("Switching to state ST_WAIT_FOR_MAGIC.")
-		self.state = const.ST_WAIT_FOR_MAGIC
-
-
-	def _receiveEncryptedTicket( self, data ):
-
-		expected = const.TICKET_LENGTH + const.MASTER_KEY_SIZE
-
-		assert len(data) >= expected
-		data = data.read(expected)
-
-		decrypted = self.recvCrypter.decrypt(data[:expected])
-		ticket = decrypted[:const.TICKET_LENGTH]
-		nextMasterKey = decrypted[const.TICKET_LENGTH : expected]
-
-		util.writeToFile(nextMasterKey + ticket, \
-				const.DATA_DIRECTORY + const.TICKET_FILE)
+		return str(int(time.time()) / const.EPOCH_GRANULARITY)
 
 
 	def _flushSendBuffer( self, circuit ):
+		"""Flushes the send buffer which could have been filled by the
+		application while ScrambleSuit was still busy handling
+		authentication."""
 
-		# Flush the buffered data, Tor wanted to send in the meantime.
+		# FIXME - this method is not called anywhere.
+
+		# Flush the buffered data, the application wanted to send before.
 		if len(self.sendBuf):
 			log.debug("Flushing %d bytes of buffered data from local Tor." % \
 				len(self.sendBuf))
 			self.sendRemote(circuit, self.sendBuf)
 			self.sendBuf = ""
+
+
+	def _receiveTicket( self, data ):
+		"""Verify and extract ticket handshake message."""
+
+		if len(data) < (const.TICKET_LENGTH + const.MAGIC_LENGTH + \
+				const.HMAC_LENGTH):
+			return False
+
+		potentialTicket = data.peek()
+		key = "A" * 32
+
+		# Look for the magic value to easily locate the HMAC.
+		magic = mycrypto.HMAC_SHA256_128(key, key + \
+				potentialTicket[:const.TICKET_LENGTH])
+		index = potentialTicket.find(magic)
+		if (index < 0) or ((len(potentialTicket) - index - \
+				const.MAGIC_LENGTH) < const.HMAC_LENGTH):
+			log.debug("Could not find magic value for ticket yet.")
+			return False
+
+		# Verify HMAC before touching the icky data.
+		existingMAC = potentialTicket[index + const.MAGIC_LENGTH:index +
+				const.MAGIC_LENGTH + const.HMAC_LENGTH]
+		newMAC = mycrypto.HMAC_SHA256_128(key, \
+				potentialTicket[0:index + const.MAGIC_LENGTH] + self._epoch())
+
+		if newMAC == existingMAC:
+			log.debug("HMAC of session ticket is valid.")
+			data.drain()
 		else:
-			log.debug("Empty buffer: no data to flush.")
+			log.error("Invalid HMAC despite valid magic value.")
+			return False
+
+		# Now try to decrypt and parse ticket.
+		log.debug("Attempting to decrypt potential session ticket.")
+		newTicket = ticket.decryptTicket(potentialTicket[:const.TICKET_LENGTH])
+
+		if ticket != None and newTicket.isValid():
+			log.debug("The ticket is valid.  Now deriving keys.")
+			data.drain(const.TICKET_LENGTH)
+			self._deriveSecrets(newTicket.masterKey)
+			log.debug("Switching to state ST_CONNECTED.")
+			self.state = const.ST_CONNECTED
+			return True
+		else:
+			return False
 
 
-	def _receiveClientMagic( self, data, circuit ):
+	def _storeNewTicket( self, masterKey, ticket ):
+		"""Store a new session ticket and the according master key for future
+		use."""
 
-		if not self._magicInData(data, self.recvMagic):
+		assert len(masterKey) == const.MASTER_KEY_LENGTH
+		assert len(ticket) == const.TICKET_LENGTH
+
+		log.debug("Storing newly received session ticket.")
+
+		util.writeToFile(masterKey + ticket, const.TICKET_FILE)
+
+
+	def _receiveClientsUniformDHPK( self, data, circuit ):
+
+		clientPK = self.__receiveUniformDHPK(data)
+		if not clientPK:
 			return
 
-		# Send server magic and next session ticket + master key.
-		rawTicket, nextMasterKey = self._getSessionTicket(circuit)
-		self._sendMagicValue(circuit, self.sendMagic + \
-				self.sendCrypter.encrypt(rawTicket + nextMasterKey))
-		self._flushSendBuffer(circuit)
+		self.dh = obfs3_dh.UniformDH()
+		try:
+			masterKey = self.dh.get_secret(clientPK)
+		except ValueError:
+			raise base.PluggableTransportError("Corrupted public key.")
+
+		self._deriveSecrets(masterKey)
 
 		log.debug("Switching to state ST_CONNECTED.")
 		self.state = const.ST_CONNECTED
-		self.sendLocal(circuit, data.read())
+
+		# Now send our PK to the client so it can finish the handshake as well.
+		myPK = self.dh.get_public()
+		assert myPK
+
+		ticket, masterKey = self._getSessionTicket()
+
+		ticketMsg = message.ProtocolMessage(payload=masterKey + ticket, \
+				flags=const.FLAG_NEW_TICKET)
+		ticketMsg = ticketMsg.encryptAndHMAC(self.sendCrypter, \
+				self.sendHMAC)
+
+		handshakeMsg = self.__createUniformDHPK(myPK)
+
+		log.debug("Sending %d bytes of UniformDH handshake and ticket." %
+				len(handshakeMsg + ticketMsg))
+		circuit.downstream.write(handshakeMsg + ticketMsg)
+		# TODO - use sendRemote() to send ticketMsg
+
+		return True
 
 
-	def _receiveServerMagic( self, data, circuit ):
+	def _receiveServersUniformDHPK( self, data ):
 
-		if self._magicInData(data, self.recvMagic):
-			assert len(data) >= const.TICKET_LENGTH
-			self._receiveEncryptedTicket(data)
-
-			log.debug("Switching to state ST_CONNECTED.")
-			self.state = const.ST_CONNECTED
-
-			self._flushSendBuffer(circuit)
-			self.sendLocal(circuit, data.read())
-
-		elif self.redeemedTicket and ((time.time() - self.magicSent) >= 5):
-			log.debug("Ticket probably not accepted. Solving the puzzle, then.")
-			self._solvePuzzleInProcess(self.cachedPuzzle)
-		else:
+		serverPK = self.__receiveUniformDHPK(data)
+		if not serverPK:
 			return
+
+		log.debug("Received UniformDH public key.  Now deriving session keys.")
+
+		try:
+			masterKey = self.dh.get_secret(serverPK)
+		except ValueError:
+			raise base.PluggableTransportError("Corrupted public key.")
+
+		self._deriveSecrets(masterKey)
+
+		log.debug("Switching to state ST_CONNECTED.")
+		self.state = const.ST_CONNECTED
+
+		return True
+
+
+	def __receiveUniformDHPK( self, data ):
+
+		assert self.uniformDHSecret is not None
+
+		# Do we already have the minimum amount of data?
+		if len(data) < (const.PUBLIC_KEY_LENGTH + const.MAGIC_LENGTH + \
+				const.HMAC_LENGTH):
+			return False
+
+		handshake = data.peek()
+
+		# Look for the magic value to easily locate the HMAC.
+		magic = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+				self.uniformDHSecret + handshake[:const.PUBLIC_KEY_LENGTH])
+		index = handshake.find(magic)
+		if (index < 0) or ((len(handshake) - index - \
+				const.MAGIC_LENGTH) < const.HMAC_LENGTH):
+			log.debug("Could not find magic value for UniformDH yet.")
+			return False
+
+		# Verify HMAC before touching the icky data.
+		existingMAC = handshake[index + const.MAGIC_LENGTH : index +
+				const.MAGIC_LENGTH + const.HMAC_LENGTH]
+		newMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+				handshake[0 : index + const.MAGIC_LENGTH] + self._epoch())
+
+		if newMAC == existingMAC:
+			log.debug("HMAC of UniformDH public key is valid.")
+			data.drain(index + const.MAGIC_LENGTH + const.HMAC_LENGTH)
+		else:
+			log.error("Invalid HMAC despite valid magic value.")
+			return False
+
+		return handshake[:const.PUBLIC_KEY_LENGTH]
+
+
+	# TODO - bad method name
+	def __createUniformDHPK( self, publicKey=None ):
+
+		assert self.uniformDHSecret is not None
+
+		if not publicKey:
+			self.dh = obfs3_dh.UniformDH()
+			publicKey = self.dh.get_public()
+		padding = mycrypto.weak_random(random.randint(0, 123)) # TODO
+
+		# Generate magic value to make it easier to locate the HMAC.
+		magic = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+				self.uniformDHSecret + publicKey)
+
+		# Authenticate the handshake including the current approximate epoch.
+		mac = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, publicKey + \
+				padding + magic + self._epoch())
+
+		return publicKey + padding + magic + mac
 
 
 	def receivedDownstream( self, data, circuit ):
 		"""Data coming from the remote end point and going to the local Tor."""
 
-		if self.weAreClient and self.state == const.ST_WAIT_FOR_PUZZLE:
-			self._receivePuzzle(data, circuit)
+		if self.weAreServer and (self.state == const.ST_WAIT_FOR_AUTH):
 
-		if self.weAreServer and self.state == const.ST_WAIT_FOR_TICKET:
-			self._receiveTicket(data)
+			# First, try to interpret the incoming data as session ticket.
+			if self._receiveTicket(data):
+				log.debug("Ticket authentication succeeded.")
 
-		if (self.weAreClient and self.state == const.ST_SOLVING_PUZZLE) or \
-				(self.weAreServer and self.state == const.ST_WAIT_FOR_PUZZLE):
-			log.debug("Discarding %d bytes of bogus data." % len(data.read()))
+			# Second, interpret the data as a UniformDH handshake.
+			elif self._receiveClientsUniformDHPK(data, circuit):
+				log.debug("UniformDH authentication succeeded.")
 
-		if self.weAreServer and self.state == const.ST_WAIT_FOR_MAGIC:
-			self._receiveClientMagic(data, circuit)
+			else:
+				log.debug("Authentication unsuccessful so far.  " \
+						"Waiting for more data.")
+				return
 
-		if self.weAreClient and self.state == const.ST_WAIT_FOR_MAGIC:
-			self._receiveServerMagic(data, circuit)
+		if self.weAreClient and (self.state == const.ST_WAIT_FOR_AUTH):
+
+			if not self._receiveServersUniformDHPK(data):
+				log.debug("Unable to read UniformDH public key at this point.")
+				return
 
 		if self.state == const.ST_CONNECTED:
 			self.sendLocal(circuit, data.read())
 
-		#log.error("Reached invalid code branch. This is probably a bug.")
 
-
-	def _getSessionTicket( self, circuit ):
+	def _getSessionTicket( self ):
 
 		log.debug("Generating new session ticket and master key.")
-		nextMasterKey = mycrypto.strong_random(const.MASTER_KEY_SIZE)
+		masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
 
-		ticket = sessionticket.new(nextMasterKey)
-		rawTicket = ticket.issue()
+		newTicket = ticket.new(masterKey)
+		rawTicket = newTicket.issue()
 
-		return rawTicket, nextMasterKey
-
-
-	def _magicInData( self, data, magic ):
-		"""Returns True if the given `magic' is found in `data'. If not, False
-		is returned."""
-
-		preview = data.peek()
-
-		magicIndex = preview.find(magic)
-		if magicIndex == -1:
-			log.debug("Found no magic value in %d-byte buffer." % len(preview))
-			return False
-
-		log.debug("Found the remote's magic value.")
-		data.drain(magicIndex + const.MAGIC_LENGTH)
-
-		return True
-
-
-	def _sendMagicValue( self, circuit, magic ):
-		"""Sends the given `magic' to the remote machine using `circuit'. Before
-		that, the cover traffic generator is stopped."""
-
-		log.debug("Stopping cover traffic generation.")
-		self.stopCoverTraffic = True
-
-		# FIXME - Use packet morpher oracle for padding.
-		circuit.downstream.write(mycrypto.weak_random(random.randint(0, \
-				const.MAX_PADDING_LENGTH)) + magic)
+		return rawTicket, masterKey
 
 
 	def receivedUpstream( self, data, circuit ):
@@ -563,17 +547,79 @@ class ScrambleSuitDaemon( base.BaseTransport ):
 			log.debug("%d bytes of outgoing data buffered." % len(self.sendBuf))
 
 
-class ScrambleSuitClient( ScrambleSuitDaemon ):
+	@classmethod
+	def register_external_mode_cli( cls, subparser ):
+		"""Register a ScrambleSuit-specific command line argument for obfsproxy
+		which can be used to pass the UniformDH shared secret to
+		ScrambleSuit."""
+
+		subparser.add_argument('--shared-secret', type=str, \
+				help='Shared secret for UniformDH', dest="uniformDHSecret")
+
+		subparser.add_argument('--ticket-file', type=str, help='Path to a ' \
+				'session ticket (only for client)', dest="ticketFile")
+
+		super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
+
+
+	@classmethod
+	def validate_external_mode_cli(cls, args):
+
+		if args.uniformDHSecret:
+			cls.uniformDHSecret = args.uniformDHSecret
+
+		if args.ticketFile:
+			cls.ticketFile = args.ticketFile
+
+		if args.uniformDHSecret and len(args.uniformDHSecret) != \
+				const.SHARED_SECRET_LENGTH:
+			raise base.PluggableTransportError("The UniformDH shared secret " \
+					"must be %d bytes in length but %d bytes given." % \
+					(const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
+
+		super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
+
+
+	def handle_socks_args( self, args ):
+		"""This method is called with arguments which are received over the
+		SOCKS handshake.  That way, the UniformDH shared secret can reach
+		ScrambleSuit over SOCKS."""
+
+		log.debug("Received the following arguments over SOCKS: %s." % args)
+
+		# A shared secret might already be set if obfsproxy is in
+		# external mode.
+		if self.uniformDHSecret:
+			log.info("A UniformDH shared secret was already specified over" \
+					"the command line.  Using the SOCKS secret.")
+
+		if len(args) != 1:
+			raise base.SOCKSArgsError("Too many SOCKS arguments " \
+					"(expected 1 but got %d)." % len(args))
+
+		if not args[0].startswith("shared-secret="):
+			raise base.SOCKSArgsError("The SOCKS argument should start with" \
+					"`shared-secret='.")
+
+		self.uniformDHSecret = args[0][14:]
+
+		if len(args.uniformDHSecret) != const.SHARED_SECRET_LENGTH:
+			raise base.PluggableTransportError("The UniformDH shared secret " \
+					"must be %d bytes in length but %d bytes given." % \
+					(const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
+
+
+class ScrambleSuitClient( ScrambleSuitTransport ):
 
 	def __init__( self ):
 		self.weAreClient = True
 		self.weAreServer = False
-		ScrambleSuitDaemon.__init__(self)
+		ScrambleSuitTransport.__init__(self)
 
 
-class ScrambleSuitServer( ScrambleSuitDaemon ):
+class ScrambleSuitServer( ScrambleSuitTransport ):
 
 	def __init__( self ):
 		self.weAreServer = True
 		self.weAreClient = False
-		ScrambleSuitDaemon.__init__(self)
+		ScrambleSuitTransport.__init__(self)

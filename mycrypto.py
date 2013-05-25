@@ -27,7 +27,7 @@ class HKDF_SHA256( object ):
 
 	def __init__( self, prk, info="", length=32 ):
 
-		self.HashLen = const.SHA256_DIGEST_SIZE
+		self.HashLen = const.SHA256_DIGEST_LENGTH
 
 		if length > (self.HashLen * 255):
 			raise ValueError("The OKM's length cannot be larger than %d." % \
@@ -66,10 +66,10 @@ class HKDF_SHA256( object ):
 
 
 
-def MyHMAC_SHA256_128( key, msg ):
+def HMAC_SHA256_128( key, msg ):
 	"""Returns the HMAC-SHA256-128 of the given `key' and `msg'."""
 
-	assert(len(key) == const.SHA256_DIGEST_SIZE)
+	assert(len(key) == const.SHA256_DIGEST_LENGTH)
 
 	h = Crypto.Hash.HMAC.new(key, msg, Crypto.Hash.SHA256)
 
@@ -109,10 +109,10 @@ class PayloadCrypter:
 	def setSessionKey( self, key, iv ):
 		"""Set the AES session key and initialize counter mode."""
 
-		log.debug("Setting session key for payload crypter: 0x%s." % \
-			key.encode('hex'))
-		log.debug("Setting IV for payload crypter: 0x%s." % \
-			iv.encode('hex'))
+		log.debug("Setting session key for AES-CTR 0x%s..." % \
+				key.encode('hex')[:10])
+		log.debug("Setting IV for AES-CTR 0x%s..." % \
+				iv.encode('hex')[:10])
 		self.sessionKey = key
 		self.counter = Crypto.Util.Counter.new(128,
 				initial_value=long(iv.encode('hex'), 16))
