@@ -169,7 +169,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			log.debug("No session ticket to redeem.  Running UniformDH.")
 
 			# TODO - use packet morpher for handshake.
-			circuit.downstream.write(self.__createUniformDHPK())
+			circuit.downstream.write(self._createUniformDHHandshake())
 
 
 	def sendRemote( self, circuit, data ):
@@ -380,11 +380,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def _receiveClientsUniformDHPK( self, data, circuit ):
+		"""This method tries to extract the client's UniformDH public key from
+		the given `data'.  If this succeeds, the shared master key is computed
+		and used to derive the session keys.  Afterwards, the server's public
+		key is sent to the client followed by a newly issued session ticket."""
 
 		clientPK = self.__extractUniformDHPK(data)
 		if not clientPK:
-			return
+			return False
 
+		# First, as the server, we need a Diffie-Hellman object.
 		self.dh = obfs3_dh.UniformDH()
 		try:
 			masterKey = self.dh.get_secret(clientPK)
@@ -396,20 +401,22 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		log.debug("Switching to state ST_CONNECTED.")
 		self.state = const.ST_CONNECTED
 
-		# Now send our PK to the client so it can finish the handshake as well.
+		# Now, send the server's UniformDH public key to the client.
 		myPK = self.dh.get_public()
 		assert myPK
 
-		log.debug("Generating new session ticket and master key.")
+		# Also, issue a new session ticket for the client.
+		log.debug("Issuing new session ticket and master key.")
 		masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
 		newTicket = (ticket.new(masterKey)).issue()
 
+		# Throw the new ticket and master key into a ScrambleSuit message.
 		ticketMsg = message.ProtocolMessage(payload=masterKey + newTicket, \
 				flags=const.FLAG_NEW_TICKET)
 		ticketMsg = ticketMsg.encryptAndHMAC(self.sendCrypter, \
 				self.sendHMAC)
 
-		handshakeMsg = self.__createUniformDHPK(myPK)
+		handshakeMsg = self._createUniformDHHandshake(myPK)
 
 		log.debug("Sending %d bytes of UniformDH handshake and ticket." %
 				len(handshakeMsg + ticketMsg))
@@ -420,12 +427,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def _receiveServersUniformDHPK( self, data ):
+		"""This method tries to extract the server's UniformDH public key from
+		the given `data'.  If this succeeds, the shared master key is computed
+		and used to derive the session keys."""
 
 		serverPK = self.__extractUniformDHPK(data)
 		if not serverPK:
-			return
+			return False
 
-		log.debug("Received UniformDH public key.  Now deriving session keys.")
+		log.debug("Extracted UniformDH public key.  Now calculating shared " \
+				"master key.")
 
 		try:
 			masterKey = self.dh.get_secret(serverPK)
@@ -441,7 +452,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
 	def __extractUniformDHPK( self, data ):
-		"""This function extracts a UniformDH public key out of the very first
+		"""This method extracts a UniformDH public key out of the very first
 		bytes of ScrambleSuit data.  The HMAC is validated and the public key
 		only returned if the HMAC is correct.  Otherwise, `False' is returned.
 		The HMAC is efficiently located by looking for a special marker."""
@@ -481,17 +492,22 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			return False
 
 
-	# TODO - bad method name
-	def __createUniformDHPK( self, publicKey=None ):
+	def _createUniformDHHandshake( self, publicKey=None ):
+		"""This method creates a UniformDH handshake message ready to be sent
+		over the wire; including the public key, random padding, the marker and
+		the HMAC.  If no public key is given in `publicKey', a new one is
+		created using the Diffie-Hellman object."""
 
 		assert self.uniformDHSecret is not None
 
+		# Create a new UniformDH public key if none is given.
 		if not publicKey:
 			self.dh = obfs3_dh.UniformDH()
 			publicKey = self.dh.get_public()
+
 		padding = mycrypto.weak_random(random.randint(0, 123)) # TODO
 
-		# Generate marker to make it easier to locate the HMAC.
+		# Add a marker to efficiently locate the HMAC.
 		marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
 				self.uniformDHSecret + publicKey)
 
@@ -523,7 +539,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if self.weAreClient and (self.state == const.ST_WAIT_FOR_AUTH):
 
 			if not self._receiveServersUniformDHPK(data):
-				log.debug("Unable to read UniformDH public key at this point.")
+				log.debug("Unable to finish UniformDH handshake just yet.")
 				return
 
 		if self.state == const.ST_CONNECTED:
