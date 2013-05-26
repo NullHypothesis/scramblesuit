@@ -15,6 +15,7 @@ import os
 import time
 import const
 import pickle
+import base64
 
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
@@ -23,6 +24,7 @@ from Crypto.Hash import SHA256
 import obfsproxy.common.log as logging
 
 import mycrypto
+import util
 
 log = logging.get_obfslogger()
 
@@ -217,3 +219,24 @@ class SessionTicket( object ):
 
 # Alias class name in order to provide a more intuitive API.
 new = SessionTicket
+
+
+# Give ScrambleSuit server operators a way to manually issue new session
+# tickets for out-of-band distribution.
+if __name__ == "__main__":
+
+	import argparse
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument("ticket_file", type=str, \
+			help="The file, the newly issued ticket is written to.")
+	args = parser.parse_args()
+
+	print "[+] Generating new session ticket."
+	ticketObj = SessionTicket(mycrypto.strong_random(const.MASTER_KEY_LENGTH))
+	ticket = ticketObj.issue()
+
+	print "[+] Writing new session ticket to `%s'." % args.ticket_file
+	util.writeToFile(base64.b32encode(ticket) + '\n', args.ticket_file)
+
+	print "[+] Success."
