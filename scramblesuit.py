@@ -148,8 +148,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			log.debug("Redeeming session ticket 0x%s..." % \
 					ticket.encode('hex')[:10])
 			self._deriveSecrets(masterKey)
+
+			# Subtract the length of the ticket to make the handshake on
+			# average as long as a UniformDH handshake message.
 			padding = mycrypto.weak_random(random.randint(0, \
-					const.MAX_PADDING_LENGTH))
+					const.MAX_PADDING_LENGTH - const.TICKET_LENGTH))
 
 			key = "A" * 32
 			marker = mycrypto.HMAC_SHA256_128(key, key + ticket)
@@ -505,7 +508,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			self.dh = obfs3_dh.UniformDH()
 			publicKey = self.dh.get_public()
 
-		padding = mycrypto.weak_random(random.randint(0, 123)) # TODO
+		# Subtract the length of the public key to make the handshake on
+		# average as long as a redeemed ticket.
+		padding = mycrypto.weak_random(random.randint(0, \
+			const.MAX_PADDING_LENGTH - const.PUBLIC_KEY_LENGTH))
 
 		# Add a marker to efficiently locate the HMAC.
 		marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
