@@ -96,8 +96,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		log.debug("Deriving session keys from master key 0x%s..." % \
 				masterKey.encode('hex')[:10])
 
-		# We need key material for two magic values, symmetric keys, nonces and
-		# HMACs. All of them are 32 bytes in size.
+		# We need key material for two symmetric keys, nonces and HMACs.  All
+		# of them are 32 bytes in size.
 		hkdf = mycrypto.HKDF_SHA256(masterKey, "", 32 * 8)
 		okm = hkdf.expand()
 
@@ -152,11 +152,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 					const.MAX_PADDING_LENGTH))
 
 			key = "A" * 32
-			magic = mycrypto.HMAC_SHA256_128(key, key + ticket)
-			mac = mycrypto.HMAC_SHA256_128(key, ticket + padding + magic + \
+			marker = mycrypto.HMAC_SHA256_128(key, key + ticket)
+			mac = mycrypto.HMAC_SHA256_128(key, ticket + padding + marker + \
 					self._epoch())
 
-			circuit.downstream.write(ticket + padding + magic + mac)
+			circuit.downstream.write(ticket + padding + marker + mac)
 			self.redeemedTicket = True
 
 			# TODO - The client can't know at this point whether the server
@@ -322,33 +322,33 @@ class ScrambleSuitTransport( base.BaseTransport ):
 	def _receiveTicket( self, data ):
 		"""Verify and extract ticket handshake message."""
 
-		if len(data) < (const.TICKET_LENGTH + const.MAGIC_LENGTH + \
+		if len(data) < (const.TICKET_LENGTH + const.MARKER_LENGTH + \
 				const.HMAC_LENGTH):
 			return False
 
 		potentialTicket = data.peek()
 		key = "A" * 32
 
-		# Look for the magic value to easily locate the HMAC.
-		magic = mycrypto.HMAC_SHA256_128(key, key + \
+		# Look for the marker to easily locate the HMAC.
+		marker = mycrypto.HMAC_SHA256_128(key, key + \
 				potentialTicket[:const.TICKET_LENGTH])
-		index = potentialTicket.find(magic)
+		index = potentialTicket.find(marker)
 		if (index < 0) or ((len(potentialTicket) - index - \
-				const.MAGIC_LENGTH) < const.HMAC_LENGTH):
-			log.debug("Could not find magic value for ticket yet.")
+				const.MARKER_LENGTH) < const.HMAC_LENGTH):
+			log.debug("Could not find marker for ticket just yet.")
 			return False
 
 		# Verify HMAC before touching the icky data.
-		existingMAC = potentialTicket[index + const.MAGIC_LENGTH:index +
-				const.MAGIC_LENGTH + const.HMAC_LENGTH]
+		existingMAC = potentialTicket[index + const.MARKER_LENGTH:index +
+				const.MARKER_LENGTH + const.HMAC_LENGTH]
 		newMAC = mycrypto.HMAC_SHA256_128(key, \
-				potentialTicket[0:index + const.MAGIC_LENGTH] + self._epoch())
+				potentialTicket[0:index + const.MARKER_LENGTH] + self._epoch())
 
 		if newMAC == existingMAC:
 			log.debug("HMAC of session ticket is valid.")
 			data.drain()
 		else:
-			log.error("Invalid HMAC despite valid magic value.")
+			log.error("Invalid HMAC despite valid marker.")
 			return False
 
 		# Now try to decrypt and parse ticket.
@@ -381,7 +381,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 	def _receiveClientsUniformDHPK( self, data, circuit ):
 
-		clientPK = self.__receiveUniformDHPK(data)
+		clientPK = self.__extractUniformDHPK(data)
 		if not clientPK:
 			return
 
@@ -421,7 +421,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 	def _receiveServersUniformDHPK( self, data ):
 
-		serverPK = self.__receiveUniformDHPK(data)
+		serverPK = self.__extractUniformDHPK(data)
 		if not serverPK:
 			return
 
@@ -440,40 +440,43 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		return True
 
 
-	def __receiveUniformDHPK( self, data ):
+	def __extractUniformDHPK( self, data ):
+		"""This function extracts a UniformDH public key out of the very first
+		bytes of ScrambleSuit data.  The public key is located by first looking
+		for the marker.  The HMAC is then validated and the public key only
+		returned if the HMAC is correct.  Otherwise, `False' is returned."""
 
 		assert self.uniformDHSecret is not None
 
 		# Do we already have the minimum amount of data?
-		if len(data) < (const.PUBLIC_KEY_LENGTH + const.MAGIC_LENGTH + \
+		if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARKER_LENGTH + \
 				const.HMAC_LENGTH):
 			return False
 
 		handshake = data.peek()
 
-		# Look for the magic value to easily locate the HMAC.
-		magic = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+		# First, find the marker to efficiently locate the HMAC.
+		marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
 				self.uniformDHSecret + handshake[:const.PUBLIC_KEY_LENGTH])
-		index = handshake.find(magic)
+		index = handshake.find(marker)
 		if (index < 0) or ((len(handshake) - index - \
-				const.MAGIC_LENGTH) < const.HMAC_LENGTH):
-			log.debug("Could not find magic value for UniformDH yet.")
+				const.MARKER_LENGTH) < const.HMAC_LENGTH):
+			log.debug("Could not find marker for UniformDH just yet.")
 			return False
 
-		# Verify HMAC before touching the icky data.
-		existingMAC = handshake[index + const.MAGIC_LENGTH : index +
-				const.MAGIC_LENGTH + const.HMAC_LENGTH]
+		# We found the marker.  Now verify the HMAC before touching the data.
+		existingMAC = handshake[index + const.MARKER_LENGTH : index +
+				const.MARKER_LENGTH + const.HMAC_LENGTH]
 		newMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
-				handshake[0 : index + const.MAGIC_LENGTH] + self._epoch())
+				handshake[0 : index + const.MARKER_LENGTH] + self._epoch())
 
 		if newMAC == existingMAC:
 			log.debug("HMAC of UniformDH public key is valid.")
-			data.drain(index + const.MAGIC_LENGTH + const.HMAC_LENGTH)
+			data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
+			return handshake[:const.PUBLIC_KEY_LENGTH]
 		else:
-			log.error("Invalid HMAC despite valid magic value.")
+			log.warning("Invalid UniformDH HMAC despite valid marker!")
 			return False
-
-		return handshake[:const.PUBLIC_KEY_LENGTH]
 
 
 	# TODO - bad method name
@@ -486,15 +489,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			publicKey = self.dh.get_public()
 		padding = mycrypto.weak_random(random.randint(0, 123)) # TODO
 
-		# Generate magic value to make it easier to locate the HMAC.
-		magic = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+		# Generate marker to make it easier to locate the HMAC.
+		marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
 				self.uniformDHSecret + publicKey)
 
 		# Authenticate the handshake including the current approximate epoch.
 		mac = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, publicKey + \
-				padding + magic + self._epoch())
+				padding + marker + self._epoch())
 
-		return publicKey + padding + magic + mac
+		return publicKey + padding + marker + mac
 
 
 	def receivedDownstream( self, data, circuit ):

@@ -31,9 +31,9 @@ KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 # File where session ticket keys are stored.
 KEY_STORE = DATA_DIRECTORY + "ticket_keys.bin"
 
-# Magic value used to easily locate the HMAC authenticating handshake messages
-# in bytes.
-MAGIC_LENGTH = 16
+# Marker used to easily locate the HMAC authenticating handshake messages in
+# bytes.
+MARKER_LENGTH = 16
 
 # Key length for the master key in bytes.
 MASTER_KEY_LENGTH = 32
