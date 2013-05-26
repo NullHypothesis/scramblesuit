@@ -19,6 +19,7 @@ import random
 import string
 import time
 import argparse
+import base64
 
 import probdist
 import mycrypto
@@ -137,8 +138,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		# Send a session ticket to the server (if we have one).
 		if self.weAreClient and os.path.exists(const.TICKET_FILE):
 
-			blob = util.readFromFile(const.TICKET_FILE, \
-					const.MASTER_KEY_LENGTH + const.TICKET_LENGTH)
+			blob = util.readFromFile(const.TICKET_FILE)
+			blob = base64.b32decode(blob.strip())
 
 			masterKey = blob[:const.MASTER_KEY_LENGTH]
 			ticket = blob[const.MASTER_KEY_LENGTH: \
@@ -374,7 +375,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		log.debug("Storing newly received session ticket.")
 
-		util.writeToFile(masterKey + ticket, const.TICKET_FILE)
+		util.writeToFile(base64.b32encode(masterKey + ticket) + '\n', \
+				const.TICKET_FILE)
 
 
 	def _receiveClientsUniformDHPK( self, data, circuit ):
