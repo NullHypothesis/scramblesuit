@@ -442,9 +442,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 	def __extractUniformDHPK( self, data ):
 		"""This function extracts a UniformDH public key out of the very first
-		bytes of ScrambleSuit data.  The public key is located by first looking
-		for the marker.  The HMAC is then validated and the public key only
-		returned if the HMAC is correct.  Otherwise, `False' is returned."""
+		bytes of ScrambleSuit data.  The HMAC is validated and the public key
+		only returned if the HMAC is correct.  Otherwise, `False' is returned.
+		The HMAC is efficiently located by looking for a special marker."""
 
 		assert self.uniformDHSecret is not None
 
@@ -459,9 +459,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
 				self.uniformDHSecret + handshake[:const.PUBLIC_KEY_LENGTH])
 		index = handshake.find(marker)
-		if (index < 0) or ((len(handshake) - index - \
-				const.MARKER_LENGTH) < const.HMAC_LENGTH):
-			log.debug("Could not find marker for UniformDH just yet.")
+		if index < 0:
+			log.debug("Could not find UniformDH marker just yet.")
+			return False
+		if (len(handshake) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
+			log.debug("Found marker but HMAC not yet fully received.")
 			return False
 
 		# We found the marker.  Now verify the HMAC before touching the data.
@@ -471,7 +473,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				handshake[0 : index + const.MARKER_LENGTH] + self._epoch())
 
 		if newMAC == existingMAC:
-			log.debug("HMAC of UniformDH public key is valid.")
+			log.debug("HMAC over UniformDH handshake is valid.")
 			data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
 			return handshake[:const.PUBLIC_KEY_LENGTH]
 		else:
