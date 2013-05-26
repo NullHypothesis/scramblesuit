@@ -400,9 +400,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		myPK = self.dh.get_public()
 		assert myPK
 
-		ticket, masterKey = self._getSessionTicket()
+		log.debug("Generating new session ticket and master key.")
+		masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
+		newTicket = (ticket.new(masterKey)).issue()
 
-		ticketMsg = message.ProtocolMessage(payload=masterKey + ticket, \
+		ticketMsg = message.ProtocolMessage(payload=masterKey + newTicket, \
 				flags=const.FLAG_NEW_TICKET)
 		ticketMsg = ticketMsg.encryptAndHMAC(self.sendCrypter, \
 				self.sendHMAC)
@@ -521,17 +523,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		if self.state == const.ST_CONNECTED:
 			self.sendLocal(circuit, data.read())
-
-
-	def _getSessionTicket( self ):
-
-		log.debug("Generating new session ticket and master key.")
-		masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
-
-		newTicket = ticket.new(masterKey)
-		rawTicket = newTicket.issue()
-
-		return rawTicket, masterKey
 
 
 	def receivedUpstream( self, data, circuit ):
