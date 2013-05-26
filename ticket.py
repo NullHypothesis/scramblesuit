@@ -233,10 +233,12 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 	print "[+] Generating new session ticket."
-	ticketObj = SessionTicket(mycrypto.strong_random(const.MASTER_KEY_LENGTH))
+	masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
+	ticketObj = SessionTicket(masterKey)
 	ticket = ticketObj.issue()
 
 	print "[+] Writing new session ticket to `%s'." % args.ticket_file
-	util.writeToFile(base64.b32encode(ticket) + '\n', args.ticket_file)
+	util.writeToFile(base64.b32encode(masterKey + ticket) + '\n', \
+			args.ticket_file)
 
 	print "[+] Success."
