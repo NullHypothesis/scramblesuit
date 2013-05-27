@@ -27,7 +27,6 @@ import message
 import const
 import util
 import packetmorpher
-import processprotocol
 import ticket
 
 
