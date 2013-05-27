@@ -154,10 +154,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			padding = mycrypto.weak_random(random.randint(0, \
 					const.MAX_PADDING_LENGTH - const.TICKET_LENGTH))
 
-			key = "A" * 32
-			marker = mycrypto.HMAC_SHA256_128(key, key + ticket)
-			mac = mycrypto.HMAC_SHA256_128(key, ticket + padding + marker + \
-					self._epoch())
+			marker = mycrypto.HMAC_SHA256_128(self.sendHMAC, \
+					self.sendHMAC + ticket)
+			mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, ticket + padding + \
+					marker + self._epoch())
 
 			circuit.downstream.write(ticket + padding + marker + mac)
 			self.redeemedTicket = True
@@ -330,10 +330,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			return False
 
 		potentialTicket = data.peek()
-		key = "A" * 32
+
+		# Now try to decrypt and parse the ticket.  We need the master key
+		# inside to verify the HMAC in the next step.
+		newTicket = ticket.decryptTicket(potentialTicket[:const.TICKET_LENGTH])
+		if newTicket != None and newTicket.isValid():
+			self._deriveSecrets(newTicket.masterKey)
+		else:
+			return False
 
 		# Look for the marker to easily locate the HMAC.
-		marker = mycrypto.HMAC_SHA256_128(key, key + \
+		marker = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC + \
 				potentialTicket[:const.TICKET_LENGTH])
 		index = potentialTicket.find(marker)
 		if (index < 0) or ((len(potentialTicket) - index - \
@@ -341,32 +348,23 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			log.debug("Could not find marker for ticket just yet.")
 			return False
 
-		# Verify HMAC before touching the icky data.
+		# Verify HMAC even though we already decrypted the ticket.
 		existingMAC = potentialTicket[index + const.MARKER_LENGTH:index +
 				const.MARKER_LENGTH + const.HMAC_LENGTH]
-		newMAC = mycrypto.HMAC_SHA256_128(key, \
+		newMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
 				potentialTicket[0:index + const.MARKER_LENGTH] + self._epoch())
 
 		if newMAC == existingMAC:
 			log.debug("HMAC of session ticket is valid.")
-			data.drain()
+			data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
 		else:
 			log.error("Invalid HMAC despite valid marker.")
 			return False
 
-		# Now try to decrypt and parse ticket.
-		log.debug("Attempting to decrypt potential session ticket.")
-		newTicket = ticket.decryptTicket(potentialTicket[:const.TICKET_LENGTH])
+		log.debug("Switching to state ST_CONNECTED.")
+		self.state = const.ST_CONNECTED
 
-		if ticket != None and newTicket.isValid():
-			log.debug("The ticket is valid.  Now deriving keys.")
-			data.drain(const.TICKET_LENGTH)
-			self._deriveSecrets(newTicket.masterKey)
-			log.debug("Switching to state ST_CONNECTED.")
-			self.state = const.ST_CONNECTED
-			return True
-		else:
-			return False
+		return True
 
 
 	def _storeNewTicket( self, masterKey, ticket ):

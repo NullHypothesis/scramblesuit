@@ -16,6 +16,8 @@ import time
 import const
 import pickle
 import base64
+import struct
+import datetime
 
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
@@ -111,29 +113,30 @@ def decryptTicket( ticket ):
 	global AESKey
 	global creationTime
 
-	log.debug("Attempting to verify and decrypt %d-byte ticket." % len(ticket))
+	log.debug("Attempting to decrypt and verify %d-byte ticket." % len(ticket))
 
 	checkKeys()
 
 	# Verify if the HMAC is correct.
 	hmac = HMAC.new(HMACKey, ticket[0:80], digestmod=SHA256).digest()
 	if hmac != ticket[80:const.TICKET_LENGTH]:
-		log.debug("Invalid HMAC.  Probably no ticket.")
+		log.debug("The ticket's HMAC is invalid.  Probably not a ticket.")
 		return None
 
 	# Decrypt ticket to obtain state.
 	aes = AES.new(AESKey, mode=AES.MODE_CBC, IV=ticket[0:16])
 	plainTicket = aes.decrypt(ticket[16:80])
 
-	issueDate = plainTicket[0:10]
-	identifier = plainTicket[10:28]
-	masterKey = plainTicket[28:60]
+	issueDate = struct.unpack('I', plainTicket[0:4])[0]
+	identifier = plainTicket[4:22]
+	masterKey = plainTicket[22:54]
 
 	if not (identifier == IDENTIFIER):
-		log.error("Valid HMAC but invalid identifier. This could be a bug.")
+		log.error("The HMAC is valid but the identifier could not be " \
+				"found.  The ticket could be corrupt.")
 		return None
 
-	return ProtocolState(masterKey, int(issueDate.encode('hex'), 16))
+	return ProtocolState(masterKey, issueDate=issueDate)
 
 
 class ProtocolState( object ):
@@ -146,7 +149,7 @@ class ProtocolState( object ):
 		self.masterKey = masterKey
 		self.issueDate = issueDate
 		# Pad to multiple of 16 bytes due to AES' block size.
-		self.pad = "\0\0\0\0"
+		self.pad = "\0\0\0\0\0\0\0\0\0\0"
 
 
 	def isValid( self ):
@@ -154,18 +157,25 @@ class ProtocolState( object ):
 		time has not expired yet.  Otherwise, `False' is returned."""
 
 		assert self.issueDate
-		now = int(time.time())
 
-		if (now - self.issueDate) > const.SESSION_TICKET_LIFETIME:
-			log.debug("Ticket is not valid anymore.")
+		lifetime = int(time.time()) - self.issueDate
+		if lifetime > const.SESSION_TICKET_LIFETIME:
+			log.debug("The ticket expired %s ago." % \
+					str(datetime.timedelta(seconds=lifetime - \
+					const.SESSION_TICKET_LIFETIME)))
 			return False
+
+		log.debug("The ticket is still valid for %s." %  \
+					str(datetime.timedelta(seconds= \
+					const.SESSION_TICKET_LIFETIME - lifetime)))
 
 		return True
 
 
 	def __repr__( self ):
 
-		return self.issueDate + self.identifier + self.masterKey + self.pad
+		return struct.pack('I', self.issueDate) + self.identifier + \
+				self.masterKey + self.pad
 
 
 class SessionTicket( object ):
@@ -197,7 +207,7 @@ class SessionTicket( object ):
 		ready to be sent over the wire. In particular, the ticket name (for
 		bookkeeping) as well as the actual encrypted ticket is returned."""
 
-		self.state.issueDate = "%d" % time.time()
+		self.state.issueDate = int(time.time())
 
 		# Encrypt the protocol state.
 		aes = AES.new(self.symmTicketKey, mode=AES.MODE_CBC, IV=self.IV)
