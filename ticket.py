@@ -9,6 +9,11 @@ The format of a 112-byte ticket:
     +------------+------------------+--------------+
     | 16-byte IV | 64-byte E(state) | 32-byte HMAC |
     +------------+------------------+--------------+
+
+The 64-byte encrypted state contains the following data:
++-------------------+--------------------+--------------------+-------------+
+| 4-byte issue date | 18-byte identifier | 32-byte master key | 10-byte pad |
++-------------------+--------------------+--------------------+-------------+
 """
 
 import os
