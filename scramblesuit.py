@@ -174,7 +174,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			circuit.downstream.write(self._createUniformDHHandshake())
 
 
-	def sendRemote( self, circuit, data ):
+	def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
 		"""Encrypt, then chop the given data into pieces and send it to the
 		remote end."""
 
@@ -184,7 +184,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		log.info("Processing %d bytes of outgoing data." % len(data))
 
 		# Wrap the application's data in ScrambleSuit protocol messages.
-		messages = message.createDataMessages(data)
+		messages = message.createDataMessages(data, flags=flags)
 
 		# Invoke the packet morpher and pad the last protocol message.
 		chopper, paddingLen = self.pktMorpher.morph(sum([len(msg) \
@@ -405,25 +405,26 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		myPK = self.dh.get_public()
 		assert myPK
 
-		# Also, issue a new session ticket for the client.
-		log.debug("Issuing new session ticket and master key.")
-		masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
-		newTicket = (ticket.new(masterKey)).issue()
-
-		# Throw the new ticket and master key into a ScrambleSuit message.
-		ticketMsg = message.ProtocolMessage(payload=masterKey + newTicket, \
-				flags=const.FLAG_NEW_TICKET)
-		ticketMsg = ticketMsg.encryptAndHMAC(self.sendCrypter, \
-				self.sendHMAC)
-
 		handshakeMsg = self._createUniformDHHandshake(myPK)
+		ticket = self._issueTicketAndKey()
 
 		log.debug("Sending %d bytes of UniformDH handshake and ticket." %
 				len(handshakeMsg + ticketMsg))
-		circuit.downstream.write(handshakeMsg + ticketMsg)
-		# TODO - use sendRemote() to send ticketMsg
+		# TODO - use packet morpher
+		circuit.downstream.write(handshakeMsg)
+		self.sendRemote(ticket)
 
 		return True
+
+
+	def _issueTicketAndKey( self ):
+
+		# Issue a new session ticket for the client.
+		log.info("Issuing new session ticket and master key.")
+		masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
+		newTicket = (ticket.new(masterKey)).issue()
+
+		return masterKey + newTicket
 
 
 	def _receiveServersUniformDHPK( self, data ):
@@ -529,6 +530,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			# First, try to interpret the incoming data as session ticket.
 			if self._receiveTicket(data):
 				log.debug("Ticket authentication succeeded.")
+				self.sendRemote(circuit, self._issueTicketAndKey(), \
+						flags=const.FLAG_NEW_TICKET)
 
 			# Second, interpret the data as a UniformDH handshake.
 			elif self._receiveClientsUniformDHPK(data, circuit):
