@@ -300,8 +300,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		"""Deobfuscate, then decrypt the given data and send it to the local
 		Tor client."""
 
-		# Don't send empty data.
-		if len(data) == 0 or not data:
+		assert circuit
+
+		if (data is None) or (len(data) == 0):
 			return
 
 		log.info("Processing %d bytes of incoming data." % len(data))
