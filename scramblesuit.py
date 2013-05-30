@@ -158,7 +158,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, ticket + padding + \
 					marker + self._epoch())
 
-			circuit.downstream.write(ticket + padding + marker + mac)
+			self._chopAndSend(circuit, ticket + padding + marker + mac, \
+					protocolMsg=False)
 			self.redeemedTicket = True
 
 			# TODO - The client can't know at this point whether the server
@@ -170,13 +171,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		elif self.weAreClient:
 			log.debug("No session ticket to redeem.  Running UniformDH.")
 
-			# TODO - use packet morpher for handshake.
-			circuit.downstream.write(self._createUniformDHHandshake())
+			self._chopAndSend(circuit, self._createUniformDHHandshake(), \
+					protocolMsg=False)
 
 
 	def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
 		"""Encrypt, then chop the given data into pieces and send it to the
 		remote end."""
+
+		assert circuit
 
 		if (data is None) or (len(data) == 0):
 			return
@@ -184,19 +187,29 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		log.info("Processing %d bytes of outgoing data." % len(data))
 
 		# Wrap the application's data in ScrambleSuit protocol messages.
-		messages = message.createDataMessages(data, flags=flags)
+		messages = message.createProtocolMessages(data, flags=flags)
 
-		# Invoke the packet morpher and pad the last protocol message.
+		self._chopAndSend(circuit, messages)
+
+
+	def _chopAndSend( self, circuit, messages, protocolMsg=True ):
+
+		# Ask the packet morpher how much we should pad and get a chopper.
 		chopper, paddingLen = self.pktMorpher.morph(sum([len(msg) \
 				for msg in messages]))
 
-		if paddingLen > const.HDR_LENGTH:
-			messages.append(message.ProtocolMessage("", \
-					paddingLen=paddingLen - const.HDR_LENGTH))
+		# If we are dealing with protocol messages, we pad, encrypt and MAC...
+		if protocolMsg:
+			if paddingLen > const.HDR_LENGTH:
+				messages.append(message.ProtocolMessage("", \
+						paddingLen=paddingLen - const.HDR_LENGTH))
+	
+			blurb = string.join([msg.encryptAndHMAC(self.sendCrypter, \
+					self.sendHMAC) for msg in messages], '')
 
-		# Encrypt and authenticate all messages.
-		blurb = string.join([msg.encryptAndHMAC(self.sendCrypter, self.sendHMAC) \
-				for msg in messages], '')
+		# ...otherwise, we leave the data as it is.
+		else:
+			blurb = messages
 
 		# Chop the encrypted blurb to fit the target probability distribution.
 		self.choppedPieces += chopper(blurb)
@@ -408,11 +421,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		handshakeMsg = self._createUniformDHHandshake(myPK)
 		ticket = self._issueTicketAndKey()
 
-		log.debug("Sending %d bytes of UniformDH handshake and ticket." %
-				len(handshakeMsg + ticketMsg))
-		# TODO - use packet morpher
-		circuit.downstream.write(handshakeMsg)
-		self.sendRemote(ticket)
+		log.debug("Sending %d bytes of UniformDH handshake and ticket." % \
+				len(handshakeMsg))
+
+		self._chopAndSend(circuit, handshakeMsg, protocolMsg=False)
+		self.sendRemote(circuit, ticket, flags=const.FLAG_NEW_TICKET)
 
 		return True
 

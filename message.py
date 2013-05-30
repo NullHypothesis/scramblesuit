@@ -11,7 +11,7 @@ import const
 log = logging.get_obfslogger()
 
 
-def createDataMessages( data, flags=const.FLAG_PAYLOAD ):
+def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
 
 	messages = []
 
