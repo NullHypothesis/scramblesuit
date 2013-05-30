@@ -11,17 +11,17 @@ import const
 log = logging.get_obfslogger()
 
 
-def createDataMessages( data ):
+def createDataMessages( data, flags=const.FLAG_PAYLOAD ):
 
 	messages = []
 
 	log.debug("Creating protocol messages.")
 
 	while len(data) >= const.MPU:
-		messages.append(ProtocolMessage(data[:const.MPU]))
+		messages.append(ProtocolMessage(data[:const.MPU], flags=flags))
 		data = data[const.MPU:]
 
-	messages.append(ProtocolMessage(data))
+	messages.append(ProtocolMessage(data, flags=flags))
 
 	return messages
 
