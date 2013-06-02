@@ -28,6 +28,7 @@ import const
 import util
 import packetmorpher
 import ticket
+import replay
 
 
 log = logging.get_obfslogger()
@@ -307,10 +308,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		log.info("Processing %d bytes of incoming data." % len(data))
 
-		finalData = self.unpack(data, self.recvCrypter)
-		if finalData is not None:
-			# Send encrypted and obfuscated data.
-			circuit.upstream.write(finalData)
+		plainData = self.unpack(data, self.recvCrypter)
+		if plainData is not None:
+			circuit.upstream.write(plainData)
 
 
 	def _epoch( self ):
@@ -352,27 +352,24 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		else:
 			return False
 
-		# Look for the marker to easily locate the HMAC.
+		# First, find the marker to efficiently locate the HMAC.
 		marker = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC + \
 				potentialTicket[:const.TICKET_LENGTH])
-		index = potentialTicket.find(marker)
-		if (index < 0) or ((len(potentialTicket) - index - \
-				const.MARKER_LENGTH) < const.HMAC_LENGTH):
-			log.debug("Could not find marker for ticket just yet.")
+
+		index = self._locateMarker(marker, potentialTicket)
+		if not index:
 			return False
 
-		# Verify HMAC even though we already decrypted the ticket.
-		existingMAC = potentialTicket[index + const.MARKER_LENGTH:index +
-				const.MARKER_LENGTH + const.HMAC_LENGTH]
-		newMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
+		# Now, verify if the HMAC is valid.
+		existingHMAC = potentialTicket[index + const.MARKER_LENGTH: \
+				index + const.MARKER_LENGTH + const.HMAC_LENGTH]
+		myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
 				potentialTicket[0:index + const.MARKER_LENGTH] + self._epoch())
 
-		if newMAC == existingMAC:
-			log.debug("HMAC of session ticket is valid.")
-			data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
-		else:
-			log.error("Invalid HMAC despite valid marker.")
+		if not self._isValidHMAC(myHMAC, existingHMAC, replay.SessionTicket):
 			return False
+
+		data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
 
 		log.debug("Switching to state ST_CONNECTED.")
 		self.state = const.ST_CONNECTED
@@ -482,29 +479,65 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		handshake = data.peek()
 
 		# First, find the marker to efficiently locate the HMAC.
+		publicKey = handshake[:const.PUBLIC_KEY_LENGTH]
 		marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
-				self.uniformDHSecret + handshake[:const.PUBLIC_KEY_LENGTH])
-		index = handshake.find(marker)
-		if index < 0:
-			log.debug("Could not find UniformDH marker just yet.")
-			return False
-		if (len(handshake) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
-			log.debug("Found marker but HMAC not yet fully received.")
+				self.uniformDHSecret + publicKey)
+
+		index = self._locateMarker(marker, handshake)
+		if not index:
 			return False
 
-		# We found the marker.  Now verify the HMAC before touching the data.
-		existingMAC = handshake[index + const.MARKER_LENGTH : index +
-				const.MARKER_LENGTH + const.HMAC_LENGTH]
-		newMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
+		# Now, verify if the HMAC is valid.
+		existingHMAC = handshake[index + const.MARKER_LENGTH: \
+				index + const.MARKER_LENGTH + const.HMAC_LENGTH]
+		myHMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
 				handshake[0 : index + const.MARKER_LENGTH] + self._epoch())
 
-		if newMAC == existingMAC:
-			log.debug("HMAC over UniformDH handshake is valid.")
-			data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
-			return handshake[:const.PUBLIC_KEY_LENGTH]
-		else:
-			log.warning("Invalid UniformDH HMAC despite valid marker!")
+		if not self._isValidHMAC(myHMAC, existingHMAC, replay.UniformDH):
 			return False
+
+		data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
+
+		return handshake[:const.PUBLIC_KEY_LENGTH]
+
+
+	def _locateMarker( self, marker, payload ):
+		"""Locate the marker in the given payload and return the index."""
+
+		index = payload.find(marker)
+		if index < 0:
+			log.debug("Could not find the marker just yet.")
+			return False
+
+		if (len(payload) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
+			log.debug("Found the marker but the HMAC is still incomplete..")
+			return False
+
+		return index
+
+
+	def _isValidHMAC( self, myHMAC, existingHMAC, replayTracker ):
+		"""Check if the HMAC is correct and not replayed."""
+
+		if not (myHMAC == existingHMAC):
+			log.warning("The HMAC is invalid (got `%s' but expected `%s')." % \
+					(existingHMAC.encode('hex'), myHMAC.encode('hex')))
+			return False
+
+		log.debug("The computed HMAC is valid.")
+
+		# Was this HMAC sent before?
+		if replayTracker.isPresent(existingHMAC):
+			log.warning("The HMAC `%s' was already observed.  This could " \
+					"be a replay attack.  Remaining silent." % \
+					existingHMAC.encode('hex'))
+			return False
+
+		# Store observed HMAC to prevent replay attacks.
+		if self.weAreServer:
+			replayTracker.addHMAC(existingHMAC)
+
+		return True
 
 
 	def _createUniformDHHandshake( self, publicKey=None ):
