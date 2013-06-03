@@ -69,6 +69,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		# `True' if the client used a session ticket, `False' otherwise.
 		self.redeemedTicket = None
 
+		# `True' if the ticket is already decrypted but not yet authenticated.
+		self.decryptedTicket = None
+
 		# Shared secret k_B which is only used for UniformDH.
 		if not hasattr(self, 'uniformDHSecret'):
 			self.uniformDHSecret = None
@@ -346,11 +349,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		# Now try to decrypt and parse the ticket.  We need the master key
 		# inside to verify the HMAC in the next step.
-		newTicket = ticket.decryptTicket(potentialTicket[:const.TICKET_LENGTH])
-		if newTicket != None and newTicket.isValid():
-			self._deriveSecrets(newTicket.masterKey)
-		else:
-			return False
+		if not self.decryptedTicket:
+			newTicket = ticket.decrypt(potentialTicket[:const.TICKET_LENGTH])
+			if newTicket != None and newTicket.isValid():
+				self._deriveSecrets(newTicket.masterKey)
+				self.decryptedTicket = True
+			else:
+				return False
 
 		# First, find the marker to efficiently locate the HMAC.
 		marker = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC + \

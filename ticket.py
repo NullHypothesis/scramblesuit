@@ -107,7 +107,7 @@ def checkKeys( ):
 		rotateKeys()
 
 
-def decryptTicket( ticket ):
+def decrypt( ticket ):
 	"""Verifies the validity, decrypts and finally returns the given potential
 	ticket as a ProtocolState object.  If the ticket is invalid, `None' is
 	returned."""
