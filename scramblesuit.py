@@ -91,6 +91,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		self.flags = None
 
 
+	def __del__( self ):
+
+		log.debug("Destroying %s." % const.TRANSPORT_NAME)
+
+		# Save replay dictionary to file.
+		if self.weAreServer:
+			log.info("Saving replay dictionaries to file.")
+			replay.UniformDH.saveToDisk(const.UNIFORMDH_REPLAY_FILE)
+			replay.SessionTicket.saveToDisk(const.TICKET_REPLAY_FILE)
+
+
 	def _deriveSecrets( self, masterKey ):
 		"""Derives session keys (AES keys, counter nonces and HMAC keys) from
 		the given master key.  All key material is derived using
@@ -517,6 +528,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if (len(payload) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
 			log.debug("Found the marker but the HMAC is still incomplete..")
 			return False
+
+		log.debug("Successfully located the marker.")
 
 		return index
 

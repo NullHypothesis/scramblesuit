@@ -50,6 +50,10 @@ MPU = MTU - HDR_LENGTH
 # Length of a UniformDH public key.
 PUBLIC_KEY_LENGTH = 192
 
+# Files which hold the replay dictionaries.
+UNIFORMDH_REPLAY_FILE = DATA_DIRECTORY + "uniformdh_replay_dict.pickle"
+TICKET_REPLAY_FILE = DATA_DIRECTORY + "ticket_replay_dict.pickle"
+
 # Life time of session tickets in seconds.
 SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
 
