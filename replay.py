@@ -25,7 +25,7 @@ class Tracker( object ):
 	def isPresent( self, element ):
 		"""Check if an element is already present in the lookup table."""
 		# TODO - load the database if it's not loaded already.
-		log.debug("Looking for existing element in size-%d dictionary." % \
+		log.debug("Looking for existing HMAC in size-%d dictionary." % \
 				len(self.table)) 
 
 		return (element in self.table)
