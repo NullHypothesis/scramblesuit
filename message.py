@@ -26,10 +26,13 @@ def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
 	return messages
 
 
-def saneHeader( totalLen, payloadLen, flags ):
+def isSane( totalLen, payloadLen, flags ):
 
 	def ok( length ):
 		return True if (0 <= length <= const.MPU) else False
+
+	log.debug("Message header: totalLen=%d, payloadLen=%d, flags" \
+			"=%d" % (totalLen, payloadLen, flags))
 
 	validFlags = [
 		const.FLAG_PAYLOAD,
@@ -83,3 +86,6 @@ class ProtocolMessage( object ):
 
 	def __len__( self ):
 		return const.HDR_LENGTH + self.totalLen
+
+# Alias class name in order to provide a more intuitive API.
+new = ProtocolMessage
