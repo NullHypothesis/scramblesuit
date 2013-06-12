@@ -4,6 +4,8 @@
 import time
 import pickle
 
+import const
+
 import obfsproxy.common.log as logging
 
 log = logging.get_obfslogger()
@@ -24,9 +26,11 @@ class Tracker( object ):
 
 	def isPresent( self, element ):
 		"""Check if an element is already present in the lookup table."""
-		# TODO - load the database if it's not loaded already.
 		log.debug("Looking for existing HMAC in size-%d dictionary." % \
 				len(self.table)) 
+
+		# Prune the replay table before checking for values.
+		self.prune()
 
 		return (element in self.table)
 
@@ -52,12 +56,12 @@ class Tracker( object ):
 
 	def prune( self ):
 		"""Delete expired elements from the table."""
-		log.debug("Pruning the lookup table.")
+		log.debug("Pruning the replay table.")
 
 		now = int(time.time())
 		for element in self.table.iterkeys():
-			if (now - self.table[element]) > const.EPOCH_GRANULARITY: # TODO no
-				log.debug("Deleting element from table.")
+			if (now - self.table[element]) > const.EPOCH_GRANULARITY:
+				log.debug("Deleting expired HMAC.")
 				del self.table[element]
 
 
