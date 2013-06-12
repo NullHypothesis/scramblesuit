@@ -94,12 +94,18 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		self.payloadLen = None
 		self.flags = None
 
+		# Load replay dictionaries from file.
+		if self.weAreServer:
+			log.info("Loading replay dictionaries from file.")
+			replay.UniformDH.loadFromDisk(const.UNIFORMDH_REPLAY_FILE)
+			replay.SessionTicket.loadFromDisk(const.TICKET_REPLAY_FILE)
+
 
 	def __del__( self ):
 
-		log.debug("Destroying %s." % const.TRANSPORT_NAME)
+		log.debug("Destroying this %s instance." % const.TRANSPORT_NAME)
 
-		# Save replay dictionary to file.
+		# Save replay dictionaries to file.
 		if self.weAreServer:
 			log.info("Saving replay dictionaries to file.")
 			replay.UniformDH.saveToDisk(const.UNIFORMDH_REPLAY_FILE)
