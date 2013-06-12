@@ -57,13 +57,13 @@ class ProtocolMessage( object ):
 		self.totalLen = payloadLen + paddingLen
 		self.payloadLen = payloadLen
 		self.payload = payload
-		self.flags = chr(flags)
+		self.flags = flags
 
 
 	def encryptAndHMAC( self, crypter, HMACKey ):
 
 		encrypted = crypter.encrypt(serialize.htons(self.totalLen) + \
-				serialize.htons(self.payloadLen) + self.flags + \
+				serialize.htons(self.payloadLen) + chr(self.flags) + \
 				self.payload + (self.totalLen - self.payloadLen) * '\0')
 
 		hmac = mycrypto.HMAC_SHA256_128(HMACKey, encrypted)

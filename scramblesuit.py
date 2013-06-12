@@ -72,6 +72,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		# `True' if the ticket is already decrypted but not yet authenticated.
 		self.decryptedTicket = None
 
+		# Cache the HMACs so they can later be added to the replay table.
+		self.cachedTicketHMAC = None
+		self.cachedUniformDHHMAC = None
+
 		# Shared secret k_B which is only used for UniformDH.
 		if not hasattr(self, 'uniformDHSecret'):
 			self.uniformDHSecret = None
@@ -253,65 +257,49 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				self.__flushPieces, circuit)
 
 
-	def unpack( self, data, aes ):
+	def extractMsgs( self, data, aes ):
+		"""Takes raw data from the wire, decrypts and authenticates the data
+		and returns ScrambleSuit protocol messages."""
 
-		# Input buffer which is not yet processed and forwarded.
 		self.recvBuf += data
-		fwdBuf = ""
+		msgs = []
 
-		# Keep trying to unpack as long as there seems to be enough data.
+		# Keep trying to unpack as long as there is at least a header.
 		while len(self.recvBuf) >= const.HDR_LENGTH:
 
-			# Extract length fields if we don't have them already.
-			if self.totalLen == None:
+			# If necessary, extract the header fields.
+			if self.totalLen == self.payloadLen == self.flags == None:
 				self.totalLen = pack.ntohs(aes.decrypt(self.recvBuf[16:18]))
 				self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
 				self.flags = ord(aes.decrypt(self.recvBuf[20]))
 
-				# Abort immediately if the extracted lengths do not make sense.
-				if not message.saneHeader(self.totalLen, self.payloadLen, \
-						self.flags):
-					raise base.PluggableTransportError("Invalid header: " \
-							"totalLen=%d, payloadLen=%d. flags=%d" % \
-							(self.totalLen, self.payloadLen, self.flags))
-				log.debug("Message header: totalLen=%d, payloadLen=%d, flags" \
-						"=%d" % (self.totalLen, self.payloadLen, self.flags))
+				# Abort if the header is invalid.
+				if not message.isSane(self.totalLen, self.payloadLen, self.flags):
+					raise base.PluggableTransportError("Invalid header.")
 
-			if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
-				return fwdBuf
-
-			# We have a full message; let's extract it.
-			else:
+			# We have (another) full message; let's extract it.
+			if (len(self.recvBuf) - const.HDR_LENGTH) >= self.totalLen:
 				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
 				vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
 						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
 						const.HDR_LENGTH)])
 
-				# Abort immediately if the HMAC is invalid.
+				# Abort if the HMAC is invalid.
 				if rcvdHMAC != vrfyHMAC:
-					raise base.PluggableTransportError("Invalid HMAC!")
+					raise base.PluggableTransportError("Invalid message HMAC.")
 
-				fwdBuf += aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
+				extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
 						(self.totalLen+const.HDR_LENGTH)])[:self.payloadLen]
+				msgs.append(message.new(payload=extracted, flags=self.flags))
 				self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
 
-				# Store tickets instead of handing them to the application.
-				if self.flags == const.FLAG_NEW_TICKET:
-					self._storeNewTicket(fwdBuf[0:const.MASTER_KEY_LENGTH], \
-							fwdBuf[const.MASTER_KEY_LENGTH: \
-							const.MASTER_KEY_LENGTH + const.TICKET_LENGTH])
-					self.totalLen = self.payloadLen = self.flags = None
-					return None
-
-				# Protocol message extracted - resetting length fields.
+				# Protocol message processed; now reset length fields.
 				self.totalLen = self.payloadLen = self.flags = None
 
-		log.debug("Unpacked %d bytes of data: 0x%s..." % \
-				(len(fwdBuf), fwdBuf[:10].encode('hex')))
-		return fwdBuf
+		return msgs
 
 
-	def sendLocal( self, circuit, data ):
+	def processMessages( self, circuit, data ):
 		"""Deobfuscate, then decrypt the given data and send it to the local
 		Tor client."""
 
@@ -320,11 +308,40 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		if (data is None) or (len(data) == 0):
 			return
 
-		log.info("Processing %d bytes of incoming data." % len(data))
+		# Try to extract protocol messages from the encrypted blurb.
+		msgs  = self.extractMsgs(data, self.recvCrypter)
+		if (msgs is None) or (len(msgs) == 0):
+			return
 
-		plainData = self.unpack(data, self.recvCrypter)
-		if plainData is not None:
-			circuit.upstream.write(plainData)
+		for msg in msgs:
+			# Forward data to the application.
+			if msg.flags & const.FLAG_PAYLOAD:
+				circuit.upstream.write(msg.payload)
+
+			# Let replay protection kick in after ticket was confirmed.
+			elif self.weAreServer and (msg.flags & const.FLAG_CONFIRM_TICKET):
+				log.debug("Adding cached HMAC to replay table.")
+				if self.cachedTicketHMAC is not None:
+					replay.SessionTicket.addHMAC(self.cachedTicketHMAC)
+				elif self.cachedUniformDHHMAC is not None:
+					replay.UniformDH.addHMAC(self.cachedUniformDHHMAC)
+
+			# Store newly received ticket and send ACK to the server.
+			elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
+				assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
+						const.MASTER_KEY_LENGTH)
+				self._storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH], \
+						msg.payload[const.MASTER_KEY_LENGTH:const.MASTER_KEY_LENGTH + \
+						const.TICKET_LENGTH])
+				# Tell the server that we received the ticket.
+				log.debug("Sending FLAG_CONFIRM_TICKET message to server.")
+				self.sendRemote(circuit, "dummy", flags=const.FLAG_CONFIRM_TICKET)
+
+			elif msg.flags == const.FLAG_CONFIRM_TICKET:
+				log.info("Confirming ticket!!1")
+
+			else:
+				log.warning("Invalid message flags: %d." % msg.flags)
 
 
 	def _epoch( self ):
@@ -553,7 +570,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 		# Store observed HMAC to prevent replay attacks.
 		if self.weAreServer:
-			replayTracker.addHMAC(existingHMAC)
+			log.debug("Caching HMAC to add it to the replay table later.")
+			if replayTracker == replay.SessionTicket:
+				self.cachedTicketHMAC = existingHMAC
+			else:
+				self.cachedUniformDHHMAC = existingHMAC
 
 		return True
 
@@ -614,7 +635,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				return
 
 		if self.state == const.ST_CONNECTED:
-			self.sendLocal(circuit, data.read())
+			self.processMessages(circuit, data.read())
 
 
 	def receivedUpstream( self, data, circuit ):
