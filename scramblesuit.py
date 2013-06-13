@@ -285,7 +285,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
                 self.flags = ord(aes.decrypt(self.recvBuf[20]))
 
-                if not message.isSane(self.totalLen, self.payloadLen, self.flags):
+                if not message.isSane(self.totalLen,
+                                      self.payloadLen, self.flags):
                     raise base.PluggableTransportError("Invalid header.")
 
             # Parts of the message are still on the wire; waiting.
@@ -343,12 +344,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
                 assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
                         const.MASTER_KEY_LENGTH)
-                self._storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH], \
-                        msg.payload[const.MASTER_KEY_LENGTH:const.MASTER_KEY_LENGTH + \
-                        const.TICKET_LENGTH])
+                self._storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH],
+                                     msg.payload[const.MASTER_KEY_LENGTH:
+                                                 const.MASTER_KEY_LENGTH +
+                                                 const.TICKET_LENGTH])
                 # Tell the server that we received the ticket.
                 log.debug("Sending FLAG_CONFIRM_TICKET message to server.")
-                self.sendRemote(circuit, "dummy", flags=const.FLAG_CONFIRM_TICKET)
+                self.sendRemote(circuit, "dummy",
+                                flags=const.FLAG_CONFIRM_TICKET)
 
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
