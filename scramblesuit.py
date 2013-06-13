@@ -21,7 +21,6 @@ import os
 import random
 import string
 import time
-import argparse
 import base64
 
 import probdist
@@ -137,9 +136,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.recvHMAC = okm[160:192]
 
         if self.weAreServer:
-            self.sendHMAC, self.recvHMAC = util.swap(self.sendHMAC, self.recvHMAC)
-            self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter, \
-                    self.recvCrypter)
+            self.sendHMAC, self.recvHMAC = util.swap(self.sendHMAC,
+                                                     self.recvHMAC)
+            self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter,
+                                                           self.recvCrypter)
 
 
     def circuitDestroyed( self, circuit, reason, side ):
