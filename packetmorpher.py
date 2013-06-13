@@ -20,7 +20,7 @@ class PacketMorpher( object ):
     target probability distribution."""
 
     def __init__( self, dist=None ):
-        """Initialize the PacketMorpher with a discrete probability
+        """Initialise the PacketMorpher with a discrete probability
         distribution. If none is given, a distribution is randomly
         generated."""
 

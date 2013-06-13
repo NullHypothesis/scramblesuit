@@ -108,14 +108,14 @@ class PayloadCrypter:
 
     def __init__( self ):
 
-        log.debug("Initializing payload crypter.")
+        log.debug("Initialising payload crypter.")
         self.sessionKey = None
         self.crypter = None
         self.counter = None
 
 
     def setSessionKey( self, key, iv ):
-        """Set the AES session key and initialize counter mode."""
+        """Set the AES session key and initialise counter mode."""
 
         log.debug("Setting session key for AES-CTR 0x%s..." %
                   key.encode('hex')[:10])
@@ -132,7 +132,7 @@ class PayloadCrypter:
     def encrypt( self, data ):
         """Encrypts the given `data' using AES."""
 
-        # Send unencrypted data if AES is not initialized yet.
+        # Send unencrypted data if AES is not initialised yet.
         if self.crypter == None:
             return data
         else:

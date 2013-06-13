@@ -149,7 +149,7 @@ def decrypt( ticket ):
 class ProtocolState( object ):
     """Describes the protocol state of a ScrambleSuit server which is part of a
     session ticket.  The state can be used to bootstrap a ScrambleSuit session
-    without the client unlocking the puzzle."""
+    without a UniformDH handshake."""
 
     def __init__( self, masterKey, issueDate=int(time.time()) ):
         self.identifier = IDENTIFIER
@@ -187,10 +187,11 @@ class ProtocolState( object ):
 
 class SessionTicket( object ):
     """Encapsulates a session ticket which can be used by the client to gain
-    access to a ScrambleSuit server without solving the served puzzle."""
+    access to a ScrambleSuit server without conducting a UniformDH
+    handshake."""
 
     def __init__( self, masterKey ):
-        """Initialize a new session ticket which contains `masterKey'. The
+        """Initialise a new session ticket which contains `masterKey'. The
         parameter `symmTicketKey' is used to encrypt the ticket and
         `hmacTicketKey' is used to authenticate the ticket when issued."""
 
@@ -198,7 +199,7 @@ class SessionTicket( object ):
 
         checkKeys()
 
-        # Initialization vector for AES-CBC.
+        # Initialisation vector for AES-CBC.
         self.IV = mycrypto.strong_random(IV_LENGTH)
 
         # The server's actual (encrypted) protocol state.

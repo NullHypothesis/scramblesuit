@@ -42,9 +42,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.warning("\n+++ Note that ScrambleSuit is still under "
                     "development and is NOT safe for practical use. +++\n")
 
-        log.info("Initializing %s." % const.TRANSPORT_NAME)
+        log.info("Initialising %s." % const.TRANSPORT_NAME)
 
-        # Initialize the protocol's state machine.
+        # Initialise the protocol's state machine.
         log.debug("Switching to state ST_WAIT_FOR_AUTH.")
         self.state = const.ST_WAIT_FOR_AUTH
 
@@ -666,8 +666,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if self.state == const.ST_CONNECTED:
             self.sendRemote(circuit, data.read())
 
-        # Buffer data we are not ready to transmit yet. It will get flushed
-        # once the puzzle is solved and the connection established.
+        # Buffer data we are not ready to transmit yet.
         else:
             self.sendBuf += data.read()
             log.debug("%d bytes of outgoing data buffered." %

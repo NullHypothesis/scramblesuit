@@ -39,7 +39,7 @@ MARKER_LENGTH = 16
 # Key length for the master key in bytes.
 MASTER_KEY_LENGTH = 32
 
-# The maximum padding length to be appended to the puzzle in bytes.
+# The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 4096
 
 # Length of ScrambleSuit's MTU in bytes.
