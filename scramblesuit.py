@@ -191,6 +191,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			# accepted the ticket.
 			log.debug("Switching to state ST_CONNECTED.")
 			self.state = const.ST_CONNECTED
+			self._flushSendBuffer(circuit)
 
 		# Conduct an authenticated UniformDH handshake if there's no ticket.
 		elif self.weAreClient:
@@ -365,14 +366,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		application while ScrambleSuit was still busy handling
 		authentication."""
 
-		# FIXME - this method is not called anywhere.
+		assert circuit
 
-		# Flush the buffered data, the application wanted to send before.
-		if len(self.sendBuf):
-			log.debug("Flushing %d bytes of buffered data from local Tor." % \
-				len(self.sendBuf))
-			self.sendRemote(circuit, self.sendBuf)
-			self.sendBuf = ""
+		if len(self.sendBuf) == 0:
+			return
+
+		# Flush the buffered data, the application is so eager to send.
+		log.debug("Flushing %d bytes of buffered application data." % \
+			len(self.sendBuf))
+
+		self.sendRemote(circuit, self.sendBuf)
+		self.sendBuf = ""
 
 
 	def _receiveTicket( self, data ):
@@ -625,12 +629,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			# First, try to interpret the incoming data as session ticket.
 			if self._receiveTicket(data):
 				log.debug("Ticket authentication succeeded.")
+				self._flushSendBuffer(circuit)
 				self.sendRemote(circuit, self._issueTicketAndKey(), \
 						flags=const.FLAG_NEW_TICKET)
 
 			# Second, interpret the data as a UniformDH handshake.
 			elif self._receiveClientsUniformDHPK(data, circuit):
 				log.debug("UniformDH authentication succeeded.")
+				self._flushSendBuffer(circuit)
 
 			else:
 				log.debug("Authentication unsuccessful so far.  " \
@@ -642,6 +648,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			if not self._receiveServersUniformDHPK(data):
 				log.debug("Unable to finish UniformDH handshake just yet.")
 				return
+			self._flushSendBuffer(circuit)
 
 		if self.state == const.ST_CONNECTED:
 			self.processMessages(circuit, data.read())
