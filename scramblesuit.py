@@ -19,7 +19,6 @@ import obfsproxy.transports.obfs3_dh as obfs3_dh
 
 import os
 import random
-import string
 import time
 import base64
 
@@ -233,8 +232,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 messages.append(message.ProtocolMessage("", \
                         paddingLen=paddingLen - const.HDR_LENGTH))
     
-            blurb = string.join([msg.encryptAndHMAC(self.sendCrypter, \
-                    self.sendHMAC) for msg in messages], '')
+            blurb = "".join([msg.encryptAndHMAC(self.sendCrypter, \
+                    self.sendHMAC) for msg in messages])
 
         # ...otherwise, we leave the data as it is.
         else:
