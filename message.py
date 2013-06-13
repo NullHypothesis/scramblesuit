@@ -39,8 +39,8 @@ def isSane( totalLen, payloadLen, flags ):
     def ok( length ):
         return True if (0 <= length <= const.MPU) else False
 
-    log.debug("Message header: totalLen=%d, payloadLen=%d, flags" \
-            "=%d" % (totalLen, payloadLen, flags))
+    log.debug("Message header: totalLen=%d, payloadLen=%d, flags"
+              "=%d" % (totalLen, payloadLen, flags))
 
     validFlags = [
         const.FLAG_PAYLOAD,
@@ -70,9 +70,10 @@ class ProtocolMessage( object ):
 
     def encryptAndHMAC( self, crypter, HMACKey ):
 
-        encrypted = crypter.encrypt(serialize.htons(self.totalLen) + \
-                serialize.htons(self.payloadLen) + chr(self.flags) + \
-                self.payload + (self.totalLen - self.payloadLen) * '\0')
+        encrypted = crypter.encrypt(serialize.htons(self.totalLen) +
+                                    serialize.htons(self.payloadLen) +
+                                    chr(self.flags) + self.payload +
+                                    (self.totalLen - self.payloadLen) * '\0')
 
         hmac = mycrypto.HMAC_SHA256_128(HMACKey, encrypted)
 
@@ -87,8 +88,8 @@ class ProtocolMessage( object ):
         if paddingLen == 0:
             return
 
-        log.debug("Adding %d bytes of padding to %d-byte message." % \
-                (paddingLen, const.HDR_LENGTH + self.totalLen))
+        log.debug("Adding %d bytes of padding to %d-byte message." %
+                  (paddingLen, const.HDR_LENGTH + self.totalLen))
         self.totalLen += paddingLen
 
 

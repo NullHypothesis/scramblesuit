@@ -139,8 +139,8 @@ def decrypt( ticket ):
     masterKey = plainTicket[22:54]
 
     if not (identifier == IDENTIFIER):
-        log.error("The HMAC is valid but the identifier could not be " \
-                "found.  The ticket could be corrupt.")
+        log.error("The HMAC is valid but the identifier could not be "
+                  "found.  The ticket could be corrupt.")
         return None
 
     return ProtocolState(masterKey, issueDate=issueDate)
@@ -167,14 +167,14 @@ class ProtocolState( object ):
 
         lifetime = int(time.time()) - self.issueDate
         if lifetime > const.SESSION_TICKET_LIFETIME:
-            log.debug("The ticket expired %s ago." % \
-                    str(datetime.timedelta(seconds=lifetime - \
-                    const.SESSION_TICKET_LIFETIME)))
+            log.debug("The ticket expired %s ago." %
+                      str(datetime.timedelta(seconds=(lifetime -
+                      const.SESSION_TICKET_LIFETIME))))
             return False
 
-        log.debug("The ticket is still valid for %s." %  \
-                    str(datetime.timedelta(seconds= \
-                    const.SESSION_TICKET_LIFETIME - lifetime)))
+        log.debug("The ticket is still valid for %s." %
+                  str(datetime.timedelta(seconds=
+                  (const.SESSION_TICKET_LIFETIME - lifetime))))
 
         return True
 
@@ -182,7 +182,7 @@ class ProtocolState( object ):
     def __repr__( self ):
 
         return struct.pack('I', self.issueDate) + self.identifier + \
-                self.masterKey + self.pad
+                           self.masterKey + self.pad
 
 
 class SessionTicket( object ):
@@ -223,13 +223,13 @@ class SessionTicket( object ):
         cryptedState = aes.encrypt(state)
 
         # Authenticate ticket name, IV and the encrypted state.
-        hmac = HMAC.new(self.hmacTicketKey, self.IV + \
-                cryptedState, digestmod=SHA256).digest()
+        hmac = HMAC.new(self.hmacTicketKey, self.IV +
+                        cryptedState, digestmod=SHA256).digest()
 
         ticket = self.IV + cryptedState + hmac
 
         log.debug("Returning %d-byte ticket." % (len(self.IV) +
-            len(cryptedState) + len(hmac)))
+                  len(cryptedState) + len(hmac)))
 
         return ticket
 
@@ -245,8 +245,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("ticket_file", type=str, \
-            help="The file, the newly issued ticket is written to.")
+    parser.add_argument("ticket_file", type=str, help="The file, the newly "
+                        "issued ticket is written to.")
     args = parser.parse_args()
 
     print "[+] Generating new session ticket."
@@ -255,7 +255,7 @@ if __name__ == "__main__":
     ticket = ticketObj.issue()
 
     print "[+] Writing new session ticket to `%s'." % args.ticket_file
-    util.writeToFile(base64.b32encode(masterKey + ticket) + '\n', \
-            args.ticket_file)
+    util.writeToFile(base64.b32encode(masterKey + ticket) + '\n',
+                     args.ticket_file)
 
     print "[+] Success."

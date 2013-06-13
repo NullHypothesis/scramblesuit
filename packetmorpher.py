@@ -24,8 +24,11 @@ class PacketMorpher( object ):
         distribution. If none is given, a distribution is randomly
         generated."""
 
-        self.dist = dist if dist else \
-            probdist.RandProbDist(lambda: random.randint(const.HDR_LENGTH, const.MTU))
+        if dist:
+            self.dist = dist
+        else:
+            self.dist = probdist.RandProbDist(lambda: random.randint(
+                                              const.HDR_LENGTH, const.MTU))
 
 
     def morph( self, dataLen ):

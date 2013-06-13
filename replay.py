@@ -35,8 +35,8 @@ class Tracker( object ):
 
     def isPresent( self, element ):
         """Check if an element is already present in the lookup table."""
-        log.debug("Looking for existing HMAC in size-%d dictionary." % \
-                len(self.table)) 
+        log.debug("Looking for existing HMAC in size-%d dictionary." %
+                  len(self.table)) 
 
         # Prune the replay table before checking for values.
         self.prune()
@@ -50,8 +50,8 @@ class Tracker( object ):
                 pickle.dump(self.table, fd)
                 fd.close()
         except IOError as e:
-            log.error("Error saving replay table to file `%s': %s" % \
-                    (fileName, e))
+            log.error("Error saving replay table to file `%s': %s" %
+                      (fileName, e))
 
     def loadFromDisk( self, fileName ):
         """Load the lookup table from the disk."""
@@ -60,8 +60,8 @@ class Tracker( object ):
                 self.table = pickle.load(fd)
                 fd.close()
         except IOError as e:
-            log.error("Error opening replay table from file `%s': %s." % \
-                    (fileName, e))
+            log.error("Error opening replay table from file `%s': %s." %
+                      (fileName, e))
 
     def prune( self ):
         """Delete expired elements from the table."""

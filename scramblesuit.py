@@ -39,8 +39,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
     def __init__( self ):
 
-        log.warning("\n+++ Note that ScrambleSuit is still under " \
-                "development and is NOT safe for practical use. +++\n")
+        log.warning("\n+++ Note that ScrambleSuit is still under "
+                    "development and is NOT safe for practical use. +++\n")
 
         log.info("Initializing %s." % const.TRANSPORT_NAME)
 
@@ -118,8 +118,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         the given master key.  All key material is derived using
         HKDF-SHA256."""
 
-        log.debug("Deriving session keys from master key 0x%s..." % \
-                masterKey.encode('hex')[:10])
+        log.debug("Deriving session keys from master key 0x%s..." %
+                  masterKey.encode('hex')[:10])
 
         # We need key material for two symmetric keys, nonces and HMACs.  All
         # of them are 32 bytes in size.
@@ -157,8 +157,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         if self.weAreClient:
             if (not self.uniformDHSecret) and (not self.ticketFile):
-                raise base.PluggableTransportError("Neither a UniformDH " \
-                        "secret nor a ticket is available.  ScrambleSuite " \
+                raise base.PluggableTransportError("Neither a UniformDH "
+                        "secret nor a ticket is available.  ScrambleSuite "
                         "needs at least one of these two for authentication.")
 
         # Send a session ticket to the server (if we have one).
@@ -224,8 +224,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
     def _chopAndSend( self, circuit, messages, protocolMsg=True ):
 
         # Ask the packet morpher how much we should pad and get a chopper.
-        chopper, paddingLen = self.pktMorpher.morph(sum([len(msg) \
-                for msg in messages]))
+        chopper, paddingLen = self.pktMorpher.morph(sum([len(msg)
+                                                    for msg in messages]))
 
         # If we are dealing with protocol messages, we pad, encrypt and MAC...
         if protocolMsg:

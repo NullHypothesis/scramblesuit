@@ -37,12 +37,12 @@ class HKDF_SHA256( object ):
         self.HashLen = const.SHA256_DIGEST_LENGTH
 
         if length > (self.HashLen * 255):
-            raise ValueError("The OKM's length cannot be larger than %d." % \
-                    (self.HashLen * 255))
+            raise ValueError("The OKM's length cannot be larger than %d." %
+                             (self.HashLen * 255))
 
         if len(prk) < self.HashLen:
-            raise ValueError("The PRK must be at least %d bytes in length " \
-                    "(%d given)." % (self.HashLen, len(prk)))
+            raise ValueError("The PRK must be at least %d bytes in length "
+                             "(%d given)." % (self.HashLen, len(prk)))
 
         self.N = math.ceil(float(length) / self.HashLen)
         self.prk = prk
@@ -60,12 +60,13 @@ class HKDF_SHA256( object ):
 
         # Prevent the accidental re-use of output keying material.
         if len(self.T) > 0:
-            raise base.PluggableTransportError("HKDF-SHA256 OKM must not " \
-                    "be re-used by application.")
+            raise base.PluggableTransportError("HKDF-SHA256 OKM must not "
+                                               "be re-used by application.")
 
         while self.length > len(self.T):
-            tmp = Crypto.Hash.HMAC.new(self.prk, tmp + self.info + \
-                    chr(self.ctr), Crypto.Hash.SHA256).digest()
+            tmp = Crypto.Hash.HMAC.new(self.prk, tmp + self.info +
+                                       chr(self.ctr),
+                                       Crypto.Hash.SHA256).digest()
             self.T += tmp
             self.ctr += 1
 
@@ -116,15 +117,16 @@ class PayloadCrypter:
     def setSessionKey( self, key, iv ):
         """Set the AES session key and initialize counter mode."""
 
-        log.debug("Setting session key for AES-CTR 0x%s..." % \
-                key.encode('hex')[:10])
-        log.debug("Setting IV for AES-CTR 0x%s..." % \
-                iv.encode('hex')[:10])
+        log.debug("Setting session key for AES-CTR 0x%s..." %
+                  key.encode('hex')[:10])
+        log.debug("Setting IV for AES-CTR 0x%s..." %
+                  iv.encode('hex')[:10])
+
         self.sessionKey = key
-        self.counter = Crypto.Util.Counter.new(128,
-                initial_value=long(iv.encode('hex'), 16))
-        self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR, \
-                counter=self.counter)
+        self.counter = Crypto.Util.Counter.new(128, initial_value = 
+                                               long(iv.encode('hex'), 16))
+        self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR,
+                                             counter=self.counter)
 
 
     def encrypt( self, data ):
