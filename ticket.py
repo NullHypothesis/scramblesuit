@@ -61,18 +61,18 @@ def rotateKeys( ):
     global AESKey
     global creationTime
 
-    log.info("Rotating session ticket keys.")
+    log.info("Attempting to rotate session ticket keys.")
 
+    # Generate and load fresh keys.
     HMACKey = mycrypto.strong_random(HMAC_KEY_LENGTH)
     AESKey = mycrypto.strong_random(AES_KEY_LENGTH)
     creationTime = int(time.time())
 
     try:
-        with open(const.KEY_STORE, "wb") as fd:
+        with open(const.KEY_STORE, 'w') as fd:
             pickle.dump([creationTime, HMACKey, AESKey], fd)
-            fd.close()
-    except IOError as e:
-        log.error("Error opening ticket key file: %s." % e)
+    except IOError as err:
+        log.error("Error writing ticket key file to `%s'." % err)
 
 
 def loadKeys( ):
@@ -83,7 +83,8 @@ def loadKeys( ):
     global AESKey
     global creationTime
 
-    log.info("Reading session ticket keys k_S from `%s'." % const.KEY_STORE)
+    log.info("Attempting to read ticket keys k_S from file `%s'." %
+             const.KEY_STORE)
 
     # If the key store does not exist (yet), it must be created.
     if not os.path.exists(const.KEY_STORE):
@@ -91,11 +92,10 @@ def loadKeys( ):
         return
 
     try:
-        with open(const.KEY_STORE, "rb") as fd:
+        with open(const.KEY_STORE, 'r') as fd:
             creationTime, HMACKey, AESKey = pickle.load(fd)
-            fd.close()
-    except IOError as e:
-        log.error("Error opening ticket key file: %s." % e)
+    except IOError as err:
+        log.error("Error reading ticket key file from `%s'." % err)
 
 
 def checkKeys( ):
@@ -114,33 +114,33 @@ def decrypt( ticket ):
     ticket as a ProtocolState object.  If the ticket is invalid, `None' is
     returned."""
 
-    assert len(ticket) == const.TICKET_LENGTH
+    assert (ticket is not None) and (len(ticket) == const.TICKET_LENGTH)
 
     global HMACKey
     global AESKey
     global creationTime
 
-    log.debug("Attempting to decrypt and verify %d-byte ticket." % len(ticket))
+    log.debug("Attempting to decrypt and verify ticket.")
 
     checkKeys()
 
-    # Verify if the HMAC is correct.
+    # Verify the ticket's authenticity before decrypting.
     hmac = HMAC.new(HMACKey, ticket[0:80], digestmod=SHA256).digest()
     if hmac != ticket[80:const.TICKET_LENGTH]:
         log.debug("The ticket's HMAC is invalid.  Probably not a ticket.")
         return None
 
-    # Decrypt ticket to obtain state.
-    aes = AES.new(AESKey, mode=AES.MODE_CBC, IV=ticket[0:16])
-    plainTicket = aes.decrypt(ticket[16:80])
+    # Decrypt the ticket to extract the state information.
+    aes = AES.new(AESKey, mode=AES.MODE_CBC, IV=ticket[0:IV_LENGTH])
+    plainTicket = aes.decrypt(ticket[IV_LENGTH:80])
 
     issueDate = struct.unpack('I', plainTicket[0:4])[0]
     identifier = plainTicket[4:22]
     masterKey = plainTicket[22:54]
 
     if not (identifier == IDENTIFIER):
-        log.error("The HMAC is valid but the identifier could not be "
-                  "found.  The ticket could be corrupt.")
+        log.error("The ticket's HMAC is valid but the identifier is invalid.  "
+                  "The ticket could be corrupt.")
         return None
 
     return ProtocolState(masterKey, issueDate=issueDate)
@@ -155,7 +155,7 @@ class ProtocolState( object ):
         self.identifier = IDENTIFIER
         self.masterKey = masterKey
         self.issueDate = issueDate
-        # Pad to multiple of 16 bytes due to AES' block size.
+        # Pad to multiple of 16 bytes to match AES' block size.
         self.pad = "\0\0\0\0\0\0\0\0\0\0"
 
 
@@ -168,8 +168,8 @@ class ProtocolState( object ):
         lifetime = int(time.time()) - self.issueDate
         if lifetime > const.SESSION_TICKET_LIFETIME:
             log.debug("The ticket expired %s ago." %
-                      str(datetime.timedelta(seconds=(lifetime -
-                      const.SESSION_TICKET_LIFETIME))))
+                      str(datetime.timedelta(seconds=
+                      (lifetime - const.SESSION_TICKET_LIFETIME))))
             return False
 
         log.debug("The ticket is still valid for %s." %
@@ -195,17 +195,18 @@ class SessionTicket( object ):
         parameter `symmTicketKey' is used to encrypt the ticket and
         `hmacTicketKey' is used to authenticate the ticket when issued."""
 
-        assert len(masterKey) == const.MASTER_KEY_LENGTH
+        assert (masterKey is not None) and \
+               len(masterKey) == const.MASTER_KEY_LENGTH
 
         checkKeys()
 
         # Initialisation vector for AES-CBC.
         self.IV = mycrypto.strong_random(IV_LENGTH)
 
-        # The server's actual (encrypted) protocol state.
+        # The server's (encrypted) protocol state.
         self.state = ProtocolState(masterKey)
 
-        # AES and HMAC key to protect the ticket.
+        # AES and HMAC keys to encrypt and authenticate the ticket.
         self.symmTicketKey = AESKey
         self.hmacTicketKey = HMACKey
 
@@ -223,16 +224,14 @@ class SessionTicket( object ):
         assert (len(state) % AES.block_size) == 0
         cryptedState = aes.encrypt(state)
 
-        # Authenticate ticket name, IV and the encrypted state.
-        hmac = HMAC.new(self.hmacTicketKey, self.IV +
-                        cryptedState, digestmod=SHA256).digest()
+        # Authenticate the encrypted state and the IV.
+        hmac = HMAC.new(self.hmacTicketKey,
+                        self.IV + cryptedState, digestmod=SHA256).digest()
 
-        ticket = self.IV + cryptedState + hmac
+        finalTicket = self.IV + cryptedState + hmac
+        log.debug("Returning %d-byte ticket." % len(finalTicket))
 
-        log.debug("Returning %d-byte ticket." % (len(self.IV) +
-                  len(cryptedState) + len(hmac)))
-
-        return ticket
+        return finalTicket
 
 
 # Alias class name in order to provide a more intuitive API.
