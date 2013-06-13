@@ -267,6 +267,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		"""Takes raw data from the wire, decrypts and authenticates the data
 		and returns ScrambleSuit protocol messages."""
 
+		assert aes and (data is not None)
+
 		self.recvBuf += data
 		msgs = []
 
@@ -279,28 +281,29 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
 				self.flags = ord(aes.decrypt(self.recvBuf[20]))
 
-				# Abort if the header is invalid.
 				if not message.isSane(self.totalLen, self.payloadLen, self.flags):
 					raise base.PluggableTransportError("Invalid header.")
 
-			# We have (another) full message; let's extract it.
-			if (len(self.recvBuf) - const.HDR_LENGTH) >= self.totalLen:
-				rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
-				vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
-						self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
-						const.HDR_LENGTH)])
+			# Parts of the message are still on the wire; waiting.
+			if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
+				break
 
-				# Abort if the HMAC is invalid.
-				if rcvdHMAC != vrfyHMAC:
-					raise base.PluggableTransportError("Invalid message HMAC.")
+			rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
+			vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
+					self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
+					const.HDR_LENGTH)])
 
-				extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
-						(self.totalLen+const.HDR_LENGTH)])[:self.payloadLen]
-				msgs.append(message.new(payload=extracted, flags=self.flags))
-				self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
+			if rcvdHMAC != vrfyHMAC:
+				raise base.PluggableTransportError("Invalid message HMAC.")
 
-				# Protocol message processed; now reset length fields.
-				self.totalLen = self.payloadLen = self.flags = None
+			# Decrypt the message and remove it from the input buffer.
+			extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
+					(self.totalLen + const.HDR_LENGTH)])[:self.payloadLen]
+			msgs.append(message.new(payload=extracted, flags=self.flags))
+			self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
+
+			# Protocol message processed; now reset length fields.
+			self.totalLen = self.payloadLen = self.flags = None
 
 		return msgs
 
