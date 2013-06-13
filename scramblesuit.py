@@ -168,25 +168,26 @@ class ScrambleSuitTransport( base.BaseTransport ):
             blob = base64.b32decode(blob.strip())
 
             masterKey = blob[:const.MASTER_KEY_LENGTH]
-            ticket = blob[const.MASTER_KEY_LENGTH: \
-                    const.MASTER_KEY_LENGTH + const.TICKET_LENGTH]
+            ticket = blob[const.MASTER_KEY_LENGTH:
+                          const.MASTER_KEY_LENGTH + const.TICKET_LENGTH]
 
-            log.debug("Redeeming session ticket 0x%s..." % \
-                    ticket.encode('hex')[:10])
+            log.debug("Redeeming session ticket 0x%s..." %
+                      ticket.encode('hex')[:10])
             self._deriveSecrets(masterKey)
 
             # Subtract the length of the ticket to make the handshake on
             # average as long as a UniformDH handshake message.
-            padding = mycrypto.weak_random(random.randint(0, \
-                    const.MAX_PADDING_LENGTH - const.TICKET_LENGTH))
+            padding = mycrypto.weak_random(random.randint(0,
+                                           const.MAX_PADDING_LENGTH -
+                                           const.TICKET_LENGTH))
 
-            marker = mycrypto.HMAC_SHA256_128(self.sendHMAC, \
-                    self.sendHMAC + ticket)
-            mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, ticket + padding + \
-                    marker + self._epoch())
+            marker = mycrypto.HMAC_SHA256_128(self.sendHMAC,
+                                              self.sendHMAC + ticket)
+            mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, ticket + padding +
+                                           marker + self._epoch())
 
-            self._chopAndSend(circuit, ticket + padding + marker + mac, \
-                    protocolMsg=False)
+            self._chopAndSend(circuit, ticket + padding + marker + mac,
+                              protocolMsg=False)
             self.redeemedTicket = True
 
             # TODO - The client can't know at this point whether the server
@@ -199,8 +200,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         elif self.weAreClient:
             log.debug("No session ticket to redeem.  Running UniformDH.")
 
-            self._chopAndSend(circuit, self._createUniformDHHandshake(), \
-                    protocolMsg=False)
+            self._chopAndSend(circuit, self._createUniformDHHandshake(),
+                              protocolMsg=False)
 
 
     def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
@@ -229,11 +230,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # If we are dealing with protocol messages, we pad, encrypt and MAC...
         if protocolMsg:
             if paddingLen > const.HDR_LENGTH:
-                messages.append(message.ProtocolMessage("", \
-                        paddingLen=paddingLen - const.HDR_LENGTH))
+                messages.append(message.ProtocolMessage("",
+                                paddingLen=paddingLen - const.HDR_LENGTH))
     
-            blurb = "".join([msg.encryptAndHMAC(self.sendCrypter, \
-                    self.sendHMAC) for msg in messages])
+            blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
+                            self.sendHMAC) for msg in messages])
 
         # ...otherwise, we leave the data as it is.
         else:
@@ -256,14 +257,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             return
 
         if len(self.choppedPieces[0]) > 0:
-            log.debug("Writing %d bytes of data to downstream." % \
-                    len(self.choppedPieces[0]))
+            log.debug("Writing %d bytes of data to downstream." %
+                      len(self.choppedPieces[0]))
             circuit.downstream.write(self.choppedPieces[0])
 
         if len(self.choppedPieces) > 1:
             self.choppedPieces = self.choppedPieces[1:]
-            reactor.callLater(self.iatMorpher.randomSample(), \
-                self.__flushPieces, circuit)
+            reactor.callLater(self.iatMorpher.randomSample(),
+                              self.__flushPieces, circuit)
 
 
     def extractMsgs( self, data, aes ):
@@ -293,16 +294,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 break
 
             rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
-            vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
-                    self.recvBuf[const.HMAC_LENGTH:(self.totalLen + \
-                    const.HDR_LENGTH)])
+            vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
+                              self.recvBuf[const.HMAC_LENGTH:(self.totalLen +
+                              const.HDR_LENGTH)])
 
             if rcvdHMAC != vrfyHMAC:
                 raise base.PluggableTransportError("Invalid message HMAC.")
 
             # Decrypt the message and remove it from the input buffer.
-            extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH: \
-                    (self.totalLen + const.HDR_LENGTH)])[:self.payloadLen]
+            extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH:
+                         (self.totalLen + const.HDR_LENGTH)])[:self.payloadLen]
             msgs.append(message.new(payload=extracted, flags=self.flags))
             self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
 
@@ -342,7 +343,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # Store newly received ticket and send ACK to the server.
             elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
                 assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
-                        const.MASTER_KEY_LENGTH)
+                                    const.MASTER_KEY_LENGTH)
                 self._storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH],
                                      msg.payload[const.MASTER_KEY_LENGTH:
                                                  const.MASTER_KEY_LENGTH +
@@ -374,8 +375,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             return
 
         # Flush the buffered data, the application is so eager to send.
-        log.debug("Flushing %d bytes of buffered application data." % \
-            len(self.sendBuf))
+        log.debug("Flushing %d bytes of buffered application data." %
+                  len(self.sendBuf))
 
         self.sendRemote(circuit, self.sendBuf)
         self.sendBuf = ""
@@ -384,8 +385,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
     def _receiveTicket( self, data ):
         """Verify and extract ticket handshake message."""
 
-        if len(data) < (const.TICKET_LENGTH + const.MARKER_LENGTH + \
-                const.HMAC_LENGTH):
+        if len(data) < (const.TICKET_LENGTH + const.MARKER_LENGTH +
+                        const.HMAC_LENGTH):
             return False
 
         potentialTicket = data.peek()
@@ -402,18 +403,21 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 return False
 
         # First, find the marker to efficiently locate the HMAC.
-        marker = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC + \
-                potentialTicket[:const.TICKET_LENGTH])
+        marker = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC +
+                                         potentialTicket[:const.TICKET_LENGTH])
 
         index = self._locateMarker(marker, potentialTicket)
         if not index:
             return False
 
         # Now, verify if the HMAC is valid.
-        existingHMAC = potentialTicket[index + const.MARKER_LENGTH: \
-                index + const.MARKER_LENGTH + const.HMAC_LENGTH]
-        myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC, \
-                potentialTicket[0:index + const.MARKER_LENGTH] + self._epoch())
+        existingHMAC = potentialTicket[index + const.MARKER_LENGTH:
+                                       index + const.MARKER_LENGTH +
+                                       const.HMAC_LENGTH]
+        myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
+                                          potentialTicket[0:
+                                          index + const.MARKER_LENGTH] +
+                                          self._epoch())
 
         if not self._isValidHMAC(myHMAC, existingHMAC, replay.SessionTicket):
             return False
@@ -435,8 +439,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.debug("Storing newly received session ticket.")
 
-        util.writeToFile(base64.b32encode(masterKey + ticket) + '\n', \
-                const.TICKET_FILE)
+        util.writeToFile(base64.b32encode(masterKey + ticket) + '\n',
+                         const.TICKET_FILE)
 
 
     def _receiveClientsUniformDHPK( self, data, circuit ):
@@ -470,8 +474,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         handshakeMsg = self._createUniformDHHandshake(myPK)
         ticket = self._issueTicketAndKey()
 
-        log.debug("Sending %d bytes of UniformDH handshake and ticket." % \
-                len(handshakeMsg))
+        log.debug("Sending %d bytes of UniformDH handshake and ticket." %
+                  len(handshakeMsg))
 
         self._chopAndSend(circuit, handshakeMsg, protocolMsg=False)
         self.sendRemote(circuit, ticket, flags=const.FLAG_NEW_TICKET)
@@ -498,8 +502,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if not serverPK:
             return False
 
-        log.debug("Extracted UniformDH public key.  Now calculating shared " \
-                "master key.")
+        log.debug("Extracted UniformDH public key.  Now calculating shared "
+                  "master key.")
 
         try:
             masterKey = self.dh.get_secret(serverPK)
@@ -523,26 +527,28 @@ class ScrambleSuitTransport( base.BaseTransport ):
         assert self.uniformDHSecret is not None
 
         # Do we already have the minimum amount of data?
-        if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARKER_LENGTH + \
-                const.HMAC_LENGTH):
+        if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARKER_LENGTH +
+                        const.HMAC_LENGTH):
             return False
 
         handshake = data.peek()
 
         # First, find the marker to efficiently locate the HMAC.
         publicKey = handshake[:const.PUBLIC_KEY_LENGTH]
-        marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
-                self.uniformDHSecret + publicKey)
+        marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret,
+                                          self.uniformDHSecret + publicKey)
 
         index = self._locateMarker(marker, handshake)
         if not index:
             return False
 
         # Now, verify if the HMAC is valid.
-        existingHMAC = handshake[index + const.MARKER_LENGTH: \
-                index + const.MARKER_LENGTH + const.HMAC_LENGTH]
-        myHMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
-                handshake[0 : index + const.MARKER_LENGTH] + self._epoch())
+        existingHMAC = handshake[index + const.MARKER_LENGTH:
+                                 index + const.MARKER_LENGTH +
+                                 const.HMAC_LENGTH]
+        myHMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret,
+                                          handshake[0 : index +
+                                          const.MARKER_LENGTH] + self._epoch())
 
         if not self._isValidHMAC(myHMAC, existingHMAC, replay.UniformDH):
             return False
@@ -573,17 +579,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
         """Check if the HMAC is correct and not replayed."""
 
         if not (myHMAC == existingHMAC):
-            log.warning("The HMAC is invalid (got `%s' but expected `%s')." % \
-                    (existingHMAC.encode('hex'), myHMAC.encode('hex')))
+            log.warning("The HMAC is invalid (got `%s' but expected `%s')." %
+                        (existingHMAC.encode('hex'), myHMAC.encode('hex')))
             return False
 
         log.debug("The computed HMAC is valid.")
 
         # Was this HMAC sent before?
         if self.weAreServer and replayTracker.isPresent(existingHMAC):
-            log.warning("The HMAC `%s' was already observed.  This could " \
-                    "be a replay attack.  Remaining silent." % \
-                    existingHMAC.encode('hex'))
+            log.warning("The HMAC `%s' was already observed.  This could "
+                        "be a replay attack.  Remaining silent." %
+                        existingHMAC.encode('hex'))
             return False
 
         return True
@@ -604,16 +610,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Subtract the length of the public key to make the handshake on
         # average as long as a redeemed ticket.
-        padding = mycrypto.weak_random(random.randint(0, \
-            const.MAX_PADDING_LENGTH - const.PUBLIC_KEY_LENGTH))
+        padding = mycrypto.weak_random(random.randint(0,
+                                       const.MAX_PADDING_LENGTH -
+                                       const.PUBLIC_KEY_LENGTH))
 
         # Add a marker to efficiently locate the HMAC.
-        marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, \
-                self.uniformDHSecret + publicKey)
+        marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret,
+                                          self.uniformDHSecret + publicKey)
 
         # Authenticate the handshake including the current approximate epoch.
-        mac = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, publicKey + \
-                padding + marker + self._epoch())
+        mac = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, publicKey +
+                                       padding + marker + self._epoch())
 
         return publicKey + padding + marker + mac
 
@@ -627,8 +634,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if self._receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
                 self._flushSendBuffer(circuit)
-                self.sendRemote(circuit, self._issueTicketAndKey(), \
-                        flags=const.FLAG_NEW_TICKET)
+                self.sendRemote(circuit, self._issueTicketAndKey(),
+                                flags=const.FLAG_NEW_TICKET)
 
             # Second, interpret the data as a UniformDH handshake.
             elif self._receiveClientsUniformDHPK(data, circuit):
@@ -636,8 +643,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self._flushSendBuffer(circuit)
 
             else:
-                log.debug("Authentication unsuccessful so far.  " \
-                        "Waiting for more data.")
+                log.debug("Authentication unsuccessful so far.  "
+                          "Waiting for more data.")
                 return
 
         if self.weAreClient and (self.state == const.ST_WAIT_FOR_AUTH):
@@ -663,7 +670,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # once the puzzle is solved and the connection established.
         else:
             self.sendBuf += data.read()
-            log.debug("%d bytes of outgoing data buffered." % len(self.sendBuf))
+            log.debug("%d bytes of outgoing data buffered." %
+                      len(self.sendBuf))
 
 
     @classmethod
@@ -672,11 +680,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
         which can be used to pass the UniformDH shared secret to
         ScrambleSuit."""
 
-        subparser.add_argument('--shared-secret', type=str, \
-                help='Shared secret for UniformDH', dest="uniformDHSecret")
+        subparser.add_argument("--shared-secret", type=str,
+                               help="Shared secret for UniformDH",
+                               dest="uniformDHSecret")
 
-        subparser.add_argument('--ticket-file', type=str, help='Path to a ' \
-                'session ticket (only for client)', dest="ticketFile")
+        subparser.add_argument("--ticket-file", type=str, help="Path to a "
+                               "session ticket (only for client)",
+                               dest="ticketFile")
 
         super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
 
@@ -690,10 +700,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if args.ticketFile:
             cls.ticketFile = args.ticketFile
 
-        if args.uniformDHSecret and len(args.uniformDHSecret) != \
-                const.SHARED_SECRET_LENGTH:
-            raise base.PluggableTransportError("The UniformDH shared secret " \
-                    "must be %d bytes in length but %d bytes given." % \
+        if args.uniformDHSecret and (len(args.uniformDHSecret) !=
+                                     const.SHARED_SECRET_LENGTH):
+            raise base.PluggableTransportError("The UniformDH shared secret "
+                    "must be %d bytes in length but %d bytes given." %
                     (const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
 
         super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
@@ -709,22 +719,22 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # A shared secret might already be set if obfsproxy is in
         # external mode.
         if self.uniformDHSecret:
-            log.info("A UniformDH shared secret was already specified over" \
-                    "the command line.  Using the SOCKS secret.")
+            log.info("A UniformDH shared secret was already specified over"
+                     "the command line.  Using the SOCKS secret.")
 
         if len(args) != 1:
-            raise base.SOCKSArgsError("Too many SOCKS arguments " \
-                    "(expected 1 but got %d)." % len(args))
+            raise base.SOCKSArgsError("Too many SOCKS arguments "
+                                      "(expected 1 but got %d)." % len(args))
 
         if not args[0].startswith("shared-secret="):
-            raise base.SOCKSArgsError("The SOCKS argument should start with" \
-                    "`shared-secret='.")
+            raise base.SOCKSArgsError("The SOCKS argument should start with"
+                                      "`shared-secret='.")
 
         self.uniformDHSecret = args[0][14:]
 
         if len(args.uniformDHSecret) != const.SHARED_SECRET_LENGTH:
-            raise base.PluggableTransportError("The UniformDH shared secret " \
-                    "must be %d bytes in length but %d bytes given." % \
+            raise base.PluggableTransportError("The UniformDH shared secret "
+                    "must be %d bytes in length but %d bytes given." %
                     (const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
 
 
