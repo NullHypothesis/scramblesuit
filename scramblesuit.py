@@ -571,7 +571,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		log.debug("The computed HMAC is valid.")
 
 		# Was this HMAC sent before?
-		if replayTracker.isPresent(existingHMAC):
+		if self.weAreServer and replayTracker.isPresent(existingHMAC):
 			log.warning("The HMAC `%s' was already observed.  This could " \
 					"be a replay attack.  Remaining silent." % \
 					existingHMAC.encode('hex'))
