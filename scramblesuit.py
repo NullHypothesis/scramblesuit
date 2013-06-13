@@ -347,9 +347,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 				log.debug("Sending FLAG_CONFIRM_TICKET message to server.")
 				self.sendRemote(circuit, "dummy", flags=const.FLAG_CONFIRM_TICKET)
 
-			elif msg.flags == const.FLAG_CONFIRM_TICKET:
-				log.info("Confirming ticket!!1")
-
 			else:
 				log.warning("Invalid message flags: %d." % msg.flags)
 
