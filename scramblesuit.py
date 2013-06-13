@@ -73,8 +73,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		self.decryptedTicket = None
 
 		# Cache the HMACs so they can later be added to the replay table.
-		self.cachedTicketHMAC = None
-		self.cachedUniformDHHMAC = None
+		self.ticketReplayCache = None
+		self.uniformDHReplayCache = None
 
 		# Shared secret k_B which is only used for UniformDH.
 		if not hasattr(self, 'uniformDHSecret'):
@@ -331,10 +331,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			# Let replay protection kick in after ticket was confirmed.
 			elif self.weAreServer and (msg.flags & const.FLAG_CONFIRM_TICKET):
 				log.debug("Adding cached HMAC to replay table.")
-				if self.cachedTicketHMAC is not None:
-					replay.SessionTicket.addHMAC(self.cachedTicketHMAC)
-				elif self.cachedUniformDHHMAC is not None:
-					replay.UniformDH.addHMAC(self.cachedUniformDHHMAC)
+				if self.ticketReplayCache is not None:
+					replay.SessionTicket.addHMAC(self.ticketReplayCache)
+				elif self.uniformDHReplayCache is not None:
+					replay.UniformDH.addHMAC(self.uniformDHReplayCache)
 
 			# Store newly received ticket and send ACK to the server.
 			elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
@@ -395,6 +395,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			if newTicket != None and newTicket.isValid():
 				self._deriveSecrets(newTicket.masterKey)
 				self.decryptedTicket = True
+				self.ticketReplayCache = newTicket.masterKey
 			else:
 				return False
 
@@ -445,6 +446,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 		clientPK = self.__extractUniformDHPK(data)
 		if not clientPK:
 			return False
+
+		self.uniformDHReplayCache = clientPK
 
 		# First, as the server, we need a Diffie-Hellman object.
 		self.dh = obfs3_dh.UniformDH()
@@ -580,14 +583,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 					"be a replay attack.  Remaining silent." % \
 					existingHMAC.encode('hex'))
 			return False
-
-		# Store observed HMAC to prevent replay attacks.
-		if self.weAreServer:
-			log.debug("Caching HMAC to add it to the replay table later.")
-			if replayTracker == replay.SessionTicket:
-				self.cachedTicketHMAC = existingHMAC
-			else:
-				self.cachedUniformDHHMAC = existingHMAC
 
 		return True
 
