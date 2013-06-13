@@ -2,18 +2,20 @@
 # -*- coding: utf-8 -*-
 
 """
-Implements a subset of session tickets as proposed for TLS in RFC 5077:
-https://tools.ietf.org/html/rfc5077
+This module provides a session ticket mechanism.
 
-The format of a 112-byte ticket:
-    +------------+------------------+--------------+
-    | 16-byte IV | 64-byte E(state) | 32-byte HMAC |
-    +------------+------------------+--------------+
+The implemented mechanism is a subset of session tickets as proposed for
+TLS in RFC 5077.
 
-The 64-byte encrypted state contains the following data:
-+-------------------+--------------------+--------------------+-------------+
-| 4-byte issue date | 18-byte identifier | 32-byte master key | 10-byte pad |
-+-------------------+--------------------+--------------------+-------------+
+The format of a 112-byte ticket is:
+ +------------+------------------+--------------+
+ | 16-byte IV | 64-byte E(state) | 32-byte HMAC |
+ +------------+------------------+--------------+
+
+The 64-byte encrypted state contains:
+ +-------------------+--------------------+--------------------+-------------+
+ | 4-byte issue date | 18-byte identifier | 32-byte master key | 10-byte pad |
+ +-------------------+--------------------+--------------------+-------------+
 """
 
 import os

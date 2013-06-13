@@ -1,6 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+This module implements a mechanism to protect against replay attacks.
+
+The replay protection mechanism is based on a dictionary which caches
+previously observed keys.  The dictionaries can be extended, queried as well as
+written to and read from disk.  A pruning mechanism deletes expired keys from
+the dictionary.
+"""
+
 import time
 import pickle
 

@@ -1,7 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-""" This module provides code to deal with probability distribution. """
+"""
+This module provides code to generate and sample probability distributions.
+
+The class RandProbDist provides an interface to randomly generate probability
+distributions.  Random samples can then be drawn from these distributions.
+"""
 
 import obfsproxy.common.log as logging
 

@@ -1,6 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+"""
+Provides code to morph a chunk of data to a given probability distribution.
+
+The class provides an interface to morph network packet lengths to a previously
+generated probability distribution.  The packet lengths of the morphed network
+data should then match the probability distribution.
+"""
+
 import random
 
 import probdist

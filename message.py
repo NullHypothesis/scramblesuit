@@ -1,6 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+This module provides code to handle ScrambleSuit protocol messages.
+
+The exported classes and functions provide interfaces to handle protocol
+messages, check message headers for validity and create protocol messages out
+of application data.
+"""
+
 import obfsproxy.common.log as logging
 import obfsproxy.common.serialize as serialize
 

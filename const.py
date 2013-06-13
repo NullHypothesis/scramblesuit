@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-Defines constant values for the ScrambleSuit protocol.
-The values below are not supposed to be changed.  If you don't obey, be at
-least careful because things could break easily.
+This module defines constant values for the ScrambleSuit protocol.
+
+While some values can be changed, in general they should not.  If you do not
+obey, be at least careful because the protocol could easily break.
 """
 
 # FIXME - Directory where long-lived information is stored.

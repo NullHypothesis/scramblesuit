@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-Utility functions.
+This module implements several commonly used utility functions.
+
+The implemented functions can be used to swap variables, write and read data
+from files and to convert a number to raw text.
 """
 
 import obfsproxy.common.log as logging

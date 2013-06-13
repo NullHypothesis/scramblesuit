@@ -3,7 +3,10 @@
 
 """
 The scramblesuit module implements the ScrambleSuit obfuscation protocol.
-For more details, check out http://www.cs.kau.se/philwint/scramblesuit/
+
+The paper discussing the design and evaluation of the ScrambleSuit pluggable
+transport protocol is available here:
+http://www.cs.kau.se/philwint/scramblesuit/
 """
 
 from twisted.internet import error
