@@ -332,9 +332,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 			elif self.weAreServer and (msg.flags & const.FLAG_CONFIRM_TICKET):
 				log.debug("Adding cached HMAC to replay table.")
 				if self.ticketReplayCache is not None:
-					replay.SessionTicket.addHMAC(self.ticketReplayCache)
+					replay.SessionTicket.addKey(self.ticketReplayCache)
 				elif self.uniformDHReplayCache is not None:
-					replay.UniformDH.addHMAC(self.uniformDHReplayCache)
+					replay.UniformDH.addKey(self.uniformDHReplayCache)
 
 			# Store newly received ticket and send ACK to the server.
 			elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:

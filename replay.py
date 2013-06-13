@@ -72,7 +72,7 @@ class Tracker( object ):
 
 class UniformDHTracker( Tracker ):
 
-	def addHMAC( self, hmac ):
+	def addKey( self, hmac ):
 		"""Add a UniformDH HMAC to the lookup table."""
 		log.debug("Caching UniformDH HMAC.")
 
@@ -82,7 +82,7 @@ class UniformDHTracker( Tracker ):
 
 class SessionTicketTracker( Tracker ):
 
-	def addHMAC( self, hmac ):
+	def addKey( self, hmac ):
 		"""Add a session ticket HMAC to the lookup table."""
 		log.debug("Caching session ticket HMAC.")
 
