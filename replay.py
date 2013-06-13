@@ -77,6 +77,7 @@ class UniformDHTracker( Tracker ):
 		log.debug("Caching UniformDH HMAC.")
 
 		self.addElement(hmac)
+		self.saveToDisk(const.UNIFORMDH_REPLAY_FILE)
 
 
 class SessionTicketTracker( Tracker ):
@@ -86,6 +87,7 @@ class SessionTicketTracker( Tracker ):
 		log.debug("Caching session ticket HMAC.")
 
 		self.addElement(hmac)
+		self.saveToDisk(const.TICKET_REPLAY_FILE)
 
 
 # Both replay trackers must be shared by different scramblesuit instances.  As
