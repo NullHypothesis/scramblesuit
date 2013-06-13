@@ -58,11 +58,16 @@ class Tracker( object ):
 		"""Delete expired elements from the table."""
 		log.debug("Pruning the replay table.")
 
+		deleteList = []
+
 		now = int(time.time())
 		for element in self.table.iterkeys():
 			if (now - self.table[element]) > const.EPOCH_GRANULARITY:
 				log.debug("Deleting expired HMAC.")
-				del self.table[element]
+				deleteList.append(element)
+
+		for elem in deleteList:
+			del self.table[elem]
 
 
 class UniformDHTracker( Tracker ):
