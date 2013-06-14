@@ -52,6 +52,31 @@ IDENTIFIER = "ScrambleSuitTicket"
 HMACKey = AESKey = creationTime = None
 
 
+def findStoredTicket( bridge, fileName=const.TICKET_FILE ):
+
+    assert bridge
+
+    log.debug("Attempting to read master key and ticket from file `%s'." %
+              fileName)
+
+    if not os.path.exists(fileName):
+        return None
+
+    # Load the ticket hash table from file.
+    blurb = util.readFromFile(fileName)
+    if (blurb is None) or (len(blurb) == 0):
+        return None
+    tickets = pickle.loads(blurb)
+
+    try:
+        masterKey, ticket = tickets[bridge]
+    except KeyError:
+        log.info("Found no ticket for bridge `%s'." % str(bridge))
+        return None
+
+    return (masterKey, ticket)
+
+
 def rotateKeys( ):
     """The keys used to encrypt and authenticate tickets are rotated
     periodically.  New keys are created but the old keys are still cached for
