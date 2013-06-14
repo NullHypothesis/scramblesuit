@@ -123,7 +123,7 @@ class PayloadCrypter:
                   iv.encode('hex')[:10])
 
         self.sessionKey = key
-        self.counter = Crypto.Util.Counter.new(128, initial_value = 
+        self.counter = Crypto.Util.Counter.new(128, initial_value =
                                                long(iv.encode('hex'), 16))
         self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR,
                                              counter=self.counter)

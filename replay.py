@@ -36,7 +36,7 @@ class Tracker( object ):
     def isPresent( self, element ):
         """Check if an element is already present in the lookup table."""
         log.debug("Looking for existing HMAC in size-%d dictionary." %
-                  len(self.table)) 
+                  len(self.table))
 
         # Prune the replay table before checking for values.
         self.prune()

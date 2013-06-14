@@ -102,17 +102,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
             replay.SessionTicket.loadFromDisk(const.TICKET_REPLAY_FILE)
 
 
-    def __del__( self ):
-
-        log.debug("Destroying this %s instance." % const.TRANSPORT_NAME)
-
-        # Save replay dictionaries to file.
-        if self.weAreServer:
-            log.info("Saving replay dictionaries to file.")
-            replay.UniformDH.saveToDisk(const.UNIFORMDH_REPLAY_FILE)
-            replay.SessionTicket.saveToDisk(const.TICKET_REPLAY_FILE)
-
-
     def _deriveSecrets( self, masterKey ):
         """Derives session keys (AES keys, counter nonces and HMAC keys) from
         the given master key.  All key material is derived using
@@ -232,7 +221,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if paddingLen > const.HDR_LENGTH:
                 messages.append(message.ProtocolMessage("",
                                 paddingLen=paddingLen - const.HDR_LENGTH))
-    
+
             blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
                             self.sendHMAC) for msg in messages])
 
