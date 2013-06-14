@@ -52,6 +52,24 @@ IDENTIFIER = "ScrambleSuitTicket"
 HMACKey = AESKey = creationTime = None
 
 
+def storeNewTicket( masterKey, ticket, bridge ):
+    """Store a new session ticket and the according master key for future
+    use."""
+
+    assert len(masterKey) == const.MASTER_KEY_LENGTH
+    assert len(ticket) == const.TICKET_LENGTH
+
+    log.debug("Storing newly received ticket in `%s'." % const.TICKET_FILE)
+
+    # Add a new (key, ticket) tuple with the given bridge as hash key.
+    tickets = dict()
+    content = util.readFromFile(const.TICKET_FILE)
+    if (content is not None) and (len(content) > 0):
+        tickets = pickle.loads(content)
+    tickets[bridge] = (masterKey, ticket)
+    util.writeToFile(pickle.dumps(tickets), const.TICKET_FILE)
+
+
 def findStoredTicket( bridge, fileName=const.TICKET_FILE ):
 
     assert bridge

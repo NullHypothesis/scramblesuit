@@ -154,17 +154,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
                     "these for authentication." % const.TRANSPORT_NAME)
 
         # The preferred way to authenticate is a session ticket.
-        if os.path.exists(const.TICKET_FILE):
+        storedTicket = ticket.findStoredTicket(circuit.downstream.peer_addr)
+        if storedTicket is not None:
 
-            blob = util.readFromFile(const.TICKET_FILE)
-            blob = base64.b32decode(blob.strip())
-
-            masterKey = blob[:const.MASTER_KEY_LENGTH]
-            ticket = blob[const.MASTER_KEY_LENGTH:
-                          const.MASTER_KEY_LENGTH + const.TICKET_LENGTH]
-
+            (masterKey, rawTicket) = storedTicket
             log.debug("Redeeming session ticket 0x%s..." %
-                      ticket.encode('hex')[:10])
+                      rawTicket.encode('hex')[:10])
             self._deriveSecrets(masterKey)
 
             # Subtract the length of the ticket to make the handshake on
@@ -174,11 +169,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                            const.TICKET_LENGTH))
 
             marker = mycrypto.HMAC_SHA256_128(self.sendHMAC,
-                                              self.sendHMAC + ticket)
-            mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, ticket + padding +
+                                              self.sendHMAC + rawTicket)
+            mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, rawTicket + padding +
                                            marker + self._epoch())
 
-            self._chopAndSend(circuit, ticket + padding + marker + mac,
+            self._chopAndSend(circuit, rawTicket + padding + marker + mac,
                               protocolMsg=False)
             self.redeemedTicket = True
 
@@ -336,10 +331,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
             elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
                 assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
                                     const.MASTER_KEY_LENGTH)
-                self._storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH],
-                                     msg.payload[const.MASTER_KEY_LENGTH:
-                                                 const.MASTER_KEY_LENGTH +
-                                                 const.TICKET_LENGTH])
+                ticket.storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH],
+                                      msg.payload[const.MASTER_KEY_LENGTH:
+                                                  const.MASTER_KEY_LENGTH +
+                                                  const.TICKET_LENGTH],
+                                      circuit.downstream.peer_addr)
                 # Tell the server that we received the ticket.
                 log.debug("Sending FLAG_CONFIRM_TICKET message to server.")
                 self.sendRemote(circuit, "dummy",
@@ -420,19 +416,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.state = const.ST_CONNECTED
 
         return True
-
-
-    def _storeNewTicket( self, masterKey, ticket ):
-        """Store a new session ticket and the according master key for future
-        use."""
-
-        assert len(masterKey) == const.MASTER_KEY_LENGTH
-        assert len(ticket) == const.TICKET_LENGTH
-
-        log.debug("Storing newly received session ticket.")
-
-        util.writeToFile(base64.b32encode(masterKey + ticket) + '\n',
-                         const.TICKET_FILE)
 
 
     def _receiveClientsUniformDHPK( self, data, circuit ):
