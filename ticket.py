@@ -53,6 +53,21 @@ IDENTIFIER = "ScrambleSuitTicket"
 HMACKey = AESKey = creationTime = None
 
 
+def issueTicketAndKey( ):
+    """
+    Issues a new session ticket and returns it appended to the master key.
+
+    The returned ticket and key are ready to be put into a protocol message.
+    """
+
+    # Issue a new session ticket for the client.
+    log.info("Issuing new session ticket and master key.")
+    masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
+    newTicket = (SessionTicket(masterKey)).issue()
+
+    return masterKey + newTicket
+
+
 def storeNewTicket( masterKey, ticket, bridge ):
     """
     Store a new session ticket and the according master key for future use.
@@ -365,8 +380,9 @@ if __name__ == "__main__":
 
     print "[+] Writing new session ticket to `%s'." % args.ticket_file
     tickets = dict()
-    tickets[IPv4Address('TCP', args.ip_addr, args.tcp_port)] = \
-           (masterKey, ticket)
+    server = IPv4Address('TCP', args.ip_addr, args.tcp_port)
+    tickets[server] = (masterKey, ticket)
+
     util.writeToFile(pickle.dumps(tickets), args.ticket_file)
 
     print "[+] Success."

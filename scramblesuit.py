@@ -439,7 +439,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         assert myPK
 
         handshakeMsg = self._createUniformDHHandshake(myPK)
-        ticket = self._issueTicketAndKey()
+        ticket = ticket.issueTicketAndKey()
 
         log.debug("Sending %d bytes of UniformDH handshake and ticket." %
                   len(handshakeMsg))
@@ -448,16 +448,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.sendRemote(circuit, ticket, flags=const.FLAG_NEW_TICKET)
 
         return True
-
-
-    def _issueTicketAndKey( self ):
-
-        # Issue a new session ticket for the client.
-        log.info("Issuing new session ticket and master key.")
-        masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
-        newTicket = (ticket.new(masterKey)).issue()
-
-        return masterKey + newTicket
 
 
     def _receiveServersUniformDHPK( self, data ):
@@ -602,7 +592,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if self._receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
                 self._flushSendBuffer(circuit)
-                self.sendRemote(circuit, self._issueTicketAndKey(),
+                self.sendRemote(circuit, ticket.issueTicketAndKey(),
                                 flags=const.FLAG_NEW_TICKET)
 
             # Second, interpret the data as a UniformDH handshake.
