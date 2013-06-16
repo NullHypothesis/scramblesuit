@@ -29,6 +29,7 @@ import datetime
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA256
+from twisted.internet.address import IPv4Address
 
 import obfsproxy.common.log as logging
 
@@ -350,17 +351,22 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("ip_addr", type=str, help="The IPv4 address of the "
+                        "%s server." % const.TRANSPORT_NAME)
+    parser.add_argument("tcp_port", type=int, help="The TCP port of the %s "
+                        "server." % const.TRANSPORT_NAME)
     parser.add_argument("ticket_file", type=str, help="The file, the newly "
                         "issued ticket is written to.")
     args = parser.parse_args()
 
     print "[+] Generating new session ticket."
     masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
-    ticketObj = SessionTicket(masterKey)
-    ticket = ticketObj.issue()
+    ticket = SessionTicket(masterKey).issue()
 
     print "[+] Writing new session ticket to `%s'." % args.ticket_file
-    util.writeToFile(base64.b32encode(masterKey + ticket) + '\n',
-                     args.ticket_file)
+    tickets = dict()
+    tickets[IPv4Address('TCP', args.ip_addr, args.tcp_port)] = \
+           (masterKey, ticket)
+    util.writeToFile(pickle.dumps(tickets), args.ticket_file)
 
     print "[+] Success."
