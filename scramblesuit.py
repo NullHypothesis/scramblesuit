@@ -19,7 +19,6 @@ import obfsproxy.transports.obfs3_dh as obfs3_dh
 
 import os
 import random
-import time
 import base64
 
 import probdist
@@ -171,7 +170,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             marker = mycrypto.HMAC_SHA256_128(self.sendHMAC,
                                               self.sendHMAC + rawTicket)
             mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, rawTicket + padding +
-                                           marker + self._epoch())
+                                           marker + util.getEpoch())
 
             self._chopAndSend(circuit, rawTicket + padding + marker + mac,
                               protocolMsg=False)
@@ -345,13 +344,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 log.warning("Invalid message flags: %d." % msg.flags)
 
 
-    def _epoch( self ):
-        """Return a coarse-grained Unix time stamp which is divided by
-        EPOCH_GRANULARITY."""
-
-        return str(int(time.time()) / const.EPOCH_GRANULARITY)
-
-
     def _flushSendBuffer( self, circuit ):
         """Flushes the send buffer which could have been filled by the
         application while ScrambleSuit was still busy handling
@@ -405,7 +397,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
                                           potentialTicket[0:
                                           index + const.MARKER_LENGTH] +
-                                          self._epoch())
+                                          util.getEpoch())
 
         if not self._isValidHMAC(myHMAC, existingHMAC, replay.SessionTicket):
             return False
@@ -523,7 +515,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                  const.HMAC_LENGTH]
         myHMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret,
                                           handshake[0 : index +
-                                          const.MARKER_LENGTH] + self._epoch())
+                                          const.MARKER_LENGTH] +
+                                          util.getEpoch())
 
         if not self._isValidHMAC(myHMAC, existingHMAC, replay.UniformDH):
             return False
@@ -595,7 +588,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Authenticate the handshake including the current approximate epoch.
         mac = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, publicKey +
-                                       padding + marker + self._epoch())
+                                       padding + marker + util.getEpoch())
 
         return publicKey + padding + marker + mac
 
