@@ -53,8 +53,12 @@ HMACKey = AESKey = creationTime = None
 
 
 def storeNewTicket( masterKey, ticket, bridge ):
-    """Store a new session ticket and the according master key for future
-    use."""
+    """
+    Store a new session ticket and the according master key for future use.
+
+    The given data is pickled and stored in the global ticket dictionary.  If
+    there already is a ticket for the given `bridge', it is overwritten.
+    """
 
     assert len(masterKey) == const.MASTER_KEY_LENGTH
     assert len(ticket) == const.TICKET_LENGTH
@@ -66,11 +70,19 @@ def storeNewTicket( masterKey, ticket, bridge ):
     content = util.readFromFile(const.TICKET_FILE)
     if (content is not None) and (len(content) > 0):
         tickets = pickle.loads(content)
+
     tickets[bridge] = (masterKey, ticket)
     util.writeToFile(pickle.dumps(tickets), const.TICKET_FILE)
 
 
 def findStoredTicket( bridge, fileName=const.TICKET_FILE ):
+    """
+    Retrieve a previously stored ticket from the ticket dictionary.
+
+    The global ticket dictionary is loaded and the given `bridge' is used to
+    look up the ticket and the master key.  If the ticket dictionary does not
+    exist (yet) or the ticket data could not be found, `None' is returned.
+    """
 
     assert bridge
 
@@ -96,9 +108,13 @@ def findStoredTicket( bridge, fileName=const.TICKET_FILE ):
 
 
 def rotateKeys( ):
-    """The keys used to encrypt and authenticate tickets are rotated
-    periodically.  New keys are created but the old keys are still cached for
-    the next period to validate previously issued tickets."""
+    """
+    Rotate the keys used to encrypt and authenticate session tickets.
+
+    After new keys (an AES and a HMAC key) were created, the old keys are still
+    kept for a period of seven days to verify (but not to issue) session
+    tickets issues by the old keys.
+    """
 
     global HMACKey
     global AESKey
@@ -119,8 +135,12 @@ def rotateKeys( ):
 
 
 def loadKeys( ):
-    """Try to load the AES and HMAC key used to encrypt and authenticate
-    tickets from the key store."""
+    """
+    Load the keys used to encrypt and authenticate session tickets.
+
+    The keys are loaded from file and stored in global variables so they can be
+    accessed from different functions.
+    """
 
     global HMACKey
     global AESKey
@@ -142,8 +162,13 @@ def loadKeys( ):
 
 
 def checkKeys( ):
-    """Load the AES and the HMAC key if they are not defined yet.  If they are
-    expired, rotate the keys."""
+    """
+    Check whether the encryption and authentication keys are defined and valid.
+
+    If the keys are not defined, they are loaded from file by calling
+    `loadKeys()'.  If they are expired and no longer valid, the keys are
+    rotated by calling `rotateKeys()'.
+    """
 
     if (HMACKey is None) or (AESKey is None):
         loadKeys()
@@ -153,9 +178,14 @@ def checkKeys( ):
 
 
 def decrypt( ticket ):
-    """Verifies the validity, decrypts and finally returns the given potential
-    ticket as a ProtocolState object.  If the ticket is invalid, `None' is
-    returned."""
+    """
+    Decrypts, verifies and returns the given `ticket'.
+
+    First, the HMAC over the ticket is verified.  If it is valid, the ticket is
+    decrypted.  Finally, a `ProtocolState()' object containing the master key
+    and the ticket's issue date is returned.  If any of these steps fail,
+    `None' is returned.
+    """
 
     assert (ticket is not None) and (len(ticket) == const.TICKET_LENGTH)
 
@@ -190,27 +220,44 @@ def decrypt( ticket ):
 
 
 class ProtocolState( object ):
-    """Describes the protocol state of a ScrambleSuit server which is part of a
-    session ticket.  The state can be used to bootstrap a ScrambleSuit session
-    without a UniformDH handshake."""
+
+    """
+    Defines a ScrambleSuit protocol state contained in a session ticket.
+
+    A protocol state is essentially a master key which can then be used by the
+    server to derive session keys.  Besides, a state object contains an issue
+    date which specifies the expiry date of a ticket.  This class contains
+    methods to check the expiry status of a ticket and to dump it in its raw
+    form.
+    """
 
     def __init__( self, masterKey, issueDate=int(time.time()) ):
+        """
+        The constructor of the `ProtocolState' class.
+
+        The four class variables are initialised.
+        """
+
         self.identifier = IDENTIFIER
         self.masterKey = masterKey
         self.issueDate = issueDate
         # Pad to multiple of 16 bytes to match AES' block size.
         self.pad = "\0\0\0\0\0\0\0\0\0\0"
 
-
     def isValid( self ):
-        """Returns `True' if the protocol state is valid, i.e., if the life
-        time has not expired yet.  Otherwise, `False' is returned."""
+        """
+        Verifies the expiry date of the object's issue date.
+
+        If the expiry date is not yet reached and the protocol state is still
+        valid, `True' is returned.  If the protocol state has expired, `False'
+        is returned.
+        """
 
         assert self.issueDate
 
         lifetime = int(time.time()) - self.issueDate
         if lifetime > const.SESSION_TICKET_LIFETIME:
-            log.debug("The ticket expired %s ago." %
+            log.debug("The ticket is invalid and expired %s ago." %
                       str(datetime.timedelta(seconds=
                       (lifetime - const.SESSION_TICKET_LIFETIME))))
             return False
@@ -218,25 +265,37 @@ class ProtocolState( object ):
         log.debug("The ticket is still valid for %s." %
                   str(datetime.timedelta(seconds=
                   (const.SESSION_TICKET_LIFETIME - lifetime))))
-
         return True
 
-
     def __repr__( self ):
+        """
+        Return a raw string representation of the object's protocol state.
+
+        The length of the returned representation is exactly 64 bytes; a
+        multiple of AES' 16-byte block size.  That makes it suitable to be
+        encrypted using AES-CBC.
+        """
 
         return struct.pack('I', self.issueDate) + self.identifier + \
                            self.masterKey + self.pad
 
 
 class SessionTicket( object ):
-    """Encapsulates a session ticket which can be used by the client to gain
-    access to a ScrambleSuit server without conducting a UniformDH
-    handshake."""
+
+    """
+    Encrypts and authenticates an encapsulated `ProtocolState()' object.
+
+    This class implements a session ticket which can be redeemed by clients.
+    The class contains methods to initialise and issue session tickets.
+    """
 
     def __init__( self, masterKey ):
-        """Initialise a new session ticket which contains `masterKey'. The
-        parameter `symmTicketKey' is used to encrypt the ticket and
-        `hmacTicketKey' is used to authenticate the ticket when issued."""
+        """
+        The constructor of the `SessionTicket()' class.
+
+        The class variables are initialised and the validity of the symmetric
+        keys for the session tickets is checked.
+        """
 
         assert (masterKey is not None) and \
                len(masterKey) == const.MASTER_KEY_LENGTH
@@ -253,11 +312,14 @@ class SessionTicket( object ):
         self.symmTicketKey = AESKey
         self.hmacTicketKey = HMACKey
 
-
     def issue( self ):
-        """Encrypt and authenticate the ticket and return the result which is
-        ready to be sent over the wire. In particular, the ticket name (for
-        bookkeeping) as well as the actual encrypted ticket is returned."""
+        """
+        Returns a ready-to-use session ticket after prior initialisation.
+
+        After the `SessionTicket()' class was initialised with a master key,
+        this method encrypts and authenticates the protocol state and returns
+        the final result which is ready to be sent over the wire.
+        """
 
         self.state.issueDate = int(time.time())
 
