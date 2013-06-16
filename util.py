@@ -26,9 +26,12 @@ def getEpoch( ):
 
     return str(int(time.time()) / const.EPOCH_GRANULARITY)
 
+
 def dump( n ):
-    """Converts the given number to a byte string ready to be sent over the
-    wire."""
+    """Converts the given number `n' to a byte string.
+
+    The returned byte string is ready to be sent over the wire.
+    """
 
     s = '%x' % n
     if len(s) & 1:
@@ -37,17 +40,31 @@ def dump( n ):
 
 
 def writeToFile( data, fileName ):
+    """
+    Writes the given `data' to the file specified by `fileName'.
+
+    If an error occurs, the function logs an error message but does not throw
+    an exception or return an error code.
+    """
+
+    log.debug("Opening `%s' for writing." % fileName)
 
     try:
         with open(fileName, "wb") as fd:
             fd.write(data)
-            fd.close()
 
-    except IOError as e:
-        pass
+    except IOError as err:
+        log.error("Error writing to `%s': %s." % (fileName, err))
 
 
 def readFromFile( fileName, length=-1 ):
+    """
+    Read `length' amount of bytes from the given `fileName' 
+
+    If `length' equals -1 (the default), the entire file is read and the
+    content returned.  If an error occurs, the function logs an error message
+    but does not throw an exception or return an error code.
+    """
 
     data = None
 
@@ -56,13 +73,16 @@ def readFromFile( fileName, length=-1 ):
     try:
         with open(fileName, "rb") as fd:
             data = fd.read(length)
-            fd.close()
 
-    except IOError as e:
-        log.error("Could not read data from \"%s\"." % fileName)
+    except IOError as err:
+        log.error("Error reading from `%s': %s." % (fileName, err))
 
     return data
 
 
 def swap( a, b ):
+    """
+    Returns `a' and `b' in reverse order, i.e., `b' and `a'.
+    """
+
     return (b, a)
