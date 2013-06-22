@@ -15,6 +15,49 @@ import const
 
 log = logging.get_obfslogger()
 
+
+def isValidHMAC( myHMAC, existingHMAC ):
+    """
+    Check if the two given HMACs are equal.
+
+    If the two given HMACs are equal, `True' is returned.  If not, a warning is
+    logged and `False' is returned.
+    """
+
+    assert myHMAC and existingHMAC
+
+    if not (myHMAC == existingHMAC):
+        log.warning("The HMAC is invalid (got `%s' but expected `%s')." %
+                    (existingHMAC.encode('hex'), myHMAC.encode('hex')))
+        return False
+
+    log.debug("The computed HMAC is valid.")
+
+    return True
+
+
+def locateMarker( marker, payload ):
+    """
+    Locate the given `marker' in `payload' and return its index.
+
+    The `marker' is placed before the HMAC of a ScrambleSuit authentication
+    mechanism and makes it possible to efficiently locate the HMAC.
+    """
+
+    index = payload.find(marker)
+    if index < 0:
+        log.debug("Could not find the marker just yet.")
+        return False
+
+    if (len(payload) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
+        log.debug("Found the marker but the HMAC is still incomplete..")
+        return False
+
+    log.debug("Successfully located the marker.")
+
+    return index
+
+
 def getEpoch( ):
     """
     Return the Unix epoch divided by a constant as string.
