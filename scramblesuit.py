@@ -29,6 +29,7 @@ import util
 import packetmorpher
 import ticket
 import replay
+import uniformdh
 
 
 log = logging.get_obfslogger()
@@ -72,15 +73,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # `True' if the ticket is already decrypted but not yet authenticated.
         self.decryptedTicket = None
 
-        # Cache the HMACs so they can later be added to the replay table.
+        # Cache the master key so it can later be added to the replay table.
         self.ticketReplayCache = None
-        self.uniformDHReplayCache = None
 
         # Shared secret k_B which is only used for UniformDH.
         if not hasattr(self, 'uniformDHSecret'):
             self.uniformDHSecret = None
         if self.uniformDHSecret:
             log.info("UniformDH shared secret: %s." % self.uniformDHSecret)
+            self.uniformdh = uniformdh.new(self.uniformDHSecret,
+                                           self.weAreServer)
 
         # Path to a file which contains a master key and the according ticket.
         if not hasattr(self, "ticketFile"):
@@ -185,8 +187,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Conduct an authenticated UniformDH handshake if there's no ticket.
         else:
             log.debug("No session ticket to redeem.  Running UniformDH.")
-
-            self._chopAndSend(circuit, self._createUniformDHHandshake(),
+            self._chopAndSend(circuit, self.uniformdh.createHandshake(),
                               protocolMsg=False)
 
 
@@ -320,11 +321,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
             # Let replay protection kick in after ticket was confirmed.
             elif self.weAreServer and (msg.flags & const.FLAG_CONFIRM_TICKET):
-                log.debug("Adding cached HMAC to replay table.")
+
                 if self.ticketReplayCache is not None:
+                    log.debug("Adding master key contained in ticket to the "
+                              "replay table.")
                     replay.SessionTicket.addKey(self.ticketReplayCache)
-                elif self.uniformDHReplayCache is not None:
-                    replay.UniformDH.addKey(self.uniformDHReplayCache)
+
+                elif self.uniformdh.getRemotePublicKey() is not None:
+                    log.debug("Adding the remote's UniformDH public key to "
+                              "the replay table.")
+                    replay.UniformDH.addKey(
+                            self.uniformdh.getRemotePublicKey())
 
             # Store newly received ticket and send ACK to the server.
             elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
@@ -386,7 +393,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         marker = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC +
                                          potentialTicket[:const.TICKET_LENGTH])
 
-        index = self._locateMarker(marker, potentialTicket)
+        index = util.locateMarker(marker, potentialTicket)
         if not index:
             return False
 
@@ -399,7 +406,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                           index + const.MARKER_LENGTH] +
                                           util.getEpoch())
 
-        if not self._isValidHMAC(myHMAC, existingHMAC, replay.SessionTicket):
+        if not util.isValidHMAC(myHMAC, existingHMAC):
             return False
 
         data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
@@ -408,179 +415,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.state = const.ST_CONNECTED
 
         return True
-
-
-    def _receiveClientsUniformDHPK( self, data, circuit ):
-        """This method tries to extract the client's UniformDH public key from
-        the given `data'.  If this succeeds, the shared master key is computed
-        and used to derive the session keys.  Afterwards, the server's public
-        key is sent to the client followed by a newly issued session ticket."""
-
-        clientPK = self.__extractUniformDHPK(data)
-        if not clientPK:
-            return False
-
-        self.uniformDHReplayCache = clientPK
-
-        # First, as the server, we need a Diffie-Hellman object.
-        self.dh = obfs3_dh.UniformDH()
-        try:
-            masterKey = self.dh.get_secret(clientPK)
-        except ValueError:
-            raise base.PluggableTransportError("Corrupted public key.")
-
-        self._deriveSecrets(masterKey)
-
-        log.debug("Switching to state ST_CONNECTED.")
-        self.state = const.ST_CONNECTED
-
-        # Now, send the server's UniformDH public key to the client.
-        myPK = self.dh.get_public()
-        assert myPK
-
-        handshakeMsg = self._createUniformDHHandshake(myPK)
-        ticket = ticket.issueTicketAndKey()
-
-        log.debug("Sending %d bytes of UniformDH handshake and ticket." %
-                  len(handshakeMsg))
-
-        self._chopAndSend(circuit, handshakeMsg, protocolMsg=False)
-        self.sendRemote(circuit, ticket, flags=const.FLAG_NEW_TICKET)
-
-        return True
-
-
-    def _receiveServersUniformDHPK( self, data ):
-        """This method tries to extract the server's UniformDH public key from
-        the given `data'.  If this succeeds, the shared master key is computed
-        and used to derive the session keys."""
-
-        serverPK = self.__extractUniformDHPK(data)
-        if not serverPK:
-            return False
-
-        log.debug("Extracted UniformDH public key.  Now calculating shared "
-                  "master key.")
-
-        try:
-            masterKey = self.dh.get_secret(serverPK)
-        except ValueError:
-            raise base.PluggableTransportError("Corrupted public key.")
-
-        self._deriveSecrets(masterKey)
-
-        log.debug("Switching to state ST_CONNECTED.")
-        self.state = const.ST_CONNECTED
-
-        return True
-
-
-    def __extractUniformDHPK( self, data ):
-        """This method extracts a UniformDH public key out of the very first
-        bytes of ScrambleSuit data.  The HMAC is validated and the public key
-        only returned if the HMAC is correct.  Otherwise, `False' is returned.
-        The HMAC is efficiently located by looking for a special marker."""
-
-        assert self.uniformDHSecret is not None
-
-        # Do we already have the minimum amount of data?
-        if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARKER_LENGTH +
-                        const.HMAC_LENGTH):
-            return False
-
-        handshake = data.peek()
-
-        # First, find the marker to efficiently locate the HMAC.
-        publicKey = handshake[:const.PUBLIC_KEY_LENGTH]
-        marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret,
-                                          self.uniformDHSecret + publicKey)
-
-        index = self._locateMarker(marker, handshake)
-        if not index:
-            return False
-
-        # Now, verify if the HMAC is valid.
-        existingHMAC = handshake[index + const.MARKER_LENGTH:
-                                 index + const.MARKER_LENGTH +
-                                 const.HMAC_LENGTH]
-        myHMAC = mycrypto.HMAC_SHA256_128(self.uniformDHSecret,
-                                          handshake[0 : index +
-                                          const.MARKER_LENGTH] +
-                                          util.getEpoch())
-
-        if not self._isValidHMAC(myHMAC, existingHMAC, replay.UniformDH):
-            return False
-
-        data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
-
-        return handshake[:const.PUBLIC_KEY_LENGTH]
-
-
-    def _locateMarker( self, marker, payload ):
-        """Locate the marker in the given payload and return the index."""
-
-        index = payload.find(marker)
-        if index < 0:
-            log.debug("Could not find the marker just yet.")
-            return False
-
-        if (len(payload) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
-            log.debug("Found the marker but the HMAC is still incomplete..")
-            return False
-
-        log.debug("Successfully located the marker.")
-
-        return index
-
-
-    def _isValidHMAC( self, myHMAC, existingHMAC, replayTracker ):
-        """Check if the HMAC is correct and not replayed."""
-
-        if not (myHMAC == existingHMAC):
-            log.warning("The HMAC is invalid (got `%s' but expected `%s')." %
-                        (existingHMAC.encode('hex'), myHMAC.encode('hex')))
-            return False
-
-        log.debug("The computed HMAC is valid.")
-
-        # Was this HMAC sent before?
-        if self.weAreServer and replayTracker.isPresent(existingHMAC):
-            log.warning("The HMAC `%s' was already observed.  This could "
-                        "be a replay attack.  Remaining silent." %
-                        existingHMAC.encode('hex'))
-            return False
-
-        return True
-
-
-    def _createUniformDHHandshake( self, publicKey=None ):
-        """This method creates a UniformDH handshake message ready to be sent
-        over the wire; including the public key, random padding, the marker and
-        the HMAC.  If no public key is given in `publicKey', a new one is
-        created using the Diffie-Hellman object."""
-
-        assert self.uniformDHSecret is not None
-
-        # Create a new UniformDH public key if none is given.
-        if not publicKey:
-            self.dh = obfs3_dh.UniformDH()
-            publicKey = self.dh.get_public()
-
-        # Subtract the length of the public key to make the handshake on
-        # average as long as a redeemed ticket.
-        padding = mycrypto.weak_random(random.randint(0,
-                                       const.MAX_PADDING_LENGTH -
-                                       const.PUBLIC_KEY_LENGTH))
-
-        # Add a marker to efficiently locate the HMAC.
-        marker = mycrypto.HMAC_SHA256_128(self.uniformDHSecret,
-                                          self.uniformDHSecret + publicKey)
-
-        # Authenticate the handshake including the current approximate epoch.
-        mac = mycrypto.HMAC_SHA256_128(self.uniformDHSecret, publicKey +
-                                       padding + marker + util.getEpoch())
-
-        return publicKey + padding + marker + mac
 
 
     def receivedDownstream( self, data, circuit ):
@@ -596,8 +430,20 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                 flags=const.FLAG_NEW_TICKET)
 
             # Second, interpret the data as a UniformDH handshake.
-            elif self._receiveClientsUniformDHPK(data, circuit):
+            elif self.uniformdh.receivePublicKey(data, self._deriveSecrets):
+                # Now send the server's UniformDH public key to the client.
+                handshakeMsg = self.uniformdh.createHandshake()
+                newTicket = ticket.issueTicketAndKey()
+
+                log.debug("Sending %d bytes of UniformDH handshake and "
+                          "session ticket." % len(handshakeMsg))
+
+                self._chopAndSend(circuit, handshakeMsg, protocolMsg=False)
                 log.debug("UniformDH authentication succeeded.")
+                self.sendRemote(circuit, newTicket, flags=const.FLAG_NEW_TICKET)
+
+                log.debug("Switching to state ST_CONNECTED.")
+                self.state = const.ST_CONNECTED
                 self._flushSendBuffer(circuit)
 
             else:
@@ -607,12 +453,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         if self.weAreClient and (self.state == const.ST_WAIT_FOR_AUTH):
 
-            if not self._receiveServersUniformDHPK(data):
+            if not self.uniformdh.receivePublicKey(data, self._deriveSecrets):
                 log.debug("Unable to finish UniformDH handshake just yet.")
                 return
+            log.debug("Switching to state ST_CONNECTED.")
+            self.state = const.ST_CONNECTED
             self._flushSendBuffer(circuit)
 
         if self.state == const.ST_CONNECTED:
+
             self.processMessages(circuit, data.read())
 
 
