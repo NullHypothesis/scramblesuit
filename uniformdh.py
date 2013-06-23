@@ -77,6 +77,9 @@ class UniformDH( object ):
         except ValueError:
             raise base.PluggableTransportError("Corrupted public key.")
 
+        # Truncate remainder of 1536-bit UniformDH group.
+        masterKey = masterKey[:const.MASTER_KEY_LENGTH]
+
         # Derive the session keys from the newly obtained master key.
         callback(masterKey)
 
