@@ -15,11 +15,8 @@ from twisted.internet import reactor
 import obfsproxy.transports.base as base
 import obfsproxy.common.serialize as pack
 import obfsproxy.common.log as logging
-import obfsproxy.transports.obfs3_dh as obfs3_dh
 
-import os
 import random
-import base64
 
 import probdist
 import mycrypto
@@ -37,7 +34,18 @@ log = logging.get_obfslogger()
 
 class ScrambleSuitTransport( base.BaseTransport ):
 
+    """
+    Implement the ScrambleSuit protocol.
+
+    The class implements methods which implement the ScrambleSuit protocol.  A
+    large part of the protocol's functionality is outsources to different
+    modules.
+    """
+
     def __init__( self ):
+        """
+        Initialise a ScrambleSuitTransport object.
+        """
 
         log.warning("\n+++ Note that ScrambleSuit is still under "
                     "development and is NOT safe for practical use. +++\n")
@@ -47,9 +55,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Initialise the protocol's state machine.
         log.debug("Switching to state ST_WAIT_FOR_AUTH.")
         self.state = const.ST_WAIT_FOR_AUTH
-
-        # UniformDH object.
-        self.dh = None
 
         # Buffers for incoming and outgoing data.
         self.sendBuf = self.recvBuf = ""
@@ -66,9 +71,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Inter arrival time morpher to obfuscate inter arrival times.
         self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.01)
-
-        # `True' if the client used a session ticket, `False' otherwise.
-        self.redeemedTicket = None
 
         # `True' if the ticket is already decrypted but not yet authenticated.
         self.decryptedTicket = None
@@ -102,25 +104,29 @@ class ScrambleSuitTransport( base.BaseTransport ):
             replay.UniformDH.loadFromDisk(const.UNIFORMDH_REPLAY_FILE)
             replay.SessionTicket.loadFromDisk(const.TICKET_REPLAY_FILE)
 
-
     def _deriveSecrets( self, masterKey ):
-        """Derives session keys (AES keys, counter nonces and HMAC keys) from
-        the given master key.  All key material is derived using
-        HKDF-SHA256."""
+        """
+        Derive session keys from the given master key.
+
+        The argument `masterKey' is used to derive two session keys and nonces
+        for AES-CTR and two HMAC keys.  The derivation is done using
+        HKDF-SHA256.
+        """
+
+        log.warning(len(masterKey))
+        assert len(masterKey) == const.MASTER_KEY_LENGTH
 
         log.debug("Deriving session keys from master key 0x%s..." %
                   masterKey.encode('hex')[:10])
 
         # We need key material for two symmetric keys, nonces and HMACs.  All
-        # of them are 32 bytes in size.
+        # of these eight are 32 bytes in size.
         hkdf = mycrypto.HKDF_SHA256(masterKey, "", 32 * 8)
         okm = hkdf.expand()
 
-        # Set the symmetric AES keys.
         self.sendCrypter.setSessionKey(okm[0:32],  okm[32:64])
         self.recvCrypter.setSessionKey(okm[64:96], okm[96:128])
 
-        # Set the HMAC keys.
         self.sendHMAC = okm[128:160]
         self.recvHMAC = okm[160:192]
 
@@ -130,53 +136,44 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter,
                                                            self.recvCrypter)
 
-
     def circuitDestroyed( self, circuit, reason, side ):
-        """This method is called by obfsproxy when the TCP connection to the
-        remote end was destroyed; either cleanly or in a non-clean fashion."""
+        """
+        Log a warning if then connection was closed in a non-clean fashion.
+        """
 
         # This is only printed because the user might be interested in it.
         if reason and reason.check(error.ConnectionLost):
             log.info("The connection was lost in a non-clean fashion.")
 
-
     def handshake( self, circuit ):
-        """This function is invoked after a circuit was established.  If a
-        ticket is available, the client redeems it.  Otherwise, the client
-        tries to start a UniformDH handshake."""
+        """
+        Initiate a ScrambleSuit handshake.
+
+        This method is only run by clients.  If a session ticket is available
+        it is redeemed.  Otherwise, a UniformDH handshake is initiated.
+        """
 
         # The server handles the handshake passively.
         if self.weAreServer:
             return
 
         if (self.uniformDHSecret is None) and (self.ticketFile is None):
-            raise base.PluggableTransportError("Neither a UniformDH secret "
-                    "nor a ticket is available.  %s needs at least one of "
-                    "these for authentication." % const.TRANSPORT_NAME)
+            log.error("Neither a UniformDH secret nor a ticket is available."
+                      "  %s needs at least one of these for authentication." %
+                      const.TRANSPORT_NAME)
+            raise base.PluggableTransportError("Unable to authenticate.")
 
         # The preferred way to authenticate is a session ticket.
         storedTicket = ticket.findStoredTicket(circuit.downstream.peer_addr)
         if storedTicket is not None:
 
+            log.debug("Redeeming stored session ticket.")
             (masterKey, rawTicket) = storedTicket
-            log.debug("Redeeming session ticket 0x%s..." %
-                      rawTicket.encode('hex')[:10])
             self._deriveSecrets(masterKey)
 
-            # Subtract the length of the ticket to make the handshake on
-            # average as long as a UniformDH handshake message.
-            padding = mycrypto.weak_random(random.randint(0,
-                                           const.MAX_PADDING_LENGTH -
-                                           const.TICKET_LENGTH))
-
-            marker = mycrypto.HMAC_SHA256_128(self.sendHMAC,
-                                              self.sendHMAC + rawTicket)
-            mac = mycrypto.HMAC_SHA256_128(self.sendHMAC, rawTicket + padding +
-                                           marker + util.getEpoch())
-
-            self._chopAndSend(circuit, rawTicket + padding + marker + mac,
-                              protocolMsg=False)
-            self.redeemedTicket = True
+            ticketMessage = ticket.createTicketMessage(rawTicket,
+                                                       self.sendHMAC)
+            self._chopAndSend(circuit, ticketMessage, protocolMsg=False)
 
             # TODO - The client can't know at this point whether the server
             # accepted the ticket.
@@ -190,10 +187,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self._chopAndSend(circuit, self.uniformdh.createHandshake(),
                               protocolMsg=False)
 
-
     def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
-        """Encrypt, then chop the given data into pieces and send it to the
-        remote end."""
+        """
+        Send data to the remote end after a connection was established.
+
+        The given `data' is first encapsulated in protocol messages.  Then, the
+        protocol message(s) are chopped into pieces and sent over the wire
+        using the given `circuit'.  The argument `flags' specifies the protocol
+        message flags with the default flags signalling payload.
+        """
 
         assert circuit
 
@@ -207,8 +209,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         self._chopAndSend(circuit, messages)
 
-
     def _chopAndSend( self, circuit, messages, protocolMsg=True ):
+        """
+        Chop the given data into pieces and sent them over the wire.
+
+        The given `messages' is chopped to packets sizes as dictated by the
+        packet morpher.  The pieces are then sent to the remote end using
+        `circuit'.  If `protocolMsg' is `True', the given data is first
+        encrypted and authenticated.
+        """
 
         # Ask the packet morpher how much we should pad and get a chopper.
         chopper, paddingLen = self.pktMorpher.morph(sum([len(msg)
@@ -233,10 +242,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
     def __flushPieces( self, circuit ):
-        """Writes the cached and chopped data pieces to the wire using
-        `circuit'. After every write, control is given back to the reactor so
-        it has a chance to actually write the data. Shortly thereafter, this
-        function is called again if data is left to write."""
+        """
+        Write the chopped application data pieces on the wire.
+
+        The cached and chopped data pieces are written to `circuit'.  After
+        every write call, control is given back to the Twisted reactor so it
+        has a change to flush the data.  Shortly thereafter, this function is
+        called again to write the next piece of data.  The delays in between
+        subsequent write calls are controlled by the inter arrival time
+        obfuscator.
+        """
 
         assert circuit
 
@@ -254,9 +269,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
                               self.__flushPieces, circuit)
 
 
-    def extractMsgs( self, data, aes ):
-        """Takes raw data from the wire, decrypts and authenticates the data
-        and returns ScrambleSuit protocol messages."""
+    def extractMessages( self, data, aes ):
+        """
+        Unpacks (i.e., decrypts and authenticates) protocol messages.
+
+        The raw `data' coming directly from the wire is decrypted using `aes'
+        and authenticated.  The payload (be it a session ticket or actual
+        payload) is then returned as unencrypted protocol messages.  In case of
+        invalid headers or HMACs, an exception is raised.
+        """
 
         assert aes and (data is not None)
 
@@ -301,8 +322,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
     def processMessages( self, circuit, data ):
-        """Deobfuscate, then decrypt the given data and send it to the local
-        Tor client."""
+        """
+        Acts on extracted protocol messages based on header flags.
+
+        After the incoming `data' is decrypted and authenticated, this method
+        processes the received data based on the header flags.  Payload is
+        written to the local application using `circuit', new tickets are
+        stored or keys are added to the replay table.
+        """
 
         assert circuit
 
@@ -310,7 +337,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             return
 
         # Try to extract protocol messages from the encrypted blurb.
-        msgs  = self.extractMsgs(data, self.recvCrypter)
+        msgs  = self.extractMessages(data, self.recvCrypter)
         if (msgs is None) or (len(msgs) == 0):
             return
 
@@ -352,9 +379,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
     def _flushSendBuffer( self, circuit ):
-        """Flushes the send buffer which could have been filled by the
-        application while ScrambleSuit was still busy handling
-        authentication."""
+        """
+        Flush the application's queued data.
+
+        The application could have sent data while we were busy authenticating
+        the remote machine.  Using `circuit', this method flushes the data
+        which could have been queued in the meanwhile.
+        """
 
         assert circuit
 
@@ -370,7 +401,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
     def _receiveTicket( self, data ):
-        """Verify and extract ticket handshake message."""
+        """
+        Extract and verify a potential session ticket.
+
+        The given `data' is treated as a session ticket.  The ticket is being
+        decrypted and authenticated (yes, in that order).  If all these steps
+        succeed, `True' is returned.  Otherwise, `False' is returned.
+        """
 
         if len(data) < (const.TICKET_LENGTH + const.MARKER_LENGTH +
                         const.HMAC_LENGTH):
@@ -416,9 +453,32 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         return True
 
+    def receivedUpstream( self, data, circuit ):
+        """
+        Sends data to the remote machine or queues it to be sent later.
+
+        Depending on the current protocol state, the given `data' is either
+        directly sent to the remote machine using `circuit' or queued.  The
+        buffer is then flushed once, a connection is established.
+        """
+
+        if self.state == const.ST_CONNECTED:
+            self.sendRemote(circuit, data.read())
+
+        # Buffer data we are not ready to transmit yet.
+        else:
+            self.sendBuf += data.read()
+            log.debug("%d bytes of outgoing data buffered." %
+                      len(self.sendBuf))
 
     def receivedDownstream( self, data, circuit ):
-        """Data coming from the remote end point and going to the local Tor."""
+        """
+        Receives and processes data coming from the remote machine.
+
+        The incoming `data' is dispatched depending on the current protocol
+        state and whether we are the client or the server.  The data is either
+        payload or authentication data.
+        """
 
         if self.weAreServer and (self.state == const.ST_WAIT_FOR_AUTH):
 
@@ -465,40 +525,33 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.processMessages(circuit, data.read())
 
 
-    def receivedUpstream( self, data, circuit ):
-        """Data coming from the local Tor client and going to the remote
-        bridge. If the data can't be sent immediately (in state ST_CONNECTED)
-        it is buffered to be transmitted later."""
-
-        if self.state == const.ST_CONNECTED:
-            self.sendRemote(circuit, data.read())
-
-        # Buffer data we are not ready to transmit yet.
-        else:
-            self.sendBuf += data.read()
-            log.debug("%d bytes of outgoing data buffered." %
-                      len(self.sendBuf))
-
-
     @classmethod
     def register_external_mode_cli( cls, subparser ):
-        """Register a ScrambleSuit-specific command line argument for obfsproxy
-        which can be used to pass the UniformDH shared secret to
-        ScrambleSuit."""
+        """
+        Register a CLI arguments to pass a secret or ticket to ScrambleSuit.
 
-        subparser.add_argument("--shared-secret", type=str,
+        Two options are made available over the command line interface: one to
+        specify a ticket file and one to specify a UniformDH shared secret.
+        """
+
+        subparser.add_argument("--shared-secret",
+                               type=str,
                                help="Shared secret for UniformDH",
                                dest="uniformDHSecret")
 
-        subparser.add_argument("--ticket-file", type=str, help="Path to a "
-                               "session ticket (only for client)",
+        subparser.add_argument("--ticket-file",
+                               type=str,
+                               help="Path to a session ticket (client only)",
                                dest="ticketFile")
 
         super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
 
 
     @classmethod
-    def validate_external_mode_cli(cls, args):
+    def validate_external_mode_cli( cls, args ):
+        """
+        Assign the given command line arguments to local variables.
+        """
 
         if args.uniformDHSecret:
             cls.uniformDHSecret = args.uniformDHSecret
@@ -516,9 +569,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 
     def handle_socks_args( self, args ):
-        """This method is called with arguments which are received over the
-        SOCKS handshake.  That way, the UniformDH shared secret can reach
-        ScrambleSuit over SOCKS."""
+        """
+        Receive arguments passed over a SOCKS connection.
+
+        The SOCKS authentication mechanism is (ab)used to pass arguments to
+        pluggable transports.  This method receives these arguments and parses
+        them.  As argument, we only expect a UniformDH shared secret.
+        """
 
         log.debug("Received the following arguments over SOCKS: %s." % args)
 
@@ -546,7 +603,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
 class ScrambleSuitClient( ScrambleSuitTransport ):
 
+    """
+    Extend the ScrambleSuit class.
+    """
+
     def __init__( self ):
+        """
+        Initialise a ScrambleSuitClient object.
+        """
+
         self.weAreClient = True
         self.weAreServer = False
         ScrambleSuitTransport.__init__(self)
@@ -554,7 +619,14 @@ class ScrambleSuitClient( ScrambleSuitTransport ):
 
 class ScrambleSuitServer( ScrambleSuitTransport ):
 
+    """
+    Extend the ScrambleSuit class.
+    """
+
     def __init__( self ):
+        """
+        Initialise a ScrambleSuitServer object.
+        """
         self.weAreServer = True
         self.weAreClient = False
         ScrambleSuitTransport.__init__(self)

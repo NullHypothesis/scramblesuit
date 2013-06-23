@@ -24,6 +24,7 @@ import const
 import pickle
 import base64
 import struct
+import random
 import datetime
 
 from Crypto.Cipher import AES
@@ -51,6 +52,29 @@ AES_KEY_LENGTH = 16
 IDENTIFIER = "ScrambleSuitTicket"
 
 HMACKey = AESKey = creationTime = None
+
+
+def createTicketMessage( rawTicket, HMACKey ):
+    """
+    Create and return a ready-to-be-sent ticket authentication message.
+
+    Pseudo-random padding and a marker are added to `rawTicket' and the result
+    is then authenticated using `HMACKey' as key for a HMAC.  The resulting
+    authentication message is then returned.
+    """
+
+    # Subtract the length of the ticket to make the handshake on
+    # average as long as a UniformDH handshake message.
+    padding = mycrypto.weak_random(random.randint(0,
+                                   const.MAX_PADDING_LENGTH -
+                                   const.TICKET_LENGTH))
+
+    marker = mycrypto.HMAC_SHA256_128(HMACKey, HMACKey + rawTicket)
+
+    hmac = mycrypto.HMAC_SHA256_128(HMACKey, rawTicket + padding +
+                                    marker + util.getEpoch())
+
+    return rawTicket + padding + marker + hmac
 
 
 def issueTicketAndKey( ):
