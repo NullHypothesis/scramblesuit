@@ -20,6 +20,13 @@ log = logging.get_obfslogger()
 
 
 def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
+    """
+    Create protocol messages out of the given payload.
+
+    The given `data' is turned into a list of protocol messages with the given
+    `flags' set.  The list is then returned.  If possible, all messages fill
+    the MTU.
+    """
 
     messages = []
 
@@ -35,6 +42,13 @@ def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
 
 
 def isSane( totalLen, payloadLen, flags ):
+    """
+    Verifies whether the given header fields are sane.
+
+    The values of the fields `totalLen', `payloadLen' and `flags' are checked
+    for their sanity.  If they are in the expected range, `True' is returned.
+    If any of these fields has an invalid value, `False' is returned.
+    """
 
     def ok( length ):
         return True if (0 <= length <= const.MPU) else False
@@ -53,10 +67,19 @@ def isSane( totalLen, payloadLen, flags ):
 
 
 class ProtocolMessage( object ):
-    """Provides an abstraction of ScrambleSuit protocol messages. The class
-    provides methods to build, encrypt and pad protocol messages."""
+
+    """
+    Represents a ScrambleSuit protocol message.
+
+    This class provides methods to deal with protocol messages.  The methods
+    make it possible to add padding as well as to encrypt and authenticate
+    protocol messages.
+    """
 
     def __init__( self, payload="", paddingLen=0, flags=const.FLAG_PAYLOAD ):
+        """
+        Initialises a ProtocolMessage object.
+        """
 
         payloadLen = len(payload)
         assert((payloadLen + paddingLen) <= (const.MPU))
@@ -67,8 +90,14 @@ class ProtocolMessage( object ):
         self.payload = payload
         self.flags = flags
 
-
     def encryptAndHMAC( self, crypter, HMACKey ):
+        """
+        Encrypt and authenticate this protocol message.
+
+        This protocol message is encrypted using `crypter' and authenticated
+        using `HMACKey'.  Finally, the encrypted message prepended by a
+        HMAC-SHA256-128 is returned and ready to be sent over the wire.
+        """
 
         encrypted = crypter.encrypt(serialize.htons(self.totalLen) +
                                     serialize.htons(self.payloadLen) +
@@ -79,8 +108,13 @@ class ProtocolMessage( object ):
 
         return hmac + encrypted
 
-
     def addPadding( self, paddingLen ):
+        """
+        Add padding to this protocol message.
+
+        Padding is added to this protocol message.  The exact amount is
+        specified by `paddingLen'.
+        """
 
         # The padding must not exceed the message size.
         assert ((self.totalLen + paddingLen) <= const.MPU)
@@ -92,8 +126,11 @@ class ProtocolMessage( object ):
                   (paddingLen, const.HDR_LENGTH + self.totalLen))
         self.totalLen += paddingLen
 
-
     def __len__( self ):
+        """
+        Return the length of this protocol message.
+        """
+
         return const.HDR_LENGTH + self.totalLen
 
 # Alias class name in order to provide a more intuitive API.
