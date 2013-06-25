@@ -154,11 +154,9 @@ class PayloadCrypter:
         Encrypts the given `data' using AES in counter mode.
         """
 
-        # Send unencrypted data if AES is not initialised yet.
-        if self.crypter == None:
-            return data
-        else:
-            return self.crypter.encrypt(data)
+        assert self.crypter is not None
+
+        return self.crypter.encrypt(data)
 
     # Encryption equals decryption in AES CTR.
     decrypt = encrypt
