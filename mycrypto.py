@@ -21,18 +21,22 @@ import os
 
 import const
 
-
 log = logging.get_obfslogger()
 
 
 class HKDF_SHA256( object ):
+
     """
     Implements HKDF using SHA256: https://tools.ietf.org/html/rfc5869
+
     This class only implements the `expand' but not the `extract' stage since
     the provided PRK already exhibits strong entropy.
     """
 
     def __init__( self, prk, info="", length=32 ):
+        """
+        Initialise a HKDF_SHA256 object.
+        """
 
         self.HashLen = const.SHA256_DIGEST_LENGTH
 
@@ -51,10 +55,13 @@ class HKDF_SHA256( object ):
         self.ctr = 1
         self.T = ""
 
-
     def expand( self ):
-        """Returns the expanded output key material which is calculated based
-        on the given PRK, info and L."""
+        """
+        Return the expanded output key material.
+
+        The output key material is calculated based on the given PRK, info and
+        L.
+        """
 
         tmp = ""
 
@@ -73,9 +80,10 @@ class HKDF_SHA256( object ):
         return self.T[:self.length]
 
 
-
 def HMAC_SHA256_128( key, msg ):
-    """Returns the HMAC-SHA256-128 of the given `key' and `msg'."""
+    """
+    Return the HMAC-SHA256-128 of the given `msg' authenticated by `key'.
+    """
 
     assert(len(key) == const.SHA256_DIGEST_LENGTH)
 
@@ -85,37 +93,50 @@ def HMAC_SHA256_128( key, msg ):
     return h.digest()[:16]
 
 
-
 def strong_random( size ):
-    """Returns `size' bytes of strong randomness which is suitable for
-    cryptographic use."""
+    """
+    Return `size' bytes of strong randomness suitable for cryptographic use.
+    """
 
     return os.urandom(size)
 
 
-
 def weak_random( size ):
-    """Returns `size' bytes of weak randomness which can be used to pad
-    application data but is not suitable for cryptographic use."""
+    """
+    Return `size' bytes of weak randomness not suitable for cryptographic use.
+    """
 
     # TODO - Use a function which does not stress our entropy pool.
     return os.urandom(size)
 
 
 class PayloadCrypter:
-    """Encrypts plain Tor data using AES. The encrypted data is then passed on
-    to the obfuscation component PayloadScrambler."""
+
+    """
+    Provides methods to encrypt data using AES in counter mode.
+
+    This class provides methods to set a session key as well as an
+    initialisation vector and to encrypt and decrypt data.
+    """
 
     def __init__( self ):
+        """
+        Initialise a PayloadCrypter object.
+        """
 
         log.debug("Initialising payload crypter.")
+
         self.sessionKey = None
         self.crypter = None
         self.counter = None
 
-
     def setSessionKey( self, key, iv ):
-        """Set the AES session key and initialise counter mode."""
+        """
+        Set an AES session key and an initialisation vector.
+
+        The given `key' and `iv' are used as AES counter mode key and
+        initialisation vector.
+        """
 
         log.debug("Setting session key for AES-CTR 0x%s..." %
                   key.encode('hex')[:10])
@@ -128,16 +149,16 @@ class PayloadCrypter:
         self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR,
                                              counter=self.counter)
 
-
     def encrypt( self, data ):
-        """Encrypts the given `data' using AES."""
+        """
+        Encrypts the given `data' using AES in counter mode.
+        """
 
         # Send unencrypted data if AES is not initialised yet.
         if self.crypter == None:
             return data
         else:
             return self.crypter.encrypt(data)
-
 
     # Encryption equals decryption in AES CTR.
     decrypt = encrypt
