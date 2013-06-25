@@ -93,7 +93,7 @@ def HMAC_SHA256_128( key, msg ):
     return h.digest()[:16]
 
 
-def strong_random( size ):
+def strongRandom( size ):
     """
     Return `size' bytes of strong randomness suitable for cryptographic use.
     """
@@ -101,7 +101,7 @@ def strong_random( size ):
     return os.urandom(size)
 
 
-def weak_random( size ):
+def weakRandom( size ):
     """
     Return `size' bytes of weak randomness not suitable for cryptographic use.
     """

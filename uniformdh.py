@@ -152,7 +152,7 @@ class UniformDH( object ):
 
         # Subtract the length of the public key to make the handshake on
         # average as long as a redeemed ticket.
-        padding = mycrypto.weak_random(random.randint(0,
+        padding = mycrypto.weakRandom(random.randint(0,
                                        const.MAX_PADDING_LENGTH -
                                        const.PUBLIC_KEY_LENGTH))
 

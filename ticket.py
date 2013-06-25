@@ -65,7 +65,7 @@ def createTicketMessage( rawTicket, HMACKey ):
 
     # Subtract the length of the ticket to make the handshake on
     # average as long as a UniformDH handshake message.
-    padding = mycrypto.weak_random(random.randint(0,
+    padding = mycrypto.weakRandom(random.randint(0,
                                    const.MAX_PADDING_LENGTH -
                                    const.TICKET_LENGTH))
 
@@ -86,7 +86,7 @@ def issueTicketAndKey( ):
 
     # Issue a new session ticket for the client.
     log.info("Issuing new session ticket and master key.")
-    masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
+    masterKey = mycrypto.strongRandom(const.MASTER_KEY_LENGTH)
     newTicket = (SessionTicket(masterKey)).issue()
 
     return masterKey + newTicket
@@ -163,8 +163,8 @@ def rotateKeys( ):
     log.info("Attempting to rotate session ticket keys.")
 
     # Generate and load fresh keys.
-    HMACKey = mycrypto.strong_random(HMAC_KEY_LENGTH)
-    AESKey = mycrypto.strong_random(AES_KEY_LENGTH)
+    HMACKey = mycrypto.strongRandom(HMAC_KEY_LENGTH)
+    AESKey = mycrypto.strongRandom(AES_KEY_LENGTH)
     creationTime = int(time.time())
 
     try:
@@ -343,7 +343,7 @@ class SessionTicket( object ):
         checkKeys()
 
         # Initialisation vector for AES-CBC.
-        self.IV = mycrypto.strong_random(IV_LENGTH)
+        self.IV = mycrypto.strongRandom(IV_LENGTH)
 
         # The server's (encrypted) protocol state.
         self.state = ProtocolState(masterKey)
@@ -399,7 +399,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print "[+] Generating new session ticket."
-    masterKey = mycrypto.strong_random(const.MASTER_KEY_LENGTH)
+    masterKey = mycrypto.strongRandom(const.MASTER_KEY_LENGTH)
     ticket = SessionTicket(masterKey).issue()
 
     print "[+] Writing new session ticket to `%s'." % args.ticket_file
