@@ -113,7 +113,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         HKDF-SHA256.
         """
 
-        log.warning(len(masterKey))
         assert len(masterKey) == const.MASTER_KEY_LENGTH
 
         log.debug("Deriving session keys from master key 0x%s..." %
