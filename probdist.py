@@ -55,13 +55,12 @@ class RandProbDist:
 
         # Cumulative probability of all bins.
         cumulProb = 0
-        flatness = self.prng.randint(1, 3)
 
         for b in xrange(bins):
-            p = self.prng.uniform(0, (1 - cumulProb) / float(flatness))
+            p = self.prng.uniform(0, (1 - cumulProb))
             cumulProb += p
-            singleton = genSingleton()
 
+            singleton = genSingleton()
             dist[singleton] = p
             self.sampleList.append((cumulProb, singleton,))
 
