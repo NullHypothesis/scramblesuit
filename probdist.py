@@ -27,7 +27,8 @@ class RandProbDist:
 
         The parameter `genSingleton' is expected to be a function which yields
         singletons for the probability distribution.  The optional `seed' can
-        be used to seed the PRNG.
+        be used to seed the PRNG so that the probability distribution is
+        generated deterministically.
         """
 
         # Minimum and maximum amount of distinct bins for the distribution.
@@ -90,7 +91,7 @@ class RandProbDist:
 
         assert len(self.sampleList) > 0
 
-        rand = self.prng.random()
+        rand = random.random()
 
         for cumulProb, singleton in self.sampleList:
             if rand <= cumulProb:
