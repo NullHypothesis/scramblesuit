@@ -91,16 +91,13 @@ class RandProbDist:
 
         assert len(self.sampleList) > 0
 
-        CUM_PROB = 0
-        SINGLETON = 1
+        rand = self.prng.random()
 
-        r = self.prng.random()
+        for cumulProb, singleton in self.sampleList:
+            if rand <= cumulProb:
+                return singleton
 
-        for pair in self.sampleList:
-            if r <= pair[CUM_PROB]:
-                return pair[SINGLETON]
-
-        return self.sampleList[-1][SINGLETON]
+        return self.sampleList[-1][1]
 
 # Alias class name in order to provide a more intuitive API.
 new = RandProbDist
