@@ -172,7 +172,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
             ticketMessage = ticket.createTicketMessage(rawTicket,
                                                        self.sendHMAC)
-            self._chopAndSend(circuit, ticketMessage, protocolMsg=False)
+            circuit.downstream.write(ticketMessage)
 
             # TODO - The client can't know at this point whether the server
             # accepted the ticket.
@@ -183,20 +183,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Conduct an authenticated UniformDH handshake if there's no ticket.
         else:
             log.debug("No session ticket to redeem.  Running UniformDH.")
-            self._chopAndSend(circuit, self.uniformdh.createHandshake(),
-                              protocolMsg=False)
+            circuit.downstream.write(self.uniformdh.createHandshake())
 
     def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
         """
         Send data to the remote end after a connection was established.
 
         The given `data' is first encapsulated in protocol messages.  Then, the
-        protocol message(s) are chopped into pieces and sent over the wire
-        using the given `circuit'.  The argument `flags' specifies the protocol
-        message flags with the default flags signalling payload.
+        protocol message(s) are sent over the wire using the given `circuit'.
+        The argument `flags' specifies the protocol message flags with the
+        default flags signalling payload.
         """
-
-        assert circuit
 
         if (data is None) or (len(data) == 0):
             return
@@ -206,38 +203,21 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Wrap the application's data in ScrambleSuit protocol messages.
         messages = message.createProtocolMessages(data, flags=flags)
 
-        self._chopAndSend(circuit, messages)
-
-    def _chopAndSend( self, circuit, messages, protocolMsg=True ):
-        """
-        Chop the given data into pieces and sent them over the wire.
-
-        The given `messages' is chopped to packets sizes as dictated by the
-        packet morpher.  The pieces are then sent to the remote end using
-        `circuit'.  If `protocolMsg' is `True', the given data is first
-        encrypted and authenticated.
-        """
-
-        # Ask the packet morpher how much we should pad and get a chopper.
-        chopper, paddingLen = self.pktMorpher.morph(sum([len(msg)
-                                                    for msg in messages]))
+        # Let the packet morpher tell us how much we should pad.
+        paddingLen = self.pktMorpher.calcPadding(sum([len(msg) for
+                                                 msg in messages]))
 
         # If we are dealing with protocol messages, we pad, encrypt and MAC...
-        if protocolMsg:
-            if paddingLen > const.HDR_LENGTH:
-                messages.append(message.ProtocolMessage("",
-                                paddingLen=paddingLen - const.HDR_LENGTH))
-
-            blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
-                            self.sendHMAC) for msg in messages])
-
-        # ...otherwise, we leave the data as it is.
+        if paddingLen > const.HDR_LENGTH:
+            messages.append(message.ProtocolMessage("",
+                            paddingLen=paddingLen - const.HDR_LENGTH))
         else:
-            blurb = messages
+            log.debug("I DON'T KNOW WHAT TO DO!!11")
 
-        # Chop the encrypted blurb to fit the target probability distribution.
-        self.choppedPieces += chopper(blurb)
-        self.__flushPieces(circuit)
+        blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
+                        self.sendHMAC) for msg in messages])
+
+        circuit.downstream.write(blurb)
 
 
     def __flushPieces( self, circuit ):
@@ -497,7 +477,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 log.debug("Sending %d bytes of UniformDH handshake and "
                           "session ticket." % len(handshakeMsg))
 
-                self._chopAndSend(circuit, handshakeMsg, protocolMsg=False)
+                circuit.downstream.write(handshakeMsg)
+
                 log.debug("UniformDH authentication succeeded.")
                 self.sendRemote(circuit, newTicket, flags=const.FLAG_NEW_TICKET)
 
