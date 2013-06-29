@@ -14,6 +14,10 @@ import random
 import probdist
 import const
 
+import obfsproxy.common.log as logging
+
+log = logging.get_obfslogger()
+
 class PacketMorpher( object ):
     """Provides an interface to morph large chunks of bytes to a given target
     probability distribution. This is implemented by naively sampling the
@@ -24,12 +28,30 @@ class PacketMorpher( object ):
         distribution. If none is given, a distribution is randomly
         generated."""
 
+        assert len(secret) == const.SHARED_SECRET_LENGTH
+
         if dist:
             self.dist = dist
         else:
-            self.dist = probdist.RandProbDist(lambda: random.randint(
-                                              const.HDR_LENGTH, const.MTU))
+            self.dist = probdist.new(lambda: random.randint(const.HDR_LENGTH,
+                                     const.MTU))
 
+    def calcPadding( self, dataLen ):
+
+        # The source and target length of the burst's last packet.
+        dataLen = dataLen % const.MTU
+        sampleLen = self.dist.randomSample()
+
+        if sampleLen >= dataLen:
+            padLen = sampleLen - dataLen
+        else:
+            padLen = (const.MTU - dataLen) + sampleLen
+
+        log.debug("Morphing the last %d-byte packet to %d bytes by adding %d "
+                  "bytes of padding." %
+                  (dataLen % const.MTU, sampleLen, padLen))
+
+        return padLen
 
     def morph( self, dataLen ):
         """Based on `dataLen', the length of the data to morph, this function
@@ -59,3 +81,6 @@ class PacketMorpher( object ):
         """Return a random sample of the stored probability distribution."""
 
         return self.dist.randomSample()
+
+# Alias class name in order to provide a more intuitive API.
+new = PacketMorpher
