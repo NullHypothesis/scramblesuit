@@ -1,0 +1,12 @@
+ScrambleSuit is a pluggable transport protocol for obfsproxy.  It is written in
+pure Python and solves two problems:
+- Protection against active probing attacks by requiring a shared secret
+  between the client and the server.
+- Rudimentary defence against traffic analysis attacks by altering flow
+  features.
+
+For the detailed design of ScrambleSuit, please have a look at the project
+page: http://www.cs.kau.se/philwint/scramblesuit/
+
+Contact: Philipp Winter <phw@torproject.org>
+PGP fingerprint: B369 E7A2 18FE CEAD EB96  8C73 CF70 89E3 D7FD C0D0
