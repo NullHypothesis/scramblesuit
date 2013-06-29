@@ -28,8 +28,6 @@ class PacketMorpher( object ):
         distribution. If none is given, a distribution is randomly
         generated."""
 
-        assert len(secret) == const.SHARED_SECRET_LENGTH
-
         if dist:
             self.dist = dist
         else:
