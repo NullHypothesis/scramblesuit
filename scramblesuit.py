@@ -53,8 +53,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.info("Initialising %s." % const.TRANSPORT_NAME)
 
-        # Load persistent server configuration from file.
-        self.state = state.load(self.weAreServer)
+        # Load persistent configuration from file.
+        self.longState = state.load(self.weAreServer)
 
         # Initialise the protocol's state machine.
         log.debug("Switching to state ST_WAIT_FOR_AUTH.")
@@ -98,15 +98,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
             const.TICKET_FILE = self.ticketFile
 
         # Used by the unpack mechanism
-        self.totalLen = None
-        self.payloadLen = None
-        self.flags = None
+        self.totalLen = self.payloadLen = self.flags = None
 
         # Load replay dictionaries from file.
         if self.weAreServer:
             log.info("Loading replay dictionaries from file.")
-            replay.UniformDH.loadFromDisk(const.UNIFORMDH_REPLAY_FILE)
-            replay.SessionTicket.loadFromDisk(const.TICKET_REPLAY_FILE)
+            self.longState.uniformDhReplay.loadFromDisk(const.UNIFORMDH_REPLAY_FILE)
+            self.longState.ticketReplay.loadFromDisk(const.TICKET_REPLAY_FILE)
 
     def _deriveSecrets( self, masterKey ):
         """
@@ -335,12 +333,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 if self.ticketReplayCache is not None:
                     log.debug("Adding master key contained in ticket to the "
                               "replay table.")
-                    replay.SessionTicket.addKey(self.ticketReplayCache)
+                    self.longState.ticketReplay.addKey(self.ticketReplayCache)
 
                 elif self.uniformdh.getRemotePublicKey() is not None:
                     log.debug("Adding the remote's UniformDH public key to "
                               "the replay table.")
-                    replay.UniformDH.addKey(
+                    self.longState.uniformDhReplay.addKey(
                             self.uniformdh.getRemotePublicKey())
 
             # Store newly received ticket and send ACK to the server.
@@ -474,7 +472,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self._flushSendBuffer(circuit)
                 self.sendRemote(circuit, ticket.issueTicketAndKey(),
                                 flags=const.FLAG_NEW_TICKET)
-                self.sendRemote(circuit, self.state.prngSeed,
+                self.sendRemote(circuit, self.longState.prngSeed,
                                 flags=const.FLAG_PRNG_SEED)
 
             # Second, interpret the data as a UniformDH handshake.
