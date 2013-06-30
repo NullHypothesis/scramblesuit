@@ -27,6 +27,7 @@ import packetmorpher
 import ticket
 import replay
 import uniformdh
+import state
 
 
 log = logging.get_obfslogger()
@@ -52,9 +53,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.info("Initialising %s." % const.TRANSPORT_NAME)
 
+        # Load persistent server configuration from file.
+        self.state = state.load(self.weAreServer)
+
         # Initialise the protocol's state machine.
         log.debug("Switching to state ST_WAIT_FOR_AUTH.")
-        self.state = const.ST_WAIT_FOR_AUTH
+        self.protoState = const.ST_WAIT_FOR_AUTH
 
         # Buffers for incoming and outgoing data.
         self.sendBuf = self.recvBuf = ""
@@ -177,7 +181,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # TODO - The client can't know at this point whether the server
             # accepted the ticket.
             log.debug("Switching to state ST_CONNECTED.")
-            self.state = const.ST_CONNECTED
+            self.protoState = const.ST_CONNECTED
             self._flushSendBuffer(circuit)
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
@@ -353,6 +357,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.sendRemote(circuit, "dummy",
                                 flags=const.FLAG_CONFIRM_TICKET)
 
+            elif self.weAreClient and msg.flags == const.FLAG_PRNG_SEED:
+                # TODO
+                log.debug("Our PRNG seed: %s" % msg.payload.encode('hex'))
+
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
 
@@ -428,7 +436,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
 
         log.debug("Switching to state ST_CONNECTED.")
-        self.state = const.ST_CONNECTED
+        self.protoState = const.ST_CONNECTED
 
         return True
 
@@ -441,7 +449,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         buffer is then flushed once, a connection is established.
         """
 
-        if self.state == const.ST_CONNECTED:
+        if self.protoState == const.ST_CONNECTED:
             self.sendRemote(circuit, data.read())
 
         # Buffer data we are not ready to transmit yet.
@@ -458,8 +466,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         state and whether we are the client or the server.  The data is either
         payload or authentication data.
         """
-
-        if self.weAreServer and (self.state == const.ST_WAIT_FOR_AUTH):
+        if self.weAreServer and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
             # First, try to interpret the incoming data as session ticket.
             if self._receiveTicket(data):
@@ -467,6 +474,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self._flushSendBuffer(circuit)
                 self.sendRemote(circuit, ticket.issueTicketAndKey(),
                                 flags=const.FLAG_NEW_TICKET)
+                self.sendRemote(circuit, self.state.prngSeed,
+                                flags=const.FLAG_PRNG_SEED)
 
             # Second, interpret the data as a UniformDH handshake.
             elif self.uniformdh.receivePublicKey(data, self._deriveSecrets):
@@ -483,7 +492,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.sendRemote(circuit, newTicket, flags=const.FLAG_NEW_TICKET)
 
                 log.debug("Switching to state ST_CONNECTED.")
-                self.state = const.ST_CONNECTED
+                self.protoState = const.ST_CONNECTED
                 self._flushSendBuffer(circuit)
 
             else:
@@ -491,16 +500,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
                           "Waiting for more data.")
                 return
 
-        if self.weAreClient and (self.state == const.ST_WAIT_FOR_AUTH):
+        if self.weAreClient and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
             if not self.uniformdh.receivePublicKey(data, self._deriveSecrets):
                 log.debug("Unable to finish UniformDH handshake just yet.")
                 return
             log.debug("Switching to state ST_CONNECTED.")
-            self.state = const.ST_CONNECTED
+            self.protoState = const.ST_CONNECTED
             self._flushSendBuffer(circuit)
 
-        if self.state == const.ST_CONNECTED:
+        if self.protoState == const.ST_CONNECTED:
 
             self.processMessages(circuit, data.read())
 
