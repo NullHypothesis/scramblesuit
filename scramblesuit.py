@@ -53,8 +53,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.info("Initialising %s." % const.TRANSPORT_NAME)
 
-        # Load persistent configuration from file.
-        self.longState = state.load(self.weAreServer)
+        # Load the server's persistent state from file.
+        if self.weAreServer:
+            self.longState = state.load()
 
         # Initialise the protocol's state machine.
         log.debug("Switching to state ST_WAIT_FOR_AUTH.")
@@ -71,10 +72,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.recvCrypter = mycrypto.PayloadCrypter()
 
         # Packet morpher to modify the protocol's packet length distribution.
-        self.pktMorpher =  packetmorpher.PacketMorpher()
+        self.pktMorpher = packetmorpher.PacketMorpher(self.longState.pktDist
+                if self.weAreServer else None)
 
         # Inter arrival time morpher to obfuscate inter arrival times.
-        self.iatMorpher = probdist.RandProbDist(lambda: random.random() % 0.01)
+        self.iatMorpher = self.longState.iatDist if self.weAreServer else \
+                          probdist.new(lambda: random.random() % 0.01)
 
         # `True' if the ticket is already decrypted but not yet authenticated.
         self.decryptedTicket = None
@@ -403,7 +406,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Now try to decrypt and parse the ticket.  We need the master key
         # inside to verify the HMAC in the next step.
         if not self.decryptedTicket:
-            newTicket = ticket.decrypt(potentialTicket[:const.TICKET_LENGTH])
+            newTicket = ticket.decrypt(potentialTicket[:const.TICKET_LENGTH],
+                                       self.longState)
             if newTicket != None and newTicket.isValid():
                 self._deriveSecrets(newTicket.masterKey)
                 self.decryptedTicket = True
@@ -470,7 +474,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if self._receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
                 self._flushSendBuffer(circuit)
-                self.sendRemote(circuit, ticket.issueTicketAndKey(),
+                self.sendRemote(circuit, ticket.issueTicketAndKey(self.longState),
                                 flags=const.FLAG_NEW_TICKET)
                 self.sendRemote(circuit, self.longState.prngSeed,
                                 flags=const.FLAG_PRNG_SEED)
@@ -479,7 +483,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             elif self.uniformdh.receivePublicKey(data, self._deriveSecrets):
                 # Now send the server's UniformDH public key to the client.
                 handshakeMsg = self.uniformdh.createHandshake()
-                newTicket = ticket.issueTicketAndKey()
+                newTicket = ticket.issueTicketAndKey(self.longState)
 
                 log.debug("Sending %d bytes of UniformDH handshake and "
                           "session ticket." % len(handshakeMsg))
