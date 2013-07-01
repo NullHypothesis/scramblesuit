@@ -43,26 +43,6 @@ class Tracker( object ):
 
         return (element in self.table)
 
-    def saveToDisk( self, fileName ):
-        """Save the lookup table to disk."""
-        try:
-            with open(fileName, "w") as fd:
-                pickle.dump(self.table, fd)
-                fd.close()
-        except IOError as e:
-            log.error("Error saving replay table to file `%s': %s" %
-                      (fileName, e))
-
-    def loadFromDisk( self, fileName ):
-        """Load the lookup table from the disk."""
-        try:
-            with open(fileName, "r") as fd:
-                self.table = pickle.load(fd)
-                fd.close()
-        except IOError as e:
-            log.error("Error opening replay table from file `%s': %s." %
-                      (fileName, e))
-
     def prune( self ):
         """Delete expired elements from the table."""
         log.debug("Pruning the replay table.")
@@ -86,7 +66,6 @@ class UniformDHTracker( Tracker ):
         log.debug("Caching UniformDH HMAC.")
 
         self.addElement(hmac)
-        self.saveToDisk(const.UNIFORMDH_REPLAY_FILE)
 
 
 class SessionTicketTracker( Tracker ):
@@ -96,7 +75,6 @@ class SessionTicketTracker( Tracker ):
         log.debug("Caching session ticket HMAC.")
 
         self.addElement(hmac)
-        self.saveToDisk(const.TICKET_REPLAY_FILE)
 
 
 # Both replay trackers must be shared by different scramblesuit instances.  As
