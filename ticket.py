@@ -97,20 +97,21 @@ def storeNewTicket( masterKey, ticket, bridge ):
     assert len(masterKey) == const.MASTER_KEY_LENGTH
     assert len(ticket) == const.TICKET_LENGTH
 
-    log.debug("Storing newly received ticket in `%s'." % const.TICKET_FILE)
+    log.debug("Storing newly received ticket in `%s'." %
+              const.CLIENT_TICKET_FILE)
 
     # Add a new (key, ticket) tuple with the given bridge as hash key.
     # TODO - also add a timestamp here.
     tickets = dict()
-    content = util.readFromFile(const.TICKET_FILE)
+    content = util.readFromFile(const.CLIENT_TICKET_FILE)
     if (content is not None) and (len(content) > 0):
         tickets = pickle.loads(content)
 
     tickets[bridge] = (masterKey, ticket)
-    util.writeToFile(pickle.dumps(tickets), const.TICKET_FILE)
+    util.writeToFile(pickle.dumps(tickets), const.CLIENT_TICKET_FILE)
 
 
-def findStoredTicket( bridge, fileName=const.TICKET_FILE ):
+def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
     """
     Retrieve a previously stored ticket from the ticket dictionary.
 

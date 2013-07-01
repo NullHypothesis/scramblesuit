@@ -98,7 +98,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.ticketFile = None
         if self.ticketFile:
             log.info("Using session ticket file `%s'." % self.ticketFile)
-            const.TICKET_FILE = self.ticketFile
+            const.CLIENT_TICKET_FILE = self.ticketFile
 
         # Used by the unpack mechanism
         self.totalLen = self.payloadLen = self.flags = None

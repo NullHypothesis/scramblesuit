@@ -79,7 +79,7 @@ ST_CONNECTED = 1
 
 # File which holds our session ticket.
 # FIXME - multiple session tickets for multiple servers must be supported.
-TICKET_FILE = DATA_DIRECTORY + "session_ticket.pickle"
+CLIENT_TICKET_FILE = DATA_DIRECTORY + "session_ticket.pickle"
 
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
