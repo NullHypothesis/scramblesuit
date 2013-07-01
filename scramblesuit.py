@@ -103,11 +103,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Used by the unpack mechanism
         self.totalLen = self.payloadLen = self.flags = None
 
-        # Load replay dictionaries from file.
-        if self.weAreServer:
-            log.info("Loading replay dictionaries from file.")
-            self.srvState.uniformDhReplay.loadFromDisk(const.UNIFORMDH_REPLAY_FILE)
-            self.srvState.ticketReplay.loadFromDisk(const.TICKET_REPLAY_FILE)
 
     def _deriveSecrets( self, masterKey ):
         """
@@ -336,12 +331,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 if self.ticketReplayCache is not None:
                     log.debug("Adding master key contained in ticket to the "
                               "replay table.")
-                    self.srvState.ticketReplay.addKey(self.ticketReplayCache)
+                    self.srvState.registerKey(self.ticketReplayCache)
 
                 elif self.uniformdh.getRemotePublicKey() is not None:
                     log.debug("Adding the remote's UniformDH public key to "
                               "the replay table.")
-                    self.srvState.uniformDhReplay.addKey(
+                    self.srvState.registerKey(
                             self.uniformdh.getRemotePublicKey())
 
             # Store newly received ticket and send ACK to the server.
