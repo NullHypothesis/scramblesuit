@@ -22,7 +22,6 @@ import os
 import time
 import const
 import pickle
-import base64
 import struct
 import random
 import datetime
