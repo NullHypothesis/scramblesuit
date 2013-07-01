@@ -60,6 +60,7 @@ def isSane( totalLen, payloadLen, flags ):
         const.FLAG_PAYLOAD,
         const.FLAG_NEW_TICKET,
         const.FLAG_CONFIRM_TICKET,
+        const.FLAG_PRNG_SEED,
         const.FLAG_PAYLOAD + const.FLAG_CONFIRM_TICKET
     ]
 

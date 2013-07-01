@@ -8,17 +8,27 @@ While some values can be changed, in general they should not.  If you do not
 obey, be at least careful because the protocol could easily break.
 """
 
+# Length of the HMAC used to authenticate tickets in bytes.
+HMAC_KEY_LENGTH = 32
+
+# Length of the AES key used to encrypt tickets in bytes.
+AES_KEY_LENGTH = 16
+
+# Length of the IV for AES-CBC which is used to encrypt tickets in bytes.
+AES_CBC_IV_LENGTH = 16
+
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"
 
-# Divisor (in seconds) for the UNIX epoch used to defend against replay
+# Divisor (in seconds) for the Unix epoch used to defend against replay
 # attacks.
 EPOCH_GRANULARITY = 3600
 
 # Flags which can be set in a ScrambleSuit protocol message.
-FLAG_PAYLOAD = 1
-FLAG_NEW_TICKET = 2
-FLAG_CONFIRM_TICKET = 4
+FLAG_PAYLOAD =        (1 << 0)
+FLAG_NEW_TICKET =     (1 << 1)
+FLAG_CONFIRM_TICKET = (1 << 2)
+FLAG_PRNG_SEED =      (1 << 3)
 
 # Length of ScrambleSuit's header in bytes.
 HDR_LENGTH = 16 + 2 + 2 + 1
@@ -29,31 +39,31 @@ HMAC_LENGTH = 16
 # Key rotation time for session ticket keys in seconds.
 KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 
-# File where session ticket keys are stored.
-KEY_STORE = DATA_DIRECTORY + "ticket_keys.bin"
-
 # Marker used to easily locate the HMAC authenticating handshake messages in
 # bytes.
 MARKER_LENGTH = 16
 
-# Key length for the master key in bytes.
+# The master key's length in bytes.
 MASTER_KEY_LENGTH = 32
 
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 4096
 
-# Length of ScrambleSuit's MTU in bytes.
+# Length of ScrambleSuit's MTU in bytes.  Note that this is *not* the link MTU
+# which is probably 1500.
 MTU = 1460
 
 # Maximum payload unit of a ScrambleSuit message in bytes.
 MPU = MTU - HDR_LENGTH
 
-# Length of a UniformDH public key.
+# Length of a UniformDH public key in bytes.
 PUBLIC_KEY_LENGTH = 192
 
-# Files which hold the replay dictionaries.
-UNIFORMDH_REPLAY_FILE = DATA_DIRECTORY + "uniformdh_replay_dict.pickle"
-TICKET_REPLAY_FILE = DATA_DIRECTORY + "ticket_replay_dict.pickle"
+# Length of the PRNG seed used to generate probability distributions in bytes.
+PRNG_SEED_LENGTH = 32
+
+# File which holds the server's state information.
+SERVER_STATE_FILE = DATA_DIRECTORY + "server_state.pickle"
 
 # Life time of session tickets in seconds.
 SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
@@ -68,9 +78,8 @@ SHARED_SECRET_LENGTH = 32
 ST_WAIT_FOR_AUTH = 0
 ST_CONNECTED = 1
 
-# File which holds our session ticket.
-# FIXME - multiple session tickets for multiple servers must be supported.
-TICKET_FILE = DATA_DIRECTORY + "session_ticket.bin"
+# File which holds the client's session tickets.
+CLIENT_TICKET_FILE = DATA_DIRECTORY + "session_ticket.pickle"
 
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
