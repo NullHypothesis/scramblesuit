@@ -97,8 +97,8 @@ class State( object ):
         self.oldAesKey = None
 
         # Replay dictionaries for both authentication mechanisms.
-        self.ticketReplay = replay.UniformDHTracker()
-        self.uniformDhReplay = replay.SessionTicketTracker()
+        self.ticketReplay = replay.SessionTicketTracker()
+        self.uniformDhReplay = replay.UniformDHTracker()
 
         # Distributions for packet lengths and inter arrival times.
         self.pktDist = probdist.new(lambda: random.randint(const.HDR_LENGTH,
@@ -108,6 +108,27 @@ class State( object ):
                                     seed=self.prngSeed)
 
         self.writeState()
+
+    def registerKey( self, key ):
+        """
+        Register the given `key' in a replay table.
+
+        Depending on the key length, it is either added to the ticket replay
+        table or the UniformDH replay table.
+        """
+
+        assert (self.ticketReplay is not None) and \
+               (self.uniformDhReplay is not None)
+
+        if len(key) == const.MASTER_KEY_LENGTH:
+            self.ticketReplay.addKey(key)
+            self.writeState()
+        elif len(key) == const.PUBLIC_KEY_LENGTH:
+            self.uniformDhReplay.addKey(key)
+            self.writeState()
+        else:
+            log.warning("Received unknown key length of %d bytes to register "
+                        "for replay attacks." % len(key))
 
     def writeState( self ):
         """
