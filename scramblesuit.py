@@ -195,9 +195,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         default flags signalling payload.
         """
 
-        if (data is None) or (len(data) == 0):
-            return
-
         log.info("Processing %d bytes of outgoing data." % len(data))
 
         # Wrap the application's data in ScrambleSuit protocol messages.
@@ -350,8 +347,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                       circuit.downstream.peer_addr)
                 # Tell the server that we received the ticket.
                 log.debug("Sending FLAG_CONFIRM_TICKET message to server.")
-                self.sendRemote(circuit, "dummy",
-                                flags=const.FLAG_CONFIRM_TICKET)
+                self.sendRemote(circuit, "", flags=const.FLAG_CONFIRM_TICKET)
 
             # Use the PRNG seed to generate the same probability distributions
             # as the server.  That's where the polymorphism comes from.
