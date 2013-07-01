@@ -8,6 +8,12 @@ While some values can be changed, in general they should not.  If you do not
 obey, be at least careful because the protocol could easily break.
 """
 
+# Length of the HMAC used to authenticate the ticket.
+HMAC_KEY_LENGTH = 32
+
+# Length of the AES key used to encrypt the ticket.
+AES_KEY_LENGTH = 16
+
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"
 
@@ -19,6 +25,7 @@ EPOCH_GRANULARITY = 3600
 FLAG_PAYLOAD =        (1 << 0)
 FLAG_NEW_TICKET =     (1 << 1)
 FLAG_CONFIRM_TICKET = (1 << 2)
+FLAG_PRNG_SEED =      (1 << 3)
 
 # Length of ScrambleSuit's header in bytes.
 HDR_LENGTH = 16 + 2 + 2 + 1
@@ -30,7 +37,7 @@ HMAC_LENGTH = 16
 KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 
 # File where session ticket keys are stored.
-KEY_STORE = DATA_DIRECTORY + "ticket_keys.bin"
+KEY_STORE = DATA_DIRECTORY + "ticket_keys.pickle"
 
 # Marker used to easily locate the HMAC authenticating handshake messages in
 # bytes.
@@ -51,9 +58,15 @@ MPU = MTU - HDR_LENGTH
 # Length of a UniformDH public key.
 PUBLIC_KEY_LENGTH = 192
 
+# Length of the PRNG seed used to generate probability distributions.
+PRNG_SEED_LENGTH = 32
+
 # Files which hold the replay dictionaries.
 UNIFORMDH_REPLAY_FILE = DATA_DIRECTORY + "uniformdh_replay_dict.pickle"
 TICKET_REPLAY_FILE = DATA_DIRECTORY + "ticket_replay_dict.pickle"
+
+# File which holds the server's state information.
+SERVER_STATE_FILE = DATA_DIRECTORY + "server_state.pickle"
 
 # Life time of session tickets in seconds.
 SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
@@ -70,7 +83,7 @@ ST_CONNECTED = 1
 
 # File which holds our session ticket.
 # FIXME - multiple session tickets for multiple servers must be supported.
-TICKET_FILE = DATA_DIRECTORY + "session_ticket.bin"
+TICKET_FILE = DATA_DIRECTORY + "session_ticket.pickle"
 
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
