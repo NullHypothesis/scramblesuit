@@ -65,7 +65,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.sendBuf = self.recvBuf = ""
 
         # Caches the outgoing data before written to the wire.
-        self.choppedPieces = []
+        self.choppingBuf = ""
 
         # AES instances for incoming and outgoing data.
         self.sendCrypter = mycrypto.PayloadCrypter()
@@ -218,35 +218,37 @@ class ScrambleSuitTransport( base.BaseTransport ):
         blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
                         self.sendHMAC) for msg in messages])
 
-        circuit.downstream.write(blurb)
+        # Flush data chunk for chunk to obfuscate inter arrival times.
+        self.choppingBuf += blurb
+        self._flushPieces(circuit)
 
 
-    def __flushPieces( self, circuit ):
+    def _flushPieces( self, circuit ):
         """
-        Write the chopped application data pieces on the wire.
+        Write the application data on the wire in chunks.
 
-        The cached and chopped data pieces are written to `circuit'.  After
-        every write call, control is given back to the Twisted reactor so it
-        has a change to flush the data.  Shortly thereafter, this function is
-        called again to write the next piece of data.  The delays in between
-        subsequent write calls are controlled by the inter arrival time
-        obfuscator.
+        The cached data is written to `circuit' in chunks.  After every write
+        call, control is given back to the Twisted reactor so it has a change
+        to flush the data.  Shortly thereafter, this function is called again
+        to write the next chunk of data.  The delays in between subsequent
+        write calls are controlled by the inter arrival time obfuscator.
         """
 
-        assert circuit
-
-        if len(self.choppedPieces) == 0:
+        if len(self.choppingBuf) == 0:
             return
 
-        if len(self.choppedPieces[0]) > 0:
-            log.debug("Writing %d bytes of data to downstream." %
-                      len(self.choppedPieces[0]))
-            circuit.downstream.write(self.choppedPieces[0])
+        # Drain an MTU-sized chunk.
+        elif len(self.choppingBuf) >= const.MTU:
+            circuit.downstream.write(self.choppingBuf[0:const.MTU])
+            self.choppingBuf = self.choppingBuf[const.MTU:]
 
-        if len(self.choppedPieces) > 1:
-            self.choppedPieces = self.choppedPieces[1:]
-            reactor.callLater(self.iatMorpher.randomSample(),
-                              self.__flushPieces, circuit)
+        # Drain whatever is left.
+        else:
+            circuit.downstream.write(self.choppingBuf)
+            self.choppingBuf = ""
+
+        reactor.callLater(self.iatMorpher.randomSample(),
+                          self._flushPieces, circuit)
 
 
     def extractMessages( self, data, aes ):
