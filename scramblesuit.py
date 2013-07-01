@@ -353,9 +353,18 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.sendRemote(circuit, "dummy",
                                 flags=const.FLAG_CONFIRM_TICKET)
 
+            # Use the PRNG seed to generate the same probability distributions
+            # as the server.  That's where the polymorphism comes from.
             elif self.weAreClient and msg.flags == const.FLAG_PRNG_SEED:
-                # TODO
-                log.debug("Our PRNG seed: %s" % msg.payload.encode('hex'))
+                assert len(msg.payload) == const.PRNG_SEED_LENGTH
+                log.debug("Obtained PRNG seed: %s" % msg.payload.encode('hex'))
+                prng = random.Random(msg.payload)
+                pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
+                                                            const.MTU),
+                                       seed=msg.payload)
+                self.pktMorpher = packetmorpher.new(pktDist)
+                self.iatMorpher = probdist.new(lambda: prng.random() % 0.01,
+                                               seed=msg.payload)
 
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
@@ -486,7 +495,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 circuit.downstream.write(handshakeMsg)
 
                 log.debug("UniformDH authentication succeeded.")
-                self.sendRemote(circuit, newTicket, flags=const.FLAG_NEW_TICKET)
+                self.sendRemote(circuit, newTicket,
+                                flags=const.FLAG_NEW_TICKET)
+                self.sendRemote(circuit, self.srvState.prngSeed,
+                                flags=const.FLAG_PRNG_SEED)
 
                 log.debug("Switching to state ST_CONNECTED.")
                 self.protoState = const.ST_CONNECTED
