@@ -35,7 +35,7 @@ class RandProbDist:
         self.MIN_BINS = 1
         self.MAX_BINS = 100
 
-        self.prng = random if (seed is None) else srandom.Random(seed)
+        self.prng = random if (seed is None) else random.Random(seed)
 
         self.sampleList = []
         self.dist = self._genDistribution(genSingleton)
