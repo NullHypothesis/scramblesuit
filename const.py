@@ -8,19 +8,19 @@ While some values can be changed, in general they should not.  If you do not
 obey, be at least careful because the protocol could easily break.
 """
 
-# Length of the HMAC used to authenticate the ticket.
+# Length of the HMAC used to authenticate tickets in bytes.
 HMAC_KEY_LENGTH = 32
 
-# Length of the AES key used to encrypt the ticket.
+# Length of the AES key used to encrypt tickets in bytes.
 AES_KEY_LENGTH = 16
 
-# Length of the IV for AES-CBC which is used for session tickets.
+# Length of the IV for AES-CBC which is used to encrypt tickets in bytes.
 AES_CBC_IV_LENGTH = 16
 
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"
 
-# Divisor (in seconds) for the UNIX epoch used to defend against replay
+# Divisor (in seconds) for the Unix epoch used to defend against replay
 # attacks.
 EPOCH_GRANULARITY = 3600
 
@@ -43,22 +43,23 @@ KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 # bytes.
 MARKER_LENGTH = 16
 
-# Key length for the master key in bytes.
+# The master key's length in bytes.
 MASTER_KEY_LENGTH = 32
 
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 4096
 
-# Length of ScrambleSuit's MTU in bytes.
+# Length of ScrambleSuit's MTU in bytes.  Note that this is *not* the link MTU
+# which is probably 1500.
 MTU = 1460
 
 # Maximum payload unit of a ScrambleSuit message in bytes.
 MPU = MTU - HDR_LENGTH
 
-# Length of a UniformDH public key.
+# Length of a UniformDH public key in bytes.
 PUBLIC_KEY_LENGTH = 192
 
-# Length of the PRNG seed used to generate probability distributions.
+# Length of the PRNG seed used to generate probability distributions in bytes.
 PRNG_SEED_LENGTH = 32
 
 # File which holds the server's state information.
@@ -77,8 +78,7 @@ SHARED_SECRET_LENGTH = 32
 ST_WAIT_FOR_AUTH = 0
 ST_CONNECTED = 1
 
-# File which holds our session ticket.
-# FIXME - multiple session tickets for multiple servers must be supported.
+# File which holds the client's session tickets.
 CLIENT_TICKET_FILE = DATA_DIRECTORY + "session_ticket.pickle"
 
 # Length of a session ticket in bytes.
