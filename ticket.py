@@ -143,60 +143,6 @@ def findStoredTicket( bridge, fileName=const.TICKET_FILE ):
     return (masterKey, ticket)
 
 
-def rotateKeys( ):
-    """
-    Rotate the keys used to encrypt and authenticate session tickets.
-
-    After new keys (an AES and a HMAC key) were created, the old keys are still
-    kept for a period of seven days to verify (but not to issue) session
-    tickets issues by the old keys.
-    """
-
-    global HMACKey
-    global AESKey
-    global creationTime
-
-    log.info("Attempting to rotate session ticket keys.")
-
-    # Generate and load fresh keys.
-    HMACKey = mycrypto.strongRandom(const.HMAC_KEY_LENGTH)
-    AESKey = mycrypto.strongRandom(const.AES_KEY_LENGTH)
-    creationTime = int(time.time())
-
-    try:
-        with open(const.KEY_STORE, 'w') as fd:
-            pickle.dump([creationTime, HMACKey, AESKey], fd)
-    except IOError as err:
-        log.error("Error writing ticket key file to `%s'." % err)
-
-
-def loadKeys( ):
-    """
-    Load the keys used to encrypt and authenticate session tickets.
-
-    The keys are loaded from file and stored in global variables so they can be
-    accessed from different functions.
-    """
-
-    global HMACKey
-    global AESKey
-    global creationTime
-
-    log.info("Attempting to read ticket keys k_S from file `%s'." %
-             const.KEY_STORE)
-
-    # If the key store does not exist (yet), it must be created.
-    if not os.path.exists(const.KEY_STORE):
-        rotateKeys()
-        return
-
-    try:
-        with open(const.KEY_STORE, 'r') as fd:
-            creationTime, HMACKey, AESKey = pickle.load(fd)
-    except IOError as err:
-        log.error("Error reading ticket key file from `%s'." % err)
-
-
 def checkKeys( srvState ):
     """
     Check whether the key material for session tickets must be rotated.
