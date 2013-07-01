@@ -15,7 +15,7 @@ HMAC_KEY_LENGTH = 32
 AES_KEY_LENGTH = 16
 
 # Length of the IV for AES-CBC which is used for session tickets.
-IV_LENGTH = 16
+AES_CBC_IV_LENGTH = 16
 
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"

@@ -198,8 +198,8 @@ def decrypt( ticket, srvState ):
 
     # Decrypt the ticket to extract the state information.
     aes = AES.new(srvState.aesKey, mode=AES.MODE_CBC,
-                  IV=ticket[0:const.IV_LENGTH])
-    plainTicket = aes.decrypt(ticket[const.IV_LENGTH:80])
+                  IV=ticket[0:const.AES_CBC_IV_LENGTH])
+    plainTicket = aes.decrypt(ticket[const.AES_CBC_IV_LENGTH:80])
 
     issueDate = struct.unpack('I', plainTicket[0:4])[0]
     identifier = plainTicket[4:22]
@@ -297,7 +297,7 @@ class SessionTicket( object ):
         checkKeys(srvState)
 
         # Initialisation vector for AES-CBC.
-        self.IV = mycrypto.strongRandom(const.IV_LENGTH)
+        self.IV = mycrypto.strongRandom(const.AES_CBC_IV_LENGTH)
 
         # The server's (encrypted) protocol state.
         self.state = ProtocolState(masterKey)
