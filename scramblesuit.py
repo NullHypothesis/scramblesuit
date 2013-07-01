@@ -204,12 +204,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
         paddingLen = self.pktMorpher.calcPadding(sum([len(msg) for
                                                  msg in messages]))
 
-        # If we are dealing with protocol messages, we pad, encrypt and MAC...
+        # If padding > header length, a single message will do...
         if paddingLen > const.HDR_LENGTH:
-            messages.append(message.ProtocolMessage("",
-                            paddingLen=paddingLen - const.HDR_LENGTH))
+            messages.append(message.new("", paddingLen=paddingLen -
+                                                       const.HDR_LENGTH))
+
+        # ...otherwise, we use two padding-only messages.
         else:
-            log.debug("I DON'T KNOW WHAT TO DO!!11")
+            messages.append(message.new("", paddingLen=const.MPU -
+                                                       const.HDR_LENGTH))
+            messages.append(message.new("", paddingLen=paddingLen))
 
         blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
                         self.sendHMAC) for msg in messages])
