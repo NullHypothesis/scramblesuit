@@ -55,7 +55,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Load the server's persistent state from file.
         if self.weAreServer:
-            self.longState = state.load()
+            self.srvState = state.load()
 
         # Initialise the protocol's state machine.
         log.debug("Switching to state ST_WAIT_FOR_AUTH.")
@@ -72,11 +72,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.recvCrypter = mycrypto.PayloadCrypter()
 
         # Packet morpher to modify the protocol's packet length distribution.
-        self.pktMorpher = packetmorpher.PacketMorpher(self.longState.pktDist
+        self.pktMorpher = packetmorpher.PacketMorpher(self.srvState.pktDist
                 if self.weAreServer else None)
 
         # Inter arrival time morpher to obfuscate inter arrival times.
-        self.iatMorpher = self.longState.iatDist if self.weAreServer else \
+        self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
                           probdist.new(lambda: random.random() % 0.01)
 
         # `True' if the ticket is already decrypted but not yet authenticated.
@@ -106,8 +106,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Load replay dictionaries from file.
         if self.weAreServer:
             log.info("Loading replay dictionaries from file.")
-            self.longState.uniformDhReplay.loadFromDisk(const.UNIFORMDH_REPLAY_FILE)
-            self.longState.ticketReplay.loadFromDisk(const.TICKET_REPLAY_FILE)
+            self.srvState.uniformDhReplay.loadFromDisk(const.UNIFORMDH_REPLAY_FILE)
+            self.srvState.ticketReplay.loadFromDisk(const.TICKET_REPLAY_FILE)
 
     def _deriveSecrets( self, masterKey ):
         """
@@ -336,12 +336,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 if self.ticketReplayCache is not None:
                     log.debug("Adding master key contained in ticket to the "
                               "replay table.")
-                    self.longState.ticketReplay.addKey(self.ticketReplayCache)
+                    self.srvState.ticketReplay.addKey(self.ticketReplayCache)
 
                 elif self.uniformdh.getRemotePublicKey() is not None:
                     log.debug("Adding the remote's UniformDH public key to "
                               "the replay table.")
-                    self.longState.uniformDhReplay.addKey(
+                    self.srvState.uniformDhReplay.addKey(
                             self.uniformdh.getRemotePublicKey())
 
             # Store newly received ticket and send ACK to the server.
@@ -407,7 +407,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # inside to verify the HMAC in the next step.
         if not self.decryptedTicket:
             newTicket = ticket.decrypt(potentialTicket[:const.TICKET_LENGTH],
-                                       self.longState)
+                                       self.srvState)
             if newTicket != None and newTicket.isValid():
                 self._deriveSecrets(newTicket.masterKey)
                 self.decryptedTicket = True
@@ -474,16 +474,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if self._receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
                 self._flushSendBuffer(circuit)
-                self.sendRemote(circuit, ticket.issueTicketAndKey(self.longState),
+                self.sendRemote(circuit, ticket.issueTicketAndKey(self.srvState),
                                 flags=const.FLAG_NEW_TICKET)
-                self.sendRemote(circuit, self.longState.prngSeed,
+                self.sendRemote(circuit, self.srvState.prngSeed,
                                 flags=const.FLAG_PRNG_SEED)
 
             # Second, interpret the data as a UniformDH handshake.
             elif self.uniformdh.receivePublicKey(data, self._deriveSecrets):
                 # Now send the server's UniformDH public key to the client.
                 handshakeMsg = self.uniformdh.createHandshake()
-                newTicket = ticket.issueTicketAndKey(self.longState)
+                newTicket = ticket.issueTicketAndKey(self.srvState)
 
                 log.debug("Sending %d bytes of UniformDH handshake and "
                           "session ticket." % len(handshakeMsg))
