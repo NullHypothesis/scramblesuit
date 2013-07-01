@@ -61,10 +61,6 @@ PUBLIC_KEY_LENGTH = 192
 # Length of the PRNG seed used to generate probability distributions.
 PRNG_SEED_LENGTH = 32
 
-# Files which hold the replay dictionaries.
-UNIFORMDH_REPLAY_FILE = DATA_DIRECTORY + "uniformdh_replay_dict.pickle"
-TICKET_REPLAY_FILE = DATA_DIRECTORY + "ticket_replay_dict.pickle"
-
 # File which holds the server's state information.
 SERVER_STATE_FILE = DATA_DIRECTORY + "server_state.pickle"
 
