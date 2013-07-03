@@ -70,18 +70,6 @@ def getEpoch( ):
     return str(int(time.time()) / const.EPOCH_GRANULARITY)
 
 
-def dump( n ):
-    """Converts the given number `n' to a byte string.
-
-    The returned byte string is ready to be sent over the wire.
-    """
-
-    s = '%x' % n
-    if len(s) & 1:
-        s = '0' + s
-    return s.decode('hex')
-
-
 def writeToFile( data, fileName ):
     """
     Writes the given `data' to the file specified by `fileName'.
