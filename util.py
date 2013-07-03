@@ -81,8 +81,8 @@ def writeToFile( data, fileName ):
     log.debug("Opening `%s' for writing." % fileName)
 
     try:
-        with open(fileName, "wb") as fd:
-            fd.write(data)
+        with open(fileName, "wb") as desc:
+            desc.write(data)
 
     except IOError as err:
         log.error("Error writing to `%s': %s." % (fileName, err))
@@ -102,8 +102,8 @@ def readFromFile( fileName, length=-1 ):
     log.debug("Opening `%s' for reading." % fileName)
 
     try:
-        with open(fileName, "rb") as fd:
-            data = fd.read(length)
+        with open(fileName, "rb") as desc:
+            data = desc.read(length)
 
     except IOError as err:
         log.error("Error reading from `%s': %s." % (fileName, err))
@@ -111,9 +111,9 @@ def readFromFile( fileName, length=-1 ):
     return data
 
 
-def swap( a, b ):
+def swap( var1, var2 ):
     """
     Returns `a' and `b' in reverse order, i.e., `b' and `a'.
     """
 
-    return (b, a)
+    return (var2, var1)
