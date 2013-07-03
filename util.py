@@ -113,7 +113,7 @@ def readFromFile( fileName, length=-1 ):
 
 def swap( var1, var2 ):
     """
-    Returns `a' and `b' in reverse order, i.e., `b' and `a'.
+    Returns `var1' and `var2' in reverse order, i.e., `var2' and `var1'.
     """
 
     return (var2, var1)
