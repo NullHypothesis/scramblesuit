@@ -101,10 +101,11 @@ class State( object ):
         self.uniformDhReplay = replay.UniformDHTracker()
 
         # Distributions for packet lengths and inter arrival times.
-        self.pktDist = probdist.new(lambda: random.randint(const.HDR_LENGTH,
+        prng = random.Random(self.prngSeed)
+        self.pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
                                                            const.MTU),
                                     seed=self.prngSeed)
-        self.iatDist = probdist.new(lambda: random.random() % 0.01,
+        self.iatDist = probdist.new(lambda: prng.random() % 0.01,
                                     seed=self.prngSeed)
 
         self.writeState()
