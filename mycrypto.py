@@ -138,10 +138,8 @@ class PayloadCrypter:
         initialisation vector.
         """
 
-        log.debug("Setting session key for AES-CTR 0x%s..." %
-                  key.encode('hex')[:10])
-        log.debug("Setting IV for AES-CTR 0x%s..." %
-                  iv.encode('hex')[:10])
+        log.debug("Setting session key for AES-CTR.")
+        log.debug("Setting IV for AES-CTR.")
 
         self.sessionKey = key
         self.counter = Crypto.Util.Counter.new(128, initial_value =

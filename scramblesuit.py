@@ -115,8 +115,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         assert len(masterKey) == const.MASTER_KEY_LENGTH
 
-        log.debug("Deriving session keys from master key 0x%s..." %
-                  masterKey.encode('hex')[:10])
+        log.debug("Deriving session keys from master key.")
 
         # We need key material for two symmetric keys, nonces and HMACs.  All
         # of these eight are 32 bytes in size.
