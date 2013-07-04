@@ -163,7 +163,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             raise base.PluggableTransportError("Unable to authenticate.")
 
         # The preferred way to authenticate is a session ticket.
-        storedTicket = ticket.findStoredTicket(circuit.downstream.peer_addr)
+        peer = circuit.downstream.transport.getPeer()
+        storedTicket = ticket.findStoredTicket(peer)
         if storedTicket is not None:
 
             log.debug("Redeeming stored session ticket.")
@@ -348,11 +349,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
             elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
                 assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
                                     const.MASTER_KEY_LENGTH)
+                peer = circuit.downstream.transport.getPeer()
                 ticket.storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH],
                                       msg.payload[const.MASTER_KEY_LENGTH:
                                                   const.MASTER_KEY_LENGTH +
-                                                  const.TICKET_LENGTH],
-                                      circuit.downstream.peer_addr)
+                                                  const.TICKET_LENGTH], peer)
                 # Tell the server that we received the ticket.
                 log.debug("Sending FLAG_CONFIRM_TICKET message to server.")
                 self.sendRemote(circuit, "", flags=const.FLAG_CONFIRM_TICKET)
