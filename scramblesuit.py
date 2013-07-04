@@ -219,33 +219,35 @@ class ScrambleSuitTransport( base.BaseTransport ):
                         self.sendHMAC) for msg in messages])
 
         # Flush data chunk for chunk to obfuscate inter arrival times.
-        self.choppingBuf += blurb
-        self._flushPieces(circuit)
-
+        if len(self.choppingBuf) == 0:
+            self.choppingBuf += blurb
+            reactor.callLater(self.iatMorpher.randomSample(),
+                              self._flushPieces, circuit)
+        else:
+            # _flushPieces() is still busy processing the chopping buffer.
+            self.choppingBuf += blurb
 
     def _flushPieces( self, circuit ):
         """
-        Write the application data on the wire in chunks.
+        Write the application data in chunks to the wire.
 
-        The cached data is written to `circuit' in chunks.  After every write
-        call, control is given back to the Twisted reactor so it has a change
+        The cached data is written in chunks to `circuit'.  After every write
+        call, control is given back to the Twisted reactor so it has a chance
         to flush the data.  Shortly thereafter, this function is called again
         to write the next chunk of data.  The delays in between subsequent
         write calls are controlled by the inter arrival time obfuscator.
         """
 
-        if len(self.choppingBuf) == 0:
-            return
-
-        # Drain an MTU-sized chunk.
-        elif len(self.choppingBuf) >= const.MTU:
+        # Drain and send an MTU-sized chunk from the chopping buffer.
+        if len(self.choppingBuf) > const.MTU:
             circuit.downstream.write(self.choppingBuf[0:const.MTU])
             self.choppingBuf = self.choppingBuf[const.MTU:]
 
-        # Drain whatever is left.
+        # Drain and send whatever is left in the output buffer.
         else:
             circuit.downstream.write(self.choppingBuf)
             self.choppingBuf = ""
+            return
 
         reactor.callLater(self.iatMorpher.randomSample(),
                           self._flushPieces, circuit)
