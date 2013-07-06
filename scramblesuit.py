@@ -103,7 +103,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Used by the unpack mechanism
         self.totalLen = self.payloadLen = self.flags = None
 
-
     def _deriveSecrets( self, masterKey ):
         """
         Derive session keys from the given master key.
@@ -252,7 +251,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         reactor.callLater(self.iatMorpher.randomSample(),
                           self._flushPieces, circuit)
 
-
     def extractMessages( self, data, aes ):
         """
         Unpacks (i.e., decrypts and authenticates) protocol messages.
@@ -303,7 +301,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.totalLen = self.payloadLen = self.flags = None
 
         return msgs
-
 
     def processMessages( self, circuit, data ):
         """
@@ -373,7 +370,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
 
-
     def _flushSendBuffer( self, circuit ):
         """
         Flush the application's queued data.
@@ -394,7 +390,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         self.sendRemote(circuit, self.sendBuf)
         self.sendBuf = ""
-
 
     def _receiveTicket( self, data ):
         """
@@ -526,7 +521,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
             self.processMessages(circuit, data.read())
 
-
     @classmethod
     def register_external_mode_cli( cls, subparser ):
         """
@@ -548,7 +542,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
 
-
     @classmethod
     def validate_external_mode_cli( cls, args ):
         """
@@ -568,7 +561,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
                     (const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
 
         super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
-
 
     def handle_socks_args( self, args ):
         """
