@@ -167,8 +167,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                                        self.sendHMAC)
             circuit.downstream.write(ticketMessage)
 
-            # TODO - The client can't know at this point whether the server
-            # accepted the ticket.
+            # We switch to ST_CONNECTED opportunistically since we don't know
+            # yet whether the server accepted the ticket.
             log.debug("Switching to state ST_CONNECTED.")
             self.protoState = const.ST_CONNECTED
             self._flushSendBuffer(circuit)
