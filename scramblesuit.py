@@ -477,7 +477,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if self._receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
                 self._flushSendBuffer(circuit)
-                self.sendRemote(circuit, ticket.issueTicketAndKey(self.srvState),
+                self.sendRemote(circuit,
+                                ticket.issueTicketAndKey(self.srvState),
                                 flags=const.FLAG_NEW_TICKET)
                 self.sendRemote(circuit, self.srvState.prngSeed,
                                 flags=const.FLAG_PRNG_SEED)
