@@ -471,6 +471,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         state and whether we are the client or the server.  The data is either
         payload or authentication data.
         """
+
         if self.weAreServer and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
             # First, try to interpret the incoming data as session ticket.
@@ -622,6 +623,7 @@ class ScrambleSuitServer( ScrambleSuitTransport ):
         """
         Initialise a ScrambleSuitServer object.
         """
+
         self.weAreServer = True
         self.weAreClient = False
         ScrambleSuitTransport.__init__(self)
