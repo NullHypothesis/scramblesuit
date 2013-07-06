@@ -73,7 +73,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Packet morpher to modify the protocol's packet length distribution.
         self.pktMorpher = packetmorpher.PacketMorpher(self.srvState.pktDist
-                if self.weAreServer else None)
+                          if self.weAreServer else None)
 
         # Inter arrival time morpher to obfuscate inter arrival times.
         self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
