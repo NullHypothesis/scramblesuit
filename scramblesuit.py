@@ -154,17 +154,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if self.weAreServer:
             return
 
-        if (self.uniformDHSecret is None) and (self.ticketFile is None):
-            log.error("Neither a UniformDH secret nor a ticket is available."
-                      "  %s needs at least one of these for authentication." %
-                      const.TRANSPORT_NAME)
-            raise base.PluggableTransportError("Unable to authenticate.")
-
         # The preferred way to authenticate is a session ticket.
-        peer = circuit.downstream.transport.getPeer()
-        storedTicket = ticket.findStoredTicket(peer, fileName=self.ticketFile)
+        srvAddr = circuit.downstream.transport.getPeer()
+        storedTicket = ticket.findStoredTicket(srvAddr,
+                                               fileName=self.ticketFile)
         if storedTicket is not None:
-
             log.debug("Redeeming stored session ticket.")
             (masterKey, rawTicket) = storedTicket
             self._deriveSecrets(masterKey)
@@ -180,9 +174,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self._flushSendBuffer(circuit)
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
-        else:
+        elif self.uniformDHSecret is not None:
             log.debug("No session ticket to redeem.  Running UniformDH.")
             circuit.downstream.write(self.uniformdh.createHandshake())
+
+        else:
+            log.error("Neither a UniformDH secret nor a ticket is available."
+                      "  %s needs at least one of these for authentication." %
+                      const.TRANSPORT_NAME)
+            raise base.PluggableTransportError("Unable to authenticate.")
 
     def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
         """
