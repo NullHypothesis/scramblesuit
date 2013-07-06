@@ -51,7 +51,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.warning("\n+++ Note that ScrambleSuit is still under "
                     "development and is NOT safe for practical use. +++\n")
 
-        log.info("Initialising %s." % const.TRANSPORT_NAME)
+        log.debug("Initialising %s." % const.TRANSPORT_NAME)
 
         # Load the server's persistent state from file.
         if self.weAreServer:
