@@ -195,7 +195,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         default flags signalling payload.
         """
 
-        log.info("Processing %d bytes of outgoing data." % len(data))
+        log.debug("Processing %d bytes of outgoing data." % len(data))
 
         # Wrap the application's data in ScrambleSuit protocol messages.
         messages = message.createProtocolMessages(data, flags=flags)
