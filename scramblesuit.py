@@ -88,8 +88,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Shared secret k_B which is only used for UniformDH.
         if not hasattr(self, 'uniformDHSecret'):
             self.uniformDHSecret = None
-        if self.uniformDHSecret:
-            log.info("UniformDH shared secret: %s." % self.uniformDHSecret)
+        else:
+            log.debug("UniformDH shared secret is given.")
             self.uniformdh = uniformdh.new(self.uniformDHSecret,
                                            self.weAreServer)
 
