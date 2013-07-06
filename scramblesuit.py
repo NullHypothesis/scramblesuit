@@ -135,7 +135,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
     def circuitDestroyed( self, circuit, reason, side ):
         """
-        Log a warning if then connection was closed in a non-clean fashion.
+        Log a warning if the connection was closed in a non-clean fashion.
         """
 
         # This is only printed because the user might be interested in it.
@@ -163,9 +163,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             (masterKey, rawTicket) = storedTicket
             self._deriveSecrets(masterKey)
 
-            ticketMessage = ticket.createTicketMessage(rawTicket,
-                                                       self.sendHMAC)
-            circuit.downstream.write(ticketMessage)
+            circuit.downstream.write(ticket.createTicketMessage(rawTicket,
+                                                                self.sendHMAC))
 
             # We switch to ST_CONNECTED opportunistically since we don't know
             # yet whether the server accepted the ticket.
@@ -376,7 +375,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         The application could have sent data while we were busy authenticating
         the remote machine.  Using `circuit', this method flushes the data
-        which could have been queued in the meanwhile.
+        which could have been queued in the meanwhile in `self.sendBuf'.
         """
 
         assert circuit
