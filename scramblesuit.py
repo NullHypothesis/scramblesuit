@@ -93,12 +93,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.uniformdh = uniformdh.new(self.uniformDHSecret,
                                            self.weAreServer)
 
-        # Path to a file which contains a master key and the according ticket.
         if not hasattr(self, "ticketFile"):
-            self.ticketFile = None
-        if self.ticketFile:
-            log.info("Using session ticket file `%s'." % self.ticketFile)
-            const.CLIENT_TICKET_FILE = self.ticketFile
+            self.ticketFile = const.CLIENT_TICKET_FILE
+        else:
+            log.debug("Custom session ticket file `%s' was given." %
+                      self.ticketFile)
 
         # Used by the unpack mechanism
         self.totalLen = self.payloadLen = self.flags = None
@@ -163,7 +162,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # The preferred way to authenticate is a session ticket.
         peer = circuit.downstream.transport.getPeer()
-        storedTicket = ticket.findStoredTicket(peer)
+        storedTicket = ticket.findStoredTicket(peer, fileName=self.ticketFile)
         if storedTicket is not None:
 
             log.debug("Redeeming stored session ticket.")
