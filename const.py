@@ -47,7 +47,7 @@ MARKER_LENGTH = 16
 MASTER_KEY_LENGTH = 32
 
 # The maximum amount of padding to be appended to handshake data.
-MAX_PADDING_LENGTH = 4096
+MAX_PADDING_LENGTH = 1500
 
 # Length of ScrambleSuit's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
