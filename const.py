@@ -51,7 +51,7 @@ MAX_PADDING_LENGTH = 4096
 
 # Length of ScrambleSuit's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
-MTU = 1460
+MTU = 1448
 
 # Maximum payload unit of a ScrambleSuit message in bytes.
 MPU = MTU - HDR_LENGTH
