@@ -105,7 +105,8 @@ class State( object ):
         self.pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
                                                            const.MTU),
                                     seed=self.prngSeed)
-        self.iatDist = probdist.new(lambda: prng.random() % 0.01,
+        self.iatDist = probdist.new(lambda: prng.random() %
+                                    const.MAX_PACKET_DELAY,
                                     seed=self.prngSeed)
 
         self.writeState()

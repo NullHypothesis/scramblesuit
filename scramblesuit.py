@@ -77,7 +77,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Inter arrival time morpher to obfuscate inter arrival times.
         self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
-                          probdist.new(lambda: random.random() % 0.01)
+                          probdist.new(lambda: random.random() %
+                                       const.MAX_PACKET_DELAY)
 
         # `True' if the ticket is already decrypted but not yet authenticated.
         self.decryptedTicket = None
@@ -363,7 +364,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                                             const.MTU),
                                        seed=msg.payload)
                 self.pktMorpher = packetmorpher.new(pktDist)
-                self.iatMorpher = probdist.new(lambda: prng.random() % 0.01,
+                self.iatMorpher = probdist.new(lambda: prng.random() %
+                                               const.MAX_PACKET_DELAY,
                                                seed=msg.payload)
 
             else:

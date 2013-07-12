@@ -46,6 +46,10 @@ MARKER_LENGTH = 16
 # The master key's length in bytes.
 MASTER_KEY_LENGTH = 32
 
+# Maximum amount of seconds, a packet is delayed due to inter arrival time
+# obfuscation.
+MAX_PACKET_DELAY = 0.01
+
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 1500
 
