@@ -6,7 +6,8 @@ pure Python and solves two problems:
   features.
 
 For the detailed design of ScrambleSuit, please have a look at the project
-page: http://www.cs.kau.se/philwint/scramblesuit/
+page which also contains a link to the design paper:
+http://www.cs.kau.se/philwint/scramblesuit/
 
 Contact: Philipp Winter <phw@torproject.org>
 PGP fingerprint: B369 E7A2 18FE CEAD EB96  8C73 CF70 89E3 D7FD C0D0
