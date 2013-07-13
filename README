@@ -1,3 +1,6 @@
+
+           WARNING: ScrambleSuit is NOT YET SAFE for practical use!
+
 ScrambleSuit is a pluggable transport protocol for obfsproxy.  It is written in
 pure Python and solves two problems:
 - Protection against active probing attacks by requiring a shared secret
