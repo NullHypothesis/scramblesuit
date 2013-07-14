@@ -72,6 +72,8 @@ class UniformDH( object ):
             # As server, we need a DH object; as client, we already have one.
             self.udh = obfs3_dh.UniformDH()
 
+        assert self.udh is not None
+
         try:
             masterKey = self.udh.get_secret(remotePublicKey)
         except ValueError:
