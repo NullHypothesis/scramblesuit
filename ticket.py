@@ -101,13 +101,13 @@ def storeNewTicket( masterKey, ticket, bridge ):
               const.CLIENT_TICKET_FILE)
 
     # Add a new (key, ticket) tuple with the given bridge as hash key.
-    # TODO - also add a timestamp here.
     tickets = dict()
     content = util.readFromFile(const.CLIENT_TICKET_FILE)
     if (content is not None) and (len(content) > 0):
         tickets = pickle.loads(content)
 
-    tickets[bridge] = (masterKey, ticket)
+    # We also store a timestamp so we later know if our ticket already expired.
+    tickets[bridge] = (int(time.time()), masterKey, ticket)
     util.writeToFile(pickle.dumps(tickets), const.CLIENT_TICKET_FILE)
 
 
@@ -135,9 +135,16 @@ def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
     tickets = pickle.loads(blurb)
 
     try:
-        masterKey, ticket = tickets[bridge]
+        timestamp, masterKey, ticket = tickets[bridge]
     except KeyError:
         log.info("Found no ticket for bridge `%s'." % str(bridge))
+        return None
+
+    # If our ticket is expired, we can't redeem it.
+    if (int(time.time()) - timestamp) > const.KEY_ROTATION_TIME:
+        log.warning("We did have a ticket but it already expired %s ago." %
+                    str(datetime.timedelta(seconds=
+                    (const.SESSION_TICKET_LIFETIME - lifetime))))
         return None
 
     return (masterKey, ticket)
