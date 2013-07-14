@@ -48,11 +48,11 @@ def locateMarker( marker, payload ):
     index = payload.find(marker)
     if index < 0:
         log.debug("Could not find the marker just yet.")
-        return False
+        return None
 
     if (len(payload) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
         log.debug("Found the marker but the HMAC is still incomplete..")
-        return False
+        return None
 
     log.debug("Successfully located the marker.")
 
