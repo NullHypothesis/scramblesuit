@@ -99,13 +99,13 @@ class UniformDH( object ):
 
         assert self.sharedSecret is not None
 
-        log.debug("Attempting to extract UniformDH public key out of %d bytes "
-                  "of data." % len(data))
-
         # Do we already have the minimum amount of data?
         if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARKER_LENGTH +
                         const.HMAC_LENGTH):
             return False
+
+        log.debug("Attempting to extract UniformDH public key out of %d bytes "
+                  "of data." % len(data))
 
         handshake = data.peek()
 
