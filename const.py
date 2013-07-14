@@ -85,6 +85,10 @@ ST_CONNECTED = 1
 # File which holds the client's session tickets.
 CLIENT_TICKET_FILE = DATA_DIRECTORY + "session_ticket.pickle"
 
+# Static validation string embedded in all tickets.  Must be a multiple of 16
+# bytes due to AES' block size.
+TICKET_IDENTIFIER = "ScrambleSuitTicket"
+
 # Length of a session ticket in bytes.
 TICKET_LENGTH = 112
 

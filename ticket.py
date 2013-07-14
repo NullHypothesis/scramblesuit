@@ -39,9 +39,6 @@ import state
 
 log = logging.get_obfslogger()
 
-# Must be a multiple of 16 bytes due to AES' block size.
-IDENTIFIER = "ScrambleSuitTicket"
-
 HMACKey = AESKey = creationTime = None
 
 
@@ -222,7 +219,7 @@ def decrypt( ticket, srvState ):
     identifier = plainTicket[4:22]
     masterKey = plainTicket[22:54]
 
-    if not (identifier == IDENTIFIER):
+    if not (identifier == const.TICKET_IDENTIFIER):
         log.error("The ticket's HMAC is valid but the identifier is invalid.  "
                   "The ticket could be corrupt.")
         return None
@@ -249,7 +246,7 @@ class ProtocolState( object ):
         The four class variables are initialised.
         """
 
-        self.identifier = IDENTIFIER
+        self.identifier = const.TICKET_IDENTIFIER
         self.masterKey = masterKey
         self.issueDate = issueDate
         # Pad to multiple of 16 bytes to match AES' block size.
