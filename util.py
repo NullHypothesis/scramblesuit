@@ -42,7 +42,8 @@ def locateMarker( marker, payload ):
     Locate the given `marker' in `payload' and return its index.
 
     The `marker' is placed before the HMAC of a ScrambleSuit authentication
-    mechanism and makes it possible to efficiently locate the HMAC.
+    mechanism and makes it possible to efficiently locate the HMAC.  If the
+    `marker' could not be found, `None' is returned.
     """
 
     index = payload.find(marker)
