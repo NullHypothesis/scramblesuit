@@ -39,8 +39,6 @@ import state
 
 log = logging.get_obfslogger()
 
-HMACKey = AESKey = creationTime = None
-
 
 def createTicketMessage( rawTicket, HMACKey ):
     """
