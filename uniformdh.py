@@ -118,7 +118,7 @@ class UniformDH( object ):
         if not index:
             return False
 
-        # Now, verify if the HMAC is valid.
+        # Now that we know where the authenticating HMAC is: verify it.
         existingHMAC = handshake[index + const.MARKER_LENGTH:
                                  index + const.MARKER_LENGTH +
                                  const.HMAC_LENGTH]
