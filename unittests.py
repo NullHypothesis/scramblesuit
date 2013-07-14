@@ -3,6 +3,7 @@
 
 import unittest
 
+import util
 import const
 import uniformdh
 
@@ -45,6 +46,14 @@ class UniformDHTest( unittest.TestCase ):
         buf = obfs_buf.Buffer(handshake)
 
         self.failIf(self.udh.receivePublicKey(buf, lambda x: x) == True)
+
+class UtilTest( unittest.TestCase ):
+
+    def test1_isValidHMAC( self ):
+        self.failIf(util.isValidHMAC("A" * const.HMAC_LENGTH,
+                                     "B" * const.HMAC_LENGTH) == True)
+        self.failIf(util.isValidHMAC("A" * const.HMAC_LENGTH,
+                                     "A" * const.HMAC_LENGTH) == False)
 
 
 if __name__ == '__main__':
