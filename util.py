@@ -25,7 +25,6 @@ def isValidHMAC( myHMAC, existingHMAC ):
     """
 
     assert myHMAC and existingHMAC
-    assert len(myHMAC) == len(existingHMAC) == const.HMAC_LENGTH
 
     if not (myHMAC == existingHMAC):
         log.warning("The HMAC is invalid (got `%s' but expected `%s')." %
