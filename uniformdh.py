@@ -119,12 +119,10 @@ class UniformDH( object ):
             return False
 
         # Now that we know where the authenticating HMAC is: verify it.
-        existingHMAC = handshake[index + const.MARKER_LENGTH:
-                                 index + const.MARKER_LENGTH +
-                                 const.HMAC_LENGTH]
+        hmacStart = index + const.MARKER_LENGTH
+        existingHMAC = handshake[hmacStart : (hmacStart + const.HMAC_LENGTH)]
         myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                          handshake[0 : index +
-                                          const.MARKER_LENGTH] +
+                                          handshake[0 : hmacStart] +
                                           util.getEpoch())
 
         if not util.isValidHMAC(myHMAC, existingHMAC):
