@@ -137,9 +137,8 @@ class UniformDH( object ):
         Create and return a ready-to-be-sent UniformDH handshake.
 
         The returned handshake data includes the public key, pseudo-random
-        padding, the marker and the HMAC.  If `publicKey' is not given (which
-        is the case for the client), a new public key is created using the
-        Diffie-Hellman object.
+        padding, the marker and the HMAC.  If a UniformDH object has not been
+        initialised yet, a new instance is created.
         """
 
         assert self.sharedSecret is not None
