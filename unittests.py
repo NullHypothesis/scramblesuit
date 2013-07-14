@@ -55,6 +55,15 @@ class UtilTest( unittest.TestCase ):
         self.failIf(util.isValidHMAC("A" * const.HMAC_LENGTH,
                                      "A" * const.HMAC_LENGTH) == False)
 
+    def test2_locateMarker( self ):
+        self.failIf(util.locateMarker("D", "ABC") != None)
+
+        hmac = "X" * const.HMAC_LENGTH
+        marker = "A" * const.MARKER_LENGTH
+        payload = marker + hmac
+
+        self.failIf(util.locateMarker(marker, payload) == None)
+        self.failIf(util.locateMarker(marker, payload[:-1]) != None)
 
 if __name__ == '__main__':
     unittest.main()
