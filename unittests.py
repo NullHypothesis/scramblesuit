@@ -26,7 +26,10 @@ class UniformDHTest( unittest.TestCase ):
     def test2_receivePublicKey( self ):
         buf = obfs_buf.Buffer(self.udh.createHandshake())
 
-        self.failUnless(self.udh.receivePublicKey(buf, lambda x: x) == True)
+        def callback( masterKey ):
+            self.failUnless(len(masterKey) == const.MASTER_KEY_LENGTH)
+
+        self.failUnless(self.udh.receivePublicKey(buf, callback) == True)
 
         publicKey = self.udh.getRemotePublicKey()
         self.failUnless(len(publicKey) == const.PUBLIC_KEY_LENGTH)
