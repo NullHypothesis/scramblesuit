@@ -31,5 +31,18 @@ class UniformDHTest( unittest.TestCase ):
         publicKey = self.udh.getRemotePublicKey()
         self.failUnless(len(publicKey) == const.PUBLIC_KEY_LENGTH)
 
+    def test3_invalidHMAC( self ):
+        # Make the HMAC invalid.
+        handshake = self.udh.createHandshake()
+        if handshake[-1] != 'a':
+            handshake = handshake[:-1] + 'a'
+        else:
+            handshake = handshake[:-1] + 'b'
+
+        buf = obfs_buf.Buffer(handshake)
+
+        self.failIf(self.udh.receivePublicKey(buf, lambda x: x) == True)
+
+
 if __name__ == '__main__':
     unittest.main()
