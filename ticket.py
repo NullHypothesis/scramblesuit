@@ -374,7 +374,7 @@ if __name__ == "__main__":
     print "[+] Writing new session ticket to `%s'." % args.ticket_file
     tickets = dict()
     server = IPv4Address('TCP', args.ip_addr, args.tcp_port)
-    tickets[server] = (masterKey, ticket)
+    tickets[server] = (int(time.time()), masterKey, ticket)
 
     util.writeToFile(pickle.dumps(tickets), args.ticket_file)
 
