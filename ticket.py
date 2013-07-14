@@ -194,8 +194,7 @@ def decrypt( ticket, srvState ):
 
     # Verify the ticket's authenticity before decrypting.
     hmac = HMAC.new(srvState.hmacKey, ticket[0:80], digestmod=SHA256).digest()
-    if hmac != ticket[80:const.TICKET_LENGTH]:
-        log.debug("The ticket's HMAC is invalid.  Probably not a ticket.")
+    if not util.isValidHMAC(hmac, ticket[80:const.TICKET_LENGTH]):
         return None
 
     # Decrypt the ticket to extract the state information.
