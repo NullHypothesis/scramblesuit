@@ -150,7 +150,8 @@ class UniformDH( object ):
         publicKey = self.udh.get_public()
 
         # Subtract the length of the public key to make the handshake on
-        # average as long as a redeemed ticket.
+        # average as long as a redeemed ticket.  That should thwart statistical
+        # length-based attacks.
         padding = mycrypto.weakRandom(random.randint(0,
                                       const.MAX_PADDING_LENGTH -
                                       const.PUBLIC_KEY_LENGTH))
