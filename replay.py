@@ -10,7 +10,6 @@ pruning mechanism deletes expired keys from the dictionary.
 """
 
 import time
-import pickle
 
 import const
 
