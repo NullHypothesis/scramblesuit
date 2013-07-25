@@ -13,7 +13,7 @@ generate such state information.
 import os
 import sys
 import time
-import pickle
+import cPickle
 import random
 
 import const
@@ -44,7 +44,7 @@ def load( ):
 
     try:
         with open(const.SERVER_STATE_FILE, 'r') as fd:
-            stateObject = pickle.load(fd)
+            stateObject = cPickle.load(fd)
     except IOError as err:
         log.error("Error reading server state file from `%s': %s" %
                   (const.SERVER_STATE_FILE, err))
@@ -134,7 +134,7 @@ class State( object ):
 
     def writeState( self ):
         """
-        Write the state object to a file using the `pickle' module.
+        Write the state object to a file using the `cPickle' module.
         """
 
         log.debug("Writing server's state file to `%s'." %
@@ -142,7 +142,7 @@ class State( object ):
 
         try:
             with open(const.SERVER_STATE_FILE, 'w') as fd:
-                pickle.dump(self, fd)
+                cPickle.dump(self, fd)
         except IOError as err:
             log.error("Error writing state file to `%s': %s" %
                       (const.SERVER_STATE_FILE, err))

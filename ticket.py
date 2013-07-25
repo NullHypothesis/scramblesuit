@@ -21,7 +21,7 @@ The 64-byte encrypted state contains:
 import os
 import time
 import const
-import pickle
+import cPickle
 import struct
 import random
 import datetime
@@ -99,11 +99,11 @@ def storeNewTicket( masterKey, ticket, bridge ):
     tickets = dict()
     content = util.readFromFile(const.CLIENT_TICKET_FILE)
     if (content is not None) and (len(content) > 0):
-        tickets = pickle.loads(content)
+        tickets = cPickle.loads(content)
 
     # We also store a timestamp so we later know if our ticket already expired.
     tickets[bridge] = (int(time.time()), masterKey, ticket)
-    util.writeToFile(pickle.dumps(tickets), const.CLIENT_TICKET_FILE)
+    util.writeToFile(cPickle.dumps(tickets), const.CLIENT_TICKET_FILE)
 
 
 def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
@@ -127,7 +127,7 @@ def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
     blurb = util.readFromFile(fileName)
     if (blurb is None) or (len(blurb) == 0):
         return None
-    tickets = pickle.loads(blurb)
+    tickets = cPickle.loads(blurb)
 
     try:
         timestamp, masterKey, ticket = tickets[bridge]
@@ -376,6 +376,6 @@ if __name__ == "__main__":
     server = IPv4Address('TCP', args.ip_addr, args.tcp_port)
     tickets[server] = (int(time.time()), masterKey, ticket)
 
-    util.writeToFile(pickle.dumps(tickets), args.ticket_file)
+    util.writeToFile(cPickle.dumps(tickets), args.ticket_file)
 
     print "[+] Success."
