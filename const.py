@@ -83,7 +83,7 @@ ST_WAIT_FOR_AUTH = 0
 ST_CONNECTED = 1
 
 # File which holds the client's session tickets.
-CLIENT_TICKET_FILE = DATA_DIRECTORY + "session_ticket.cpickle"
+CLIENT_TICKET_FILE = DATA_DIRECTORY + "session_ticket.yaml"
 
 # Static validation string embedded in all tickets.  Must be a multiple of 16
 # bytes due to AES' block size.
