@@ -21,7 +21,7 @@ The 64-byte encrypted state contains:
 import os
 import time
 import const
-import cPickle
+import yaml
 import struct
 import random
 import datetime
@@ -99,11 +99,11 @@ def storeNewTicket( masterKey, ticket, bridge ):
     tickets = dict()
     content = util.readFromFile(const.CLIENT_TICKET_FILE)
     if (content is not None) and (len(content) > 0):
-        tickets = cPickle.loads(content)
+        tickets = yaml.safe_load(content)
 
     # We also store a timestamp so we later know if our ticket already expired.
-    tickets[bridge] = (int(time.time()), masterKey, ticket)
-    util.writeToFile(cPickle.dumps(tickets), const.CLIENT_TICKET_FILE)
+    tickets[str(bridge)] = [int(time.time()), masterKey, ticket]
+    util.writeToFile(yaml.dump(tickets), const.CLIENT_TICKET_FILE)
 
 
 def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
@@ -127,10 +127,10 @@ def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
     blurb = util.readFromFile(fileName)
     if (blurb is None) or (len(blurb) == 0):
         return None
-    tickets = cPickle.loads(blurb)
+    tickets = yaml.safe_load(blurb)
 
     try:
-        timestamp, masterKey, ticket = tickets[bridge]
+        timestamp, masterKey, ticket = tickets[str(bridge)]
     except KeyError:
         log.info("Found no ticket for bridge `%s'." % str(bridge))
         return None
@@ -374,8 +374,8 @@ if __name__ == "__main__":
     print "[+] Writing new session ticket to `%s'." % args.ticket_file
     tickets = dict()
     server = IPv4Address('TCP', args.ip_addr, args.tcp_port)
-    tickets[server] = (int(time.time()), masterKey, ticket)
+    tickets[str(server)] = [int(time.time()), masterKey, ticket]
 
-    util.writeToFile(cPickle.dumps(tickets), args.ticket_file)
+    util.writeToFile(yaml.dump(tickets), args.ticket_file)
 
     print "[+] Success."
