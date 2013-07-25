@@ -84,7 +84,7 @@ def storeNewTicket( masterKey, ticket, bridge ):
     Store a new session ticket and the according master key for future use.
 
     This method is only called by clients.  The given data, `masterKey',
-    `ticket' and `bridge', is pickled and stored in the global ticket
+    `ticket' and `bridge', is YAMLed and stored in the global ticket
     dictionary.  If there already is a ticket for the given `bridge', it is
     overwritten.
     """
