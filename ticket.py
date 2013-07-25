@@ -365,11 +365,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print "[+] Loading server state file."
-    srvState = state.load()
+    serverState = state.load()
 
     print "[+] Generating new session ticket."
     masterKey = mycrypto.strongRandom(const.MASTER_KEY_LENGTH)
-    ticket = SessionTicket(masterKey, srvState).issue()
+    ticket = SessionTicket(masterKey, serverState).issue()
 
     print "[+] Writing new session ticket to `%s'." % args.ticket_file
     tickets = dict()
