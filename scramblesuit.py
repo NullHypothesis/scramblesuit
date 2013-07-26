@@ -147,8 +147,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         """
         Initiate a ScrambleSuit handshake.
 
-        This method is only run by clients.  If a session ticket is available
-        it is redeemed.  Otherwise, a UniformDH handshake is initiated.
+        This method is only relevant for clients.  If a session ticket is
+        available it is redeemed.  Otherwise, a UniformDH handshake is
+        initiated.
         """
 
         # The server handles the handshake passively.
