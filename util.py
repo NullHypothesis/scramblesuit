@@ -50,7 +50,7 @@ def isValidHMAC( myHMAC, existingHMAC ):
 
     assert myHMAC and existingHMAC
 
-    if not (myHMAC == existingHMAC):
+    if not constCompare(myHMAC, existingHMAC):
         log.warning("The HMAC is invalid (got `%s' but expected `%s')." %
                     (existingHMAC.encode('hex'), myHMAC.encode('hex')))
         return False
