@@ -16,6 +16,30 @@ import const
 log = logging.get_obfslogger()
 
 
+def constCompare( val1, val2 ):
+    """
+    Implements (semi-)constant-time string comparison of `val1' and `val2'.
+
+    The parameters `val1' and `val2' are compared.  If they are equal, `True'
+    is returned and otherwise `False'.  The comparison is implemented in
+    constant time to prevent timing-based cryptographic attacks.  However, note
+    that it is *hard* to implement perfectly safe functions; even more so in
+    high-level languages.
+
+    The code is taken from:
+    http://rdist.root.org/2010/01/07/timing-independent-array-comparison/
+    """
+
+    if len(val1) != len(val2):
+        return False
+
+    result = 0
+    for x, y in zip(val1, val2):
+        result |= ord(x) ^ ord(y)
+
+    return result == 0
+
+
 def isValidHMAC( myHMAC, existingHMAC ):
     """
     Check if the two given HMACs are equal.
