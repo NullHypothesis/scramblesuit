@@ -359,7 +359,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # as the server.  That's where the polymorphism comes from.
             elif self.weAreClient and msg.flags == const.FLAG_PRNG_SEED:
                 assert len(msg.payload) == const.PRNG_SEED_LENGTH
-                log.debug("Obtained PRNG seed: %s" % msg.payload.encode('hex'))
+                log.debug("Obtained PRNG seed.")
                 prng = random.Random(msg.payload)
                 pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
                                                             const.MTU),
