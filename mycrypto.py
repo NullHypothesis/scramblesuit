@@ -101,15 +101,6 @@ def strongRandom( size ):
     return os.urandom(size)
 
 
-def weakRandom( size ):
-    """
-    Return `size' bytes of weak randomness not suitable for cryptographic use.
-    """
-
-    # TODO - Use a function which does not stress our entropy pool.
-    return os.urandom(size)
-
-
 class PayloadCrypter:
 
     """
