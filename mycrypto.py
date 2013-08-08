@@ -139,12 +139,13 @@ class PayloadCrypter:
         a CSPRNG.
         """
 
-        log.debug("Setting session key for AES-CTR.")
-        log.debug("Setting IV for AES-CTR.")
-
         self.sessionKey = key
+
+        log.debug("Setting IV for AES-CTR.")
         self.counter = Crypto.Util.Counter.new(128, initial_value =
                                                long(iv.encode('hex'), 16))
+
+        log.debug("Setting session key for AES-CTR.")
         self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR,
                                              counter=self.counter)
 
