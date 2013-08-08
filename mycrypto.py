@@ -158,5 +158,5 @@ class PayloadCrypter:
 
         return self.crypter.encrypt(data)
 
-    # Encryption equals decryption in AES CTR.
+    # Encryption equals decryption in AES-CTR.
     decrypt = encrypt
