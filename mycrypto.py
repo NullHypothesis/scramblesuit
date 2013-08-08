@@ -135,7 +135,8 @@ class PayloadCrypter:
         Set an AES session key and an initialisation vector.
 
         The given `key' and `iv' are used as AES counter mode key and
-        initialisation vector.
+        initialisation vector.  Both, the key as well as the IV must come from
+        a CSPRNG.
         """
 
         log.debug("Setting session key for AES-CTR.")
