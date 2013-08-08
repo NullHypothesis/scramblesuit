@@ -38,17 +38,17 @@ class HKDF_SHA256( object ):
         Initialise a HKDF_SHA256 object.
         """
 
-        self.HashLen = const.SHA256_DIGEST_LENGTH
+        self.hashLen = const.SHA256_DIGEST_LENGTH
 
-        if length > (self.HashLen * 255):
+        if length > (self.hashLen * 255):
             raise ValueError("The OKM's length cannot be larger than %d." %
-                             (self.HashLen * 255))
+                             (self.hashLen * 255))
 
-        if len(prk) < self.HashLen:
+        if len(prk) < self.hashLen:
             raise ValueError("The PRK must be at least %d bytes in length "
-                             "(%d given)." % (self.HashLen, len(prk)))
+                             "(%d given)." % (self.hashLen, len(prk)))
 
-        self.N = math.ceil(float(length) / self.HashLen)
+        self.N = math.ceil(float(length) / self.hashLen)
         self.prk = prk
         self.info = info
         self.length = length
