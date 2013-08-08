@@ -154,9 +154,9 @@ class UniformDH( object ):
         # Subtract the length of the public key to make the handshake on
         # average as long as a redeemed ticket.  That should thwart statistical
         # length-based attacks.
-        padding = mycrypto.weakRandom(random.randint(0,
-                                      const.MAX_PADDING_LENGTH -
-                                      const.PUBLIC_KEY_LENGTH))
+        padding = mycrypto.strongRandom(random.randint(0,
+                                        const.MAX_PADDING_LENGTH -
+                                        const.PUBLIC_KEY_LENGTH))
 
         # Add a marker which enables efficient location of the HMAC.
         marker = mycrypto.HMAC_SHA256_128(self.sharedSecret,
