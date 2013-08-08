@@ -3,6 +3,7 @@
 
 import unittest
 
+import os
 import util
 import const
 import mycrypto
@@ -74,6 +75,25 @@ class CryptoTest( unittest.TestCase ):
                "3454e5f3c738d2d9d201395faa4b61a96c8").decode('hex')
 
         self.runHKDF(ikm, salt, info, prk, okm)
+
+    def test4_CSPRNG( self ):
+        self.failIf(mycrypto.strongRandom(10) == mycrypto.strongRandom(10))
+        self.failIf(len(mycrypto.strongRandom(100)) != 100)
+
+    def test5_AES( self ):
+        plain = "this is a test"
+        key = os.urandom(16)
+        iv = os.urandom(16)
+
+        crypter1 = mycrypto.PayloadCrypter()
+        crypter1.setSessionKey(key, iv)
+        crypter2 = mycrypto.PayloadCrypter()
+        crypter2.setSessionKey(key, iv)
+
+        cipher = crypter1.encrypt(plain)
+
+        self.failIf(cipher == plain)
+        self.failUnless(crypter2.decrypt(cipher) == plain)
 
 class UniformDHTest( unittest.TestCase ):
 
