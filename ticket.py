@@ -49,6 +49,9 @@ def createTicketMessage( rawTicket, HMACKey ):
     authentication message is then returned.
     """
 
+    assert len(rawTicket) == const.TICKET_LENGTH
+    assert len(HMACKey) == const.HMAC_KEY_LENGTH
+
     # Subtract the length of the ticket to make the handshake on
     # average as long as a UniformDH handshake message.
     padding = mycrypto.strongRandom(random.randint(0,
