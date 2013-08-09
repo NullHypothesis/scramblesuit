@@ -118,7 +118,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.debug("Deriving session keys from master key.")
 
         # We need key material for two symmetric keys, nonces and HMACs.  All
-        # of these eight are 32 bytes in size.
+        # of these six are 32 bytes in size.
         hkdf = mycrypto.HKDF_SHA256(masterKey, "", 32 * 8)
         okm = hkdf.expand()
 
