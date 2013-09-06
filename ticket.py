@@ -58,7 +58,7 @@ def createTicketMessage( rawTicket, HMACKey ):
                                     const.MAX_PADDING_LENGTH -
                                     const.TICKET_LENGTH))
 
-    mark = mycrypto.HMAC_SHA256_128(HMACKey, HMACKey + rawTicket)
+    mark = mycrypto.HMAC_SHA256_128(HMACKey, rawTicket)
 
     hmac = mycrypto.HMAC_SHA256_128(HMACKey, rawTicket + padding +
                                     mark + util.getEpoch())

@@ -421,7 +421,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 return False
 
         # First, find the mark to efficiently locate the HMAC.
-        mark = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC +
+        mark = mycrypto.HMAC_SHA256_128(self.recvHMAC,
                                         potentialTicket[:const.TICKET_LENGTH])
 
         index = util.locateMark(mark, potentialTicket)

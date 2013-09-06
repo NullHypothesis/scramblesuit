@@ -111,8 +111,7 @@ class UniformDH( object ):
 
         # First, find the mark to efficiently locate the HMAC.
         publicKey = handshake[:const.PUBLIC_KEY_LENGTH]
-        mark = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                        self.sharedSecret + publicKey)
+        mark = mycrypto.HMAC_SHA256_128(self.sharedSecret, publicKey)
 
         index = util.locateMark(mark, handshake)
         if not index:
@@ -159,8 +158,7 @@ class UniformDH( object ):
                                         const.PUBLIC_KEY_LENGTH))
 
         # Add a mark which enables efficient location of the HMAC.
-        mark = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                        self.sharedSecret + publicKey)
+        mark = mycrypto.HMAC_SHA256_128(self.sharedSecret, publicKey)
 
         # Authenticate the handshake including the current approximate epoch.
         mac = mycrypto.HMAC_SHA256_128(self.sharedSecret,
