@@ -437,7 +437,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                           index + const.MARKER_LENGTH] +
                                           util.getEpoch())
 
-        if not util.isValidHMAC(myHMAC, existingHMAC):
+        if not util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
             return False
 
         data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)

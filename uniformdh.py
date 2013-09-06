@@ -125,7 +125,7 @@ class UniformDH( object ):
                                           handshake[0 : hmacStart] +
                                           util.getEpoch())
 
-        if not util.isValidHMAC(myHMAC, existingHMAC):
+        if not util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
             return False
 
         data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)

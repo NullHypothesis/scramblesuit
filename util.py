@@ -13,46 +13,33 @@ import obfsproxy.common.log as logging
 import time
 import const
 
+import mycrypto
+
 log = logging.get_obfslogger()
 
 
-def constCompare( val1, val2 ):
+def isValidHMAC( hmac1, hmac2, key ):
     """
-    Implements (semi-)constant-time string comparison of `val1' and `val2'.
+    Compares `hmac1' and `hmac2' after HMACing them again using `key'.
 
-    The parameters `val1' and `val2' are compared.  If they are equal, `True'
-    is returned and otherwise `False'.  The comparison is implemented in
-    constant time to prevent timing-based cryptographic attacks.  However, note
-    that it is *hard* to implement perfectly safe functions; even more so in
-    high-level languages.
-
-    The code is taken from:
-    http://rdist.root.org/2010/01/07/timing-independent-array-comparison/
+    The arguments `hmac1' and `hmac2' are compared.  If they are equal, `True'
+    is returned and otherwise `False'.  To prevent timing attacks, double HMAC
+    verification is used meaning that the two arguments are HMACed again before
+    (constant-time) string comparison.  The idea is taken from:
+    https://www.isecpartners.com/blog/2011/february/double-hmac-verification.aspx
     """
 
-    if len(val1) != len(val2):
-        return False
+    assert len(hmac1) == len(hmac2)
+    assert len(hmac1) == const.HMAC_LENGTH
+    assert len(key) == const.HMAC_KEY_LENGTH
 
-    result = 0
-    for x, y in zip(val1, val2):
-        result |= ord(x) ^ ord(y)
+    # HMAC the arguments again to prevent timing attacks.
+    doubleHmac1 = mycrypto.HMAC_SHA256_128(key, hmac1)
+    doubleHmac2 = mycrypto.HMAC_SHA256_128(key, hmac2)
 
-    return result == 0
-
-
-def isValidHMAC( myHMAC, existingHMAC ):
-    """
-    Check if the two given HMACs are equal.
-
-    If the two given HMACs are equal, `True' is returned.  If not, a warning is
-    logged and `False' is returned.
-    """
-
-    assert myHMAC and existingHMAC
-
-    if not constCompare(myHMAC, existingHMAC):
-        log.warning("The HMAC is invalid (got `%s' but expected `%s')." %
-                    (existingHMAC.encode('hex'), myHMAC.encode('hex')))
+    if doubleHmac1 != doubleHmac2:
+        log.warning("The HMAC is invalid: `%s' vs. `%s'." %
+                    (hmac1.encode('hex'), hmac2.encode('hex')))
         return False
 
     log.debug("The computed HMAC is valid.")

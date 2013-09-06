@@ -137,9 +137,11 @@ class UtilTest( unittest.TestCase ):
 
     def test1_isValidHMAC( self ):
         self.failIf(util.isValidHMAC("A" * const.HMAC_LENGTH,
-                                     "B" * const.HMAC_LENGTH) == True)
+                                     "B" * const.HMAC_LENGTH,
+                                     "X" * const.HMAC_KEY_LENGTH) == True)
         self.failIf(util.isValidHMAC("A" * const.HMAC_LENGTH,
-                                     "A" * const.HMAC_LENGTH) == False)
+                                     "A" * const.HMAC_LENGTH,
+                                     "X" * const.HMAC_KEY_LENGTH) == False)
 
     def test2_locateMarker( self ):
         self.failIf(util.locateMarker("D", "ABC") != None)

@@ -197,7 +197,8 @@ def decrypt( ticket, srvState ):
 
     # Verify the ticket's authenticity before decrypting.
     hmac = HMAC.new(srvState.hmacKey, ticket[0:80], digestmod=SHA256).digest()
-    if util.isValidHMAC(hmac, ticket[80:const.TICKET_LENGTH]):
+    if util.isValidHMAC(hmac, ticket[80:const.TICKET_LENGTH],
+                        srvState.hmacKey):
         aesKey = srvState.aesKey
     else:
         if srvState.oldHmacKey is None:
@@ -206,7 +207,8 @@ def decrypt( ticket, srvState ):
         # Was the HMAC created using the rotated key material?
         oldHmac = HMAC.new(srvState.oldHmacKey, ticket[0:80],
                            digestmod=SHA256).digest()
-        if util.isValidHMAC(oldHmac, ticket[80:const.TICKET_LENGTH]):
+        if util.isValidHMAC(oldHmac, ticket[80:const.TICKET_LENGTH],
+                            srvState.oldHmacKey):
             aesKey = srvState.oldAesKey
         else:
             return None
