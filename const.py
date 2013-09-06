@@ -61,7 +61,7 @@ MTU = 1448
 MPU = MTU - HDR_LENGTH
 
 # Length of a UniformDH public key in bytes.
-PUBLIC_KEY_LENGTH = 192
+PUBLIC_KEY_LENGTH = 512
 
 # Length of the PRNG seed used to generate probability distributions in bytes.
 PRNG_SEED_LENGTH = 32
