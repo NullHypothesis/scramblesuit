@@ -44,8 +44,8 @@ def createTicketMessage( rawTicket, HMACKey ):
     """
     Create and return a ready-to-be-sent ticket authentication message.
 
-    Pseudo-random padding and a marker are added to `rawTicket' and the result
-    is then authenticated using `HMACKey' as key for a HMAC.  The resulting
+    Pseudo-random padding and a mark are added to `rawTicket' and the result is
+    then authenticated using `HMACKey' as key for a HMAC.  The resulting
     authentication message is then returned.
     """
 
@@ -58,12 +58,12 @@ def createTicketMessage( rawTicket, HMACKey ):
                                     const.MAX_PADDING_LENGTH -
                                     const.TICKET_LENGTH))
 
-    marker = mycrypto.HMAC_SHA256_128(HMACKey, HMACKey + rawTicket)
+    mark = mycrypto.HMAC_SHA256_128(HMACKey, HMACKey + rawTicket)
 
     hmac = mycrypto.HMAC_SHA256_128(HMACKey, rawTicket + padding +
-                                    marker + util.getEpoch())
+                                    mark + util.getEpoch())
 
-    return rawTicket + padding + marker + hmac
+    return rawTicket + padding + mark + hmac
 
 
 def issueTicketAndKey( srvState ):

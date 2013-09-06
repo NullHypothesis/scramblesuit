@@ -402,7 +402,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         succeed, `True' is returned.  Otherwise, `False' is returned.
         """
 
-        if len(data) < (const.TICKET_LENGTH + const.MARKER_LENGTH +
+        if len(data) < (const.TICKET_LENGTH + const.MARK_LENGTH +
                         const.HMAC_LENGTH):
             return False
 
@@ -420,27 +420,27 @@ class ScrambleSuitTransport( base.BaseTransport ):
             else:
                 return False
 
-        # First, find the marker to efficiently locate the HMAC.
-        marker = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC +
-                                         potentialTicket[:const.TICKET_LENGTH])
+        # First, find the mark to efficiently locate the HMAC.
+        mark = mycrypto.HMAC_SHA256_128(self.recvHMAC, self.recvHMAC +
+                                        potentialTicket[:const.TICKET_LENGTH])
 
-        index = util.locateMarker(marker, potentialTicket)
+        index = util.locateMark(mark, potentialTicket)
         if not index:
             return False
 
         # Now, verify if the HMAC is valid.
-        existingHMAC = potentialTicket[index + const.MARKER_LENGTH:
-                                       index + const.MARKER_LENGTH +
+        existingHMAC = potentialTicket[index + const.MARK_LENGTH:
+                                       index + const.MARK_LENGTH +
                                        const.HMAC_LENGTH]
         myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
                                           potentialTicket[0:
-                                          index + const.MARKER_LENGTH] +
+                                          index + const.MARK_LENGTH] +
                                           util.getEpoch())
 
         if not util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
             return False
 
-        data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
+        data.drain(index + const.MARK_LENGTH + const.HMAC_LENGTH)
 
         log.debug("Switching to state ST_CONNECTED.")
         self.protoState = const.ST_CONNECTED

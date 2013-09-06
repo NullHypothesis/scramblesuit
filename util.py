@@ -46,25 +46,25 @@ def isValidHMAC( hmac1, hmac2, key ):
     return True
 
 
-def locateMarker( marker, payload ):
+def locateMark( mark, payload ):
     """
-    Locate the given `marker' in `payload' and return its index.
+    Locate the given `mark' in `payload' and return its index.
 
-    The `marker' is placed before the HMAC of a ScrambleSuit authentication
+    The `mark' is placed before the HMAC of a ScrambleSuit authentication
     mechanism and makes it possible to efficiently locate the HMAC.  If the
-    `marker' could not be found, `None' is returned.
+    `mark' could not be found, `None' is returned.
     """
 
-    index = payload.find(marker)
+    index = payload.find(mark)
     if index < 0:
-        log.debug("Could not find the marker just yet.")
+        log.debug("Could not find the mark just yet.")
         return None
 
-    if (len(payload) - index - const.MARKER_LENGTH) < const.HMAC_LENGTH:
-        log.debug("Found the marker but the HMAC is still incomplete.")
+    if (len(payload) - index - const.MARK_LENGTH) < const.HMAC_LENGTH:
+        log.debug("Found the mark but the HMAC is still incomplete.")
         return None
 
-    log.debug("Successfully located the marker.")
+    log.debug("Successfully located the mark.")
 
     return index
 

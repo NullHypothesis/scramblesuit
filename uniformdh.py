@@ -100,7 +100,7 @@ class UniformDH( object ):
         assert self.sharedSecret is not None
 
         # Do we already have the minimum amount of data?
-        if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARKER_LENGTH +
+        if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARK_LENGTH +
                         const.HMAC_LENGTH):
             return False
 
@@ -109,17 +109,17 @@ class UniformDH( object ):
 
         handshake = data.peek()
 
-        # First, find the marker to efficiently locate the HMAC.
+        # First, find the mark to efficiently locate the HMAC.
         publicKey = handshake[:const.PUBLIC_KEY_LENGTH]
-        marker = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                          self.sharedSecret + publicKey)
+        mark = mycrypto.HMAC_SHA256_128(self.sharedSecret,
+                                        self.sharedSecret + publicKey)
 
-        index = util.locateMarker(marker, handshake)
+        index = util.locateMark(mark, handshake)
         if not index:
             return False
 
         # Now that we know where the authenticating HMAC is: verify it.
-        hmacStart = index + const.MARKER_LENGTH
+        hmacStart = index + const.MARK_LENGTH
         existingHMAC = handshake[hmacStart : (hmacStart + const.HMAC_LENGTH)]
         myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
                                           handshake[0 : hmacStart] +
@@ -128,7 +128,7 @@ class UniformDH( object ):
         if not util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
             return False
 
-        data.drain(index + const.MARKER_LENGTH + const.HMAC_LENGTH)
+        data.drain(index + const.MARK_LENGTH + const.HMAC_LENGTH)
 
         return handshake[:const.PUBLIC_KEY_LENGTH]
 
@@ -137,7 +137,7 @@ class UniformDH( object ):
         Create and return a ready-to-be-sent UniformDH handshake.
 
         The returned handshake data includes the public key, pseudo-random
-        padding, the marker and the HMAC.  If a UniformDH object has not been
+        padding, the mark and the HMAC.  If a UniformDH object has not been
         initialised yet, a new instance is created.
         """
 
@@ -158,16 +158,16 @@ class UniformDH( object ):
                                         const.MAX_PADDING_LENGTH -
                                         const.PUBLIC_KEY_LENGTH))
 
-        # Add a marker which enables efficient location of the HMAC.
-        marker = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                          self.sharedSecret + publicKey)
+        # Add a mark which enables efficient location of the HMAC.
+        mark = mycrypto.HMAC_SHA256_128(self.sharedSecret,
+                                        self.sharedSecret + publicKey)
 
         # Authenticate the handshake including the current approximate epoch.
         mac = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                       publicKey + padding + marker +
+                                       publicKey + padding + mark +
                                        util.getEpoch())
 
-        return publicKey + padding + marker + mac
+        return publicKey + padding + mark + mac
 
 # Alias class name in order to provide a more intuitive API.
 new = UniformDH

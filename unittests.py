@@ -104,9 +104,9 @@ class UniformDHTest( unittest.TestCase ):
     def test1_createHandshake( self ):
         handshake = self.udh.createHandshake()
         self.failUnless((const.PUBLIC_KEY_LENGTH +
-                         const.MARKER_LENGTH +
+                         const.MARK_LENGTH +
                          const.HMAC_LENGTH) <= len(handshake) <=
-                        (const.MARKER_LENGTH +
+                        (const.MARK_LENGTH +
                          const.HMAC_LENGTH +
                          const.MAX_PADDING_LENGTH))
 
@@ -143,15 +143,15 @@ class UtilTest( unittest.TestCase ):
                                      "A" * const.HMAC_LENGTH,
                                      "X" * const.HMAC_KEY_LENGTH) == False)
 
-    def test2_locateMarker( self ):
-        self.failIf(util.locateMarker("D", "ABC") != None)
+    def test2_locateMark( self ):
+        self.failIf(util.locateMark("D", "ABC") != None)
 
         hmac = "X" * const.HMAC_LENGTH
-        marker = "A" * const.MARKER_LENGTH
-        payload = marker + hmac
+        mark = "A" * const.MARK_LENGTH
+        payload = mark + hmac
 
-        self.failIf(util.locateMarker(marker, payload) == None)
-        self.failIf(util.locateMarker(marker, payload[:-1]) != None)
+        self.failIf(util.locateMark(mark, payload) == None)
+        self.failIf(util.locateMark(mark, payload[:-1]) != None)
 
 if __name__ == '__main__':
     unittest.main()

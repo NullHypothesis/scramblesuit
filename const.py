@@ -39,9 +39,9 @@ HMAC_LENGTH = 16
 # Key rotation time for session ticket keys in seconds.
 KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 
-# Marker used to easily locate the HMAC authenticating handshake messages in
+# Mark used to easily locate the HMAC authenticating handshake messages in
 # bytes.
-MARKER_LENGTH = 16
+MARK_LENGTH = 16
 
 # The master key's length in bytes.
 MASTER_KEY_LENGTH = 32
