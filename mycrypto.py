@@ -132,9 +132,16 @@ class PayloadCrypter:
 
         self.sessionKey = key
 
+        # Our 128-bit counter has the following format:
+        # [ 64-bit static and random IV ] [ 64-bit incrementing counter ]
+        # Counter wrapping is not allowed which makes it possible to transfer
+        # 2^64 * 16 bytes of data while avoiding counter reuse.  That amount is
+        # effectively out of reach given today's networking performance.
         log.debug("Setting IV for AES-CTR.")
-        self.counter = Crypto.Util.Counter.new(128, initial_value =
-                                               long(iv.encode('hex'), 16))
+        self.counter = Crypto.Util.Counter.new(64,
+                                               prefix = iv[:8],
+                                               initial_value = 1,
+                                               allow_wraparound = False)
 
         log.debug("Setting session key for AES-CTR.")
         self.crypter = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_CTR,
