@@ -12,6 +12,8 @@ import const
 import random
 import binascii
 
+import Crypto.Hash.SHA256
+
 import util
 import mycrypto
 
@@ -75,14 +77,14 @@ class UniformDH( object ):
         assert self.udh is not None
 
         try:
-            masterKey = self.udh.get_secret(remotePublicKey)
+            uniformDHSecret = self.udh.get_secret(remotePublicKey)
         except ValueError:
             raise base.PluggableTransportError("Corrupted public key.")
 
-        # Truncate remainder of 1536-bit UniformDH group.
-        masterKey = masterKey[:const.MASTER_KEY_LENGTH]
+        # First, hash the 4096-bit UniformDH secret to obtain the master key.
+        masterKey = Crypto.Hash.SHA256.new(uniformDHSecret).digest()
 
-        # Derive the session keys from the newly obtained master key.
+        # Second, session keys are now derived from the master key.
         callback(masterKey)
 
         return True
