@@ -123,11 +123,11 @@ class PayloadCrypter:
 
     def setSessionKey( self, key, iv ):
         """
-        Set an AES session key and an initialisation vector.
+        Set AES' session key and the initialisation vector for counter mode.
 
-        The given `key' and `iv' are used as AES counter mode key and
-        initialisation vector.  Both, the key as well as the IV must come from
-        a CSPRNG.
+        The given `key' and `iv' are used as 256-bit AES key and as 128-bit
+        initialisation vector for counter mode.  Both, the key as well as the
+        IV must come from a CSPRNG.
         """
 
         self.sessionKey = key
