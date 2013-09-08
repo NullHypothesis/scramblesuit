@@ -30,7 +30,6 @@ def isValidHMAC( hmac1, hmac2, key ):
     """
 
     assert len(hmac1) == len(hmac2)
-    assert len(key) == const.HMAC_KEY_LENGTH
 
     # HMAC the arguments again to prevent timing attacks.
     doubleHmac1 = mycrypto.HMAC_SHA256_128(key, hmac1)
