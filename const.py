@@ -8,14 +8,14 @@ While some values can be changed, in general they should not.  If you do not
 obey, be at least careful because the protocol could easily break.
 """
 
-# Length of the HMAC used to authenticate tickets in bytes.
-HMAC_KEY_LENGTH = 32
+# Length of the key of the HMAC which used to authenticate tickets in bytes.
+TICKET_HMAC_KEY_LENGTH = 32
 
 # Length of the AES key used to encrypt tickets in bytes.
-AES_KEY_LENGTH = 16
+TICKET_AES_KEY_LENGTH = 16
 
 # Length of the IV for AES-CBC which is used to encrypt tickets in bytes.
-AES_CBC_IV_LENGTH = 16
+TICKET_AES_CBC_IV_LENGTH = 16
 
 # FIXME - Directory where long-lived information is stored.
 DATA_DIRECTORY = "/tmp/"

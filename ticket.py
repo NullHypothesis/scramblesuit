@@ -50,7 +50,7 @@ def createTicketMessage( rawTicket, HMACKey ):
     """
 
     assert len(rawTicket) == const.TICKET_LENGTH
-    assert len(HMACKey) == const.HMAC_KEY_LENGTH
+    assert len(HMACKey) == const.TICKET_HMAC_KEY_LENGTH
 
     # Subtract the length of the ticket to make the handshake on
     # average as long as a UniformDH handshake message.
@@ -169,8 +169,8 @@ def checkKeys( srvState ):
         srvState.oldHmacKey = srvState.hmacKey
 
         # Create new key material...
-        srvState.aesKey = mycrypto.strongRandom(const.AES_KEY_LENGTH)
-        srvState.hmacKey = mycrypto.strongRandom(const.HMAC_KEY_LENGTH)
+        srvState.aesKey = mycrypto.strongRandom(const.TICKET_AES_KEY_LENGTH)
+        srvState.hmacKey = mycrypto.strongRandom(const.TICKET_HMAC_KEY_LENGTH)
         srvState.creationTime = int(time.time())
 
         # ...and save it to disk.
@@ -215,8 +215,8 @@ def decrypt( ticket, srvState ):
 
     # Decrypt the ticket to extract the state information.
     aes = AES.new(aesKey, mode=AES.MODE_CBC,
-                  IV=ticket[0:const.AES_CBC_IV_LENGTH])
-    plainTicket = aes.decrypt(ticket[const.AES_CBC_IV_LENGTH:80])
+                  IV=ticket[0:const.TICKET_AES_CBC_IV_LENGTH])
+    plainTicket = aes.decrypt(ticket[const.TICKET_AES_CBC_IV_LENGTH:80])
 
     issueDate = struct.unpack('I', plainTicket[0:4])[0]
     identifier = plainTicket[4:22]
@@ -314,7 +314,7 @@ class SessionTicket( object ):
         checkKeys(srvState)
 
         # Initialisation vector for AES-CBC.
-        self.IV = mycrypto.strongRandom(const.AES_CBC_IV_LENGTH)
+        self.IV = mycrypto.strongRandom(const.TICKET_AES_CBC_IV_LENGTH)
 
         # The server's (encrypted) protocol state.
         self.state = ProtocolState(masterKey)

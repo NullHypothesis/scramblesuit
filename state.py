@@ -88,8 +88,8 @@ class State( object ):
         self.prngSeed = mycrypto.strongRandom(const.PRNG_SEED_LENGTH)
 
         # HMAC and AES key used to encrypt and authenticate tickets.
-        self.hmacKey = mycrypto.strongRandom(const.HMAC_KEY_LENGTH)
-        self.aesKey = mycrypto.strongRandom(const.AES_KEY_LENGTH)
+        self.hmacKey = mycrypto.strongRandom(const.TICKET_HMAC_KEY_LENGTH)
+        self.aesKey = mycrypto.strongRandom(const.TICKET_AES_KEY_LENGTH)
         self.keyCreation = int(time.time())
 
         # The previous HMAC and AES keys.
