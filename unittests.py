@@ -138,10 +138,10 @@ class UtilTest( unittest.TestCase ):
     def test1_isValidHMAC( self ):
         self.failIf(util.isValidHMAC("A" * const.HMAC_SHA256_128_LENGTH,
                                      "B" * const.HMAC_SHA256_128_LENGTH,
-                                     "X" * const.SHA256_DIGEST_LENGTH) == True)
+                                     "X" * const.SHA256_LENGTH) == True)
         self.failIf(util.isValidHMAC("A" * const.HMAC_SHA256_128_LENGTH,
                                      "A" * const.HMAC_SHA256_128_LENGTH,
-                                     "X" * const.SHA256_DIGEST_LENGTH) == False)
+                                     "X" * const.SHA256_LENGTH) == False)
 
     def test2_locateMark( self ):
         self.failIf(util.locateMark("D", "ABC") != None)

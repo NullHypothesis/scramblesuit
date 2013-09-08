@@ -38,7 +38,7 @@ class HKDF_SHA256( object ):
         Initialise a HKDF_SHA256 object.
         """
 
-        self.hashLen = const.SHA256_DIGEST_LENGTH
+        self.hashLen = const.SHA256_LENGTH
 
         if length > (self.hashLen * 255):
             raise ValueError("The OKM's length cannot be larger than %d." %
@@ -85,7 +85,7 @@ def HMAC_SHA256_128( key, msg ):
     Return the HMAC-SHA256-128 of the given `msg' authenticated by `key'.
     """
 
-    assert(len(key) == const.SHA256_DIGEST_LENGTH)
+    assert(len(key) == const.SHA256_LENGTH)
 
     h = Crypto.Hash.HMAC.new(key, msg, Crypto.Hash.SHA256)
 

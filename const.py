@@ -73,7 +73,7 @@ SERVER_STATE_FILE = DATA_DIRECTORY + "server_state.cpickle"
 SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
 
 # SHA256's digest length in bytes.
-SHA256_DIGEST_LENGTH = 32
+SHA256_LENGTH = 32
 
 # The length of the UniformDH shared secret in bytes.
 SHARED_SECRET_LENGTH = 32
