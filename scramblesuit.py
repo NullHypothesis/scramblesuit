@@ -284,10 +284,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
                 break
 
-            rcvdHMAC = self.recvBuf[0:const.HMAC_LENGTH]
+            rcvdHMAC = self.recvBuf[0:const.HMAC_SHA256_128_LENGTH]
             vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
-                              self.recvBuf[const.HMAC_LENGTH:(self.totalLen +
-                              const.HDR_LENGTH)])
+                              self.recvBuf[const.HMAC_SHA256_128_LENGTH:
+                              (self.totalLen + const.HDR_LENGTH)])
 
             if rcvdHMAC != vrfyHMAC:
                 raise base.PluggableTransportError("Invalid message HMAC.")
@@ -403,7 +403,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         """
 
         if len(data) < (const.TICKET_LENGTH + const.MARK_LENGTH +
-                        const.HMAC_LENGTH):
+                        const.HMAC_SHA256_128_LENGTH):
             return False
 
         potentialTicket = data.peek()
@@ -431,7 +431,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Now, verify if the HMAC is valid.
         existingHMAC = potentialTicket[index + const.MARK_LENGTH:
                                        index + const.MARK_LENGTH +
-                                       const.HMAC_LENGTH]
+                                       const.HMAC_SHA256_128_LENGTH]
         myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
                                           potentialTicket[0:
                                           index + const.MARK_LENGTH] +
@@ -440,7 +440,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if not util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
             return False
 
-        data.drain(index + const.MARK_LENGTH + const.HMAC_LENGTH)
+        data.drain(index + const.MARK_LENGTH + const.HMAC_SHA256_128_LENGTH)
 
         log.debug("Switching to state ST_CONNECTED.")
         self.protoState = const.ST_CONNECTED

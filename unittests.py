@@ -105,9 +105,9 @@ class UniformDHTest( unittest.TestCase ):
         handshake = self.udh.createHandshake()
         self.failUnless((const.PUBLIC_KEY_LENGTH +
                          const.MARK_LENGTH +
-                         const.HMAC_LENGTH) <= len(handshake) <=
+                         const.HMAC_SHA256_128_LENGTH) <= len(handshake) <=
                         (const.MARK_LENGTH +
-                         const.HMAC_LENGTH +
+                         const.HMAC_SHA256_128_LENGTH +
                          const.MAX_PADDING_LENGTH))
 
     def test2_receivePublicKey( self ):
@@ -136,17 +136,17 @@ class UniformDHTest( unittest.TestCase ):
 class UtilTest( unittest.TestCase ):
 
     def test1_isValidHMAC( self ):
-        self.failIf(util.isValidHMAC("A" * const.HMAC_LENGTH,
-                                     "B" * const.HMAC_LENGTH,
+        self.failIf(util.isValidHMAC("A" * const.HMAC_SHA256_128_LENGTH,
+                                     "B" * const.HMAC_SHA256_128_LENGTH,
                                      "X" * const.SHA256_DIGEST_LENGTH) == True)
-        self.failIf(util.isValidHMAC("A" * const.HMAC_LENGTH,
-                                     "A" * const.HMAC_LENGTH,
+        self.failIf(util.isValidHMAC("A" * const.HMAC_SHA256_128_LENGTH,
+                                     "A" * const.HMAC_SHA256_128_LENGTH,
                                      "X" * const.SHA256_DIGEST_LENGTH) == False)
 
     def test2_locateMark( self ):
         self.failIf(util.locateMark("D", "ABC") != None)
 
-        hmac = "X" * const.HMAC_LENGTH
+        hmac = "X" * const.HMAC_SHA256_128_LENGTH
         mark = "A" * const.MARK_LENGTH
         payload = mark + hmac
 

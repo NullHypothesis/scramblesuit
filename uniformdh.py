@@ -103,7 +103,7 @@ class UniformDH( object ):
 
         # Do we already have the minimum amount of data?
         if len(data) < (const.PUBLIC_KEY_LENGTH + const.MARK_LENGTH +
-                        const.HMAC_LENGTH):
+                        const.HMAC_SHA256_128_LENGTH):
             return False
 
         log.debug("Attempting to extract UniformDH public key out of %d bytes "
@@ -121,7 +121,8 @@ class UniformDH( object ):
 
         # Now that we know where the authenticating HMAC is: verify it.
         hmacStart = index + const.MARK_LENGTH
-        existingHMAC = handshake[hmacStart : (hmacStart + const.HMAC_LENGTH)]
+        existingHMAC = handshake[hmacStart:
+                                 (hmacStart + const.HMAC_SHA256_128_LENGTH)]
         myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
                                           handshake[0 : hmacStart] +
                                           util.getEpoch())
@@ -129,7 +130,7 @@ class UniformDH( object ):
         if not util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
             return False
 
-        data.drain(index + const.MARK_LENGTH + const.HMAC_LENGTH)
+        data.drain(index + const.MARK_LENGTH + const.HMAC_SHA256_128_LENGTH)
 
         return handshake[:const.PUBLIC_KEY_LENGTH]
 

@@ -59,7 +59,8 @@ def locateMark( mark, payload ):
         log.debug("Could not find the mark just yet.")
         return None
 
-    if (len(payload) - index - const.MARK_LENGTH) < const.HMAC_LENGTH:
+    if (len(payload) - index - const.MARK_LENGTH) < \
+       const.HMAC_SHA256_128_LENGTH:
         log.debug("Found the mark but the HMAC is still incomplete.")
         return None
 

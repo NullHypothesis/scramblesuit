@@ -34,7 +34,7 @@ FLAG_PRNG_SEED =      (1 << 3)
 HDR_LENGTH = 16 + 2 + 2 + 1
 
 # Length of the HMAC-SHA256-128 in bytes.
-HMAC_LENGTH = 16
+HMAC_SHA256_128_LENGTH = 16
 
 # Key rotation time for session ticket keys in seconds.
 KEY_ROTATION_TIME = 60 * 60 * 24 * 7
