@@ -139,7 +139,7 @@ class PayloadCrypter:
         # effectively out of reach given today's networking performance.
         log.debug("Setting IV for AES-CTR.")
         self.counter = Crypto.Util.Counter.new(64,
-                                               prefix = iv[:8],
+                                               prefix = iv,
                                                initial_value = 1,
                                                allow_wraparound = False)
 

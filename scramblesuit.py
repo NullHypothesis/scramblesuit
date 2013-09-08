@@ -117,16 +117,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.debug("Deriving session keys from master key.")
 
-        # We need key material for two symmetric keys, nonces and HMACs.  All
-        # of these six are 32 bytes in size.
-        hkdf = mycrypto.HKDF_SHA256(masterKey, "", 32 * 8)
+        # We need key material for two symmetric keys, nonces and HMACs.  In
+        # total, this equals 144 bytes of key material.
+        hkdf = mycrypto.HKDF_SHA256(masterKey, "", (32 * 4) + (8 * 2))
         okm = hkdf.expand()
 
-        self.sendCrypter.setSessionKey(okm[0:32],  okm[32:64])
-        self.recvCrypter.setSessionKey(okm[64:96], okm[96:128])
+        self.sendCrypter.setSessionKey(okm[0:32],  okm[32:40])
+        self.recvCrypter.setSessionKey(okm[40:72], okm[72:80])
 
-        self.sendHMAC = okm[128:160]
-        self.recvHMAC = okm[160:192]
+        self.sendHMAC = okm[80:112]
+        self.recvHMAC = okm[112:144]
 
         if self.weAreServer:
             self.sendHMAC, self.recvHMAC = util.swap(self.sendHMAC,
