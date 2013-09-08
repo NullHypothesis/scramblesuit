@@ -33,7 +33,7 @@ FLAG_PRNG_SEED =      (1 << 3)
 # Length of ScrambleSuit's header in bytes.
 HDR_LENGTH = 16 + 2 + 2 + 1
 
-# Length of the HMAC-SHA256-128 in bytes.
+# Length of the HMAC-SHA256-128 digest in bytes.
 HMAC_SHA256_128_LENGTH = 16
 
 # Key rotation time for session ticket keys in seconds.
