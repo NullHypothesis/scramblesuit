@@ -83,7 +83,7 @@ class CryptoTest( unittest.TestCase ):
     def test5_AES( self ):
         plain = "this is a test"
         key = os.urandom(16)
-        iv = os.urandom(16)
+        iv = os.urandom(8)
 
         crypter1 = mycrypto.PayloadCrypter()
         crypter1.setSessionKey(key, iv)
