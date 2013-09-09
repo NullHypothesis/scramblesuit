@@ -17,6 +17,7 @@ import obfsproxy.common.serialize as pack
 import obfsproxy.common.log as logging
 
 import random
+import base64
 
 import probdist
 import mycrypto
@@ -553,16 +554,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
         """
 
         if args.uniformDHSecret:
-            cls.uniformDHSecret = args.uniformDHSecret
+            cls.uniformDHSecret = base64.b32decode(args.uniformDHSecret)
 
         if args.ticketFile:
             cls.ticketFile = args.ticketFile
 
-        if args.uniformDHSecret and (len(args.uniformDHSecret) !=
-                                     const.SHARED_SECRET_LENGTH):
+        rawLength = len(base64.b32decode(args.uniformDHSecret))
+
+        if args.uniformDHSecret and rawLength != const.SHARED_SECRET_LENGTH:
             raise base.PluggableTransportError("The UniformDH shared secret "
-                    "must be %d bytes in length but %d bytes given." %
-                    (const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
+                    "must be %d bytes in length but %d bytes are given." %
+                    (const.SHARED_SECRET_LENGTH, rawLength))
 
         super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
 
@@ -591,12 +593,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             raise base.SOCKSArgsError("The SOCKS argument should start with"
                                       "`shared-secret='.")
 
-        self.uniformDHSecret = args[0][14:]
+        self.uniformDHSecret = base64.b32decode(args[0][14:])
 
-        if len(args.uniformDHSecret) != const.SHARED_SECRET_LENGTH:
+        rawLength = len(base64.b32decode(args.uniformDHSecret))
+
+        if rawLength != const.SHARED_SECRET_LENGTH:
             raise base.PluggableTransportError("The UniformDH shared secret "
-                    "must be %d bytes in length but %d bytes given." %
-                    (const.SHARED_SECRET_LENGTH, len(args.uniformDHSecret)))
+                    "must be %d bytes in length but %d bytes are given." %
+                    (const.SHARED_SECRET_LENGTH, rawLength))
 
 
 class ScrambleSuitClient( ScrambleSuitTransport ):
