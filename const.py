@@ -75,8 +75,10 @@ SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
 # SHA256's digest length in bytes.
 SHA256_LENGTH = 32
 
-# The length of the UniformDH shared secret in bytes.
-SHARED_SECRET_LENGTH = 32
+# The length of the UniformDH shared secret in bytes.  It should be a multiple
+# of 5 bytes since outside ScrambleSuit it is encoded in Base32.  That way, we
+# can avoid padding which might confuse users.
+SHARED_SECRET_LENGTH = 20
 
 # States which are used for the protocol state machine.
 ST_WAIT_FOR_AUTH = 0
