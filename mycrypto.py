@@ -85,7 +85,7 @@ def HMAC_SHA256_128( key, msg ):
     Return the HMAC-SHA256-128 of the given `msg' authenticated by `key'.
     """
 
-    assert(len(key) == const.SHA256_LENGTH)
+    assert(len(key) >= const.SHARED_SECRET_LENGTH)
 
     h = Crypto.Hash.HMAC.new(key, msg, Crypto.Hash.SHA256)
 
