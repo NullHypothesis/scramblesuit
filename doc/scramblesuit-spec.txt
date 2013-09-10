@@ -1,12 +1,28 @@
                       ScrambleSuit Protocol Specification
+
                                  Philipp Winter
+
 
 0. Preliminaries
 
-      The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
-      NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and
-      "OPTIONAL" in this document are to be interpreted as described in
-      RFC 2119.
+    The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+    "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and "OPTIONAL" in this
+    document are to be interpreted as described in RFC 2119.
+
+1. Overview
+
+    ScrambleSuit is a pluggable transport protocol for the obfsproxy
+    obfuscation framework [XXX].  Its entire payload is computationally
+    indistinguishable from randomness, it modifies its flow signature to foil
+    simple statistical classifiers and it handles authenticated encryption for
+    the transported protocol.
+
+    For the motivation, a protocol overview, the threat model and evaluation,
+    please read the original research paper discussing ScrambleSuit [XXX].
+    This protocol specification discusses a subset of the research paper in
+    greater detail to facilitate alternative implementations of the protocol.
+    Besides, this specification is intended to be updated if necessary whereas
+    the research paper will remain as is.
 
 TODO:
     - Byte order
