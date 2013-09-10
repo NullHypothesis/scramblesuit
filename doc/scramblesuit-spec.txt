@@ -207,5 +207,22 @@ X. Header Format
    validate the MAC.  If the MAC is invalid, the connection MUST be terminated
    immediately.
 
+X. Protocol Polymorphism
+
+   Implementations SHOULD implement protocol polymorphism whose purpose is to
+   modify ScrambleSuit's flow signature.  In particular, the packet length
+   distribution and the distribution of inter-arrival times are modified.
+
+   To alter these two flow signatures, implementations maintain two discrete
+   probability distributions from which random samples are drawn.  These random
+   samples dictate specific inter-arrival times and packet lengths.  Both
+   probability distributions are generated based on a random 256-bit PRNG seed
+   which is different for every ScrambleSuit server.  Servers communicate their
+   seed to clients in a protocol message whose FLAG_PRNG_SEED bit is set to
+   "1".  The client then extracts the PRNG seed and derives the same
+   probability distributions as the server.
+
    References
+   [XXX] http://www.cs.kau.se/philwint/pdf/wpes2013.pdf
    [XXX] https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs3/obfs3-protocol-spec.txt
+   [XXX] http://www.ecrypt.eu.org/documents/D.SPA.20.pdf
