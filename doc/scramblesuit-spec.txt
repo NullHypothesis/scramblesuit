@@ -156,14 +156,14 @@ X. Key Derivation
    For expansion, the master key is used as HKDF's PRK and the empty string as
    HKDF's "info" argument.
 
-   The 144-byte output is used as follows:
+   The 144-byte output is used as follows.  The byte offsets are in decimal.
 
-     Byte 000:031 - 256-bit AES-CTR session key to send data.
-     Byte 032:039 - 64-bit AES-CTR IV to send data.
-     Byte 040:071 - 256-bit AES-CTR session key to receive data.
-     Byte 072:079 - 64-bit AES-CTR IV to receive data.
-     Byte 080:111 - 256-bit HMAC-SHA256-128 key to send data.
-     Byte 112:143 - 256-bit HMAC-SHA256-128 key to receive data.
+     Bytes 000:031 - 256-bit AES-CTR session key to send data.
+     Bytes 032:039 - 64-bit AES-CTR IV to send data.
+     Bytes 040:071 - 256-bit AES-CTR session key to receive data.
+     Bytes 072:079 - 64-bit AES-CTR IV to receive data.
+     Bytes 080:111 - 256-bit HMAC-SHA256-128 key to send data.
+     Bytes 112:143 - 256-bit HMAC-SHA256-128 key to receive data.
 
 X. Header Format
 
