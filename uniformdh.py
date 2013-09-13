@@ -55,7 +55,7 @@ class UniformDH( object ):
 
         return self.remotePublicKey
 
-    def receivePublicKey( self, data, callback ):
+    def receivePublicKey( self, data, callback, srvState=None ):
         """
         Extract the public key and invoke a callback with the master secret.
 
@@ -65,7 +65,7 @@ class UniformDH( object ):
         """
 
         # Extract the public key sent by the remote host.
-        remotePublicKey = self._extractPublicKey(data)
+        remotePublicKey = self._extractPublicKey(data, srvState)
         if not remotePublicKey:
             return False
 
@@ -89,7 +89,7 @@ class UniformDH( object ):
 
         return True
 
-    def _extractPublicKey( self, data ):
+    def _extractPublicKey( self, data, srvState=None ):
         """
         Extract and return a UniformDH public key out of `data'.
 
@@ -130,7 +130,18 @@ class UniformDH( object ):
         if not util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
             return False
 
+        # Do nothing if the ticket is replayed.  Immediately closing the
+        # connection would be suspicious.
+        if srvState is not None and srvState.isReplayed(existingHMAC):
+            log.warning("The HMAC was already present in the replay table.")
+            return False
+
         data.drain(index + const.MARK_LENGTH + const.HMAC_SHA256_128_LENGTH)
+
+        if srvState is not None:
+            log.debug("Adding the HMAC authenticating the UniformDH message " \
+                      "to the replay table: %s." % existingHMAC.encode('hex'))
+            srvState.registerKey(existingHMAC)
 
         return handshake[:const.PUBLIC_KEY_LENGTH]
 

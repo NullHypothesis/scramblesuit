@@ -59,9 +59,7 @@ def isSane( totalLen, payloadLen, flags ):
     validFlags = [
         const.FLAG_PAYLOAD,
         const.FLAG_NEW_TICKET,
-        const.FLAG_CONFIRM_TICKET,
         const.FLAG_PRNG_SEED,
-        const.FLAG_PAYLOAD + const.FLAG_CONFIRM_TICKET
     ]
 
     return ok(totalLen) and ok(payloadLen) and (flags in validFlags)

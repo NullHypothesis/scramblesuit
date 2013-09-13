@@ -84,9 +84,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # `True' if the ticket is already decrypted but not yet authenticated.
         self.decryptedTicket = None
 
-        # Cache the master key so it can later be added to the replay table.
-        self.ticketReplayCache = None
-
         # Shared secret k_B which is only used for UniformDH.
         if not hasattr(self, "uniformDHSecret"):
             self.uniformDHSecret = None
@@ -329,20 +326,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if msg.flags & const.FLAG_PAYLOAD:
                 circuit.upstream.write(msg.payload)
 
-            # Let replay protection kick in after ticket was confirmed.
-            elif self.weAreServer and (msg.flags & const.FLAG_CONFIRM_TICKET):
-
-                if self.ticketReplayCache is not None:
-                    log.debug("Adding master key contained in ticket to the "
-                              "replay table.")
-                    self.srvState.registerKey(self.ticketReplayCache)
-
-                elif self.uniformdh.getRemotePublicKey() is not None:
-                    log.debug("Adding the remote's UniformDH public key to "
-                              "the replay table.")
-                    self.srvState.registerKey(
-                            self.uniformdh.getRemotePublicKey())
-
             # Store newly received ticket and send ACK to the server.
             elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
                 assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
@@ -352,9 +335,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                       msg.payload[const.MASTER_KEY_LENGTH:
                                                   const.MASTER_KEY_LENGTH +
                                                   const.TICKET_LENGTH], peer)
-                # Tell the server that we received the ticket.
-                log.debug("Sending FLAG_CONFIRM_TICKET message to server.")
-                self.sendRemote(circuit, "", flags=const.FLAG_CONFIRM_TICKET)
 
             # Use the PRNG seed to generate the same probability distributions
             # as the server.  That's where the polymorphism comes from.
@@ -417,7 +397,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if newTicket != None and newTicket.isValid():
                 self._deriveSecrets(newTicket.masterKey)
                 self.decryptedTicket = True
-                self.ticketReplayCache = newTicket.masterKey
             else:
                 return False
 
@@ -441,7 +420,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if not util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
             return False
 
+        # Do nothing if the ticket is replayed.  Immediately closing the
+        # connection would be suspicious.
+        if self.srvState.isReplayed(existingHMAC):
+            log.warning("The HMAC was already present in the replay table.")
+            return False
+
         data.drain(index + const.MARK_LENGTH + const.HMAC_SHA256_128_LENGTH)
+
+        log.debug("Adding the HMAC authenticating the ticket message to the " \
+                  "replay table: %s." % existingHMAC.encode('hex'))
+        self.srvState.registerKey(existingHMAC)
 
         log.debug("Switching to state ST_CONNECTED.")
         self.protoState = const.ST_CONNECTED
@@ -488,7 +477,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                 flags=const.FLAG_PRNG_SEED)
 
             # Second, interpret the data as a UniformDH handshake.
-            elif self.uniformdh.receivePublicKey(data, self._deriveSecrets):
+            elif self.uniformdh.receivePublicKey(data, self._deriveSecrets,
+                    self.srvState):
                 # Now send the server's UniformDH public key to the client.
                 handshakeMsg = self.uniformdh.createHandshake()
                 newTicket = ticket.issueTicketAndKey(self.srvState)

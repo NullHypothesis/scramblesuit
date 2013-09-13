@@ -96,14 +96,13 @@ class State( object ):
         self.oldHmacKey = None
         self.oldAesKey = None
 
-        # Replay dictionaries for both authentication mechanisms.
-        self.ticketReplay = replay.SessionTicketTracker()
-        self.uniformDhReplay = replay.UniformDHTracker()
+        # Replay dictionary for both authentication mechanisms.
+        self.replayTracker = replay.Tracker()
 
         # Distributions for packet lengths and inter arrival times.
         prng = random.Random(self.prngSeed)
         self.pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
-                                                           const.MTU),
+                                                         const.MTU),
                                     seed=self.prngSeed)
         self.iatDist = probdist.new(lambda: prng.random() %
                                     const.MAX_PACKET_DELAY,
@@ -111,26 +110,33 @@ class State( object ):
 
         self.writeState()
 
-    def registerKey( self, key ):
+    def isReplayed( self, hmac ):
         """
-        Register the given `key' in a replay table.
+        Check if `hmac' is present in the replay table.
 
-        Depending on the key length, it is either added to the ticket replay
-        table or the UniformDH replay table.
+        Return `True' if the given `hmac' is present in the replay table and
+        `False' otherwise.
         """
 
-        assert (self.ticketReplay is not None) and \
-               (self.uniformDhReplay is not None)
+        assert self.replayTracker is not None
 
-        if len(key) == const.MASTER_KEY_LENGTH:
-            self.ticketReplay.addKey(key)
-            self.writeState()
-        elif len(key) == const.PUBLIC_KEY_LENGTH:
-            self.uniformDhReplay.addKey(key)
-            self.writeState()
-        else:
-            log.warning("Received unknown key length of %d bytes to register "
-                        "for replay attacks." % len(key))
+        log.debug("Querying if HMAC is present in the replay table.")
+
+        return self.replayTracker.isPresent(hmac)
+
+    def registerKey( self, hmac ):
+        """
+        Add the given `hmac' to the replay table.
+        """
+
+        assert self.replayTracker is not None
+
+        log.debug("Adding a new HMAC to the replay table.")
+        self.replayTracker.addElement(hmac)
+
+        # We must write the data to disk immediately so that other ScrambleSuit
+        # connections can share the same state.
+        self.writeState()
 
     def writeState( self ):
         """
