@@ -240,7 +240,7 @@ class UniformDHPublicKey( object ):
         self.priv -= flip
 
         # Generate public key
-        self.pub = pow(self.g, self.priv, self.mod)
+        self.pub = util.powMod(self.g, self.priv, self.mod)
         if flip == 1:
             self.pub = self.mod - self.pub
         self.pub_str = int_to_bytes(self.pub, self.group_len)
@@ -260,5 +260,5 @@ class UniformDHPublicKey( object ):
         """
         their_pub = int(binascii.hexlify(their_pub_str), 16)
 
-        self.shared_secret = pow(their_pub, self.priv, self.mod)
+        self.shared_secret = util.powMod(their_pub, self.priv, self.mod)
         return int_to_bytes(self.shared_secret, self.group_len)
