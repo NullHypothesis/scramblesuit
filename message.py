@@ -30,13 +30,13 @@ def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
 
     messages = []
 
-    log.debug("Creating protocol messages.")
-
     while len(data) >= const.MPU:
         messages.append(ProtocolMessage(data[:const.MPU], flags=flags))
         data = data[const.MPU:]
 
     messages.append(ProtocolMessage(data, flags=flags))
+
+    log.debug("Created %d protocol messages." % len(messages))
 
     return messages
 
