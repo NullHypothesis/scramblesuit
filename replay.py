@@ -76,35 +76,3 @@ class Tracker( object ):
         # this construct.
         for elem in deleteList:
             del self.table[elem]
-
-
-class UniformDHTracker( Tracker ):
-
-    """
-    Extends the `Tracker' class with an `addKey()' method for UniformDH.
-    """
-
-    def addKey( self, key ):
-        """
-        Add the given UniformDH public key `key' to the lookup table.
-        """
-
-        log.debug("Caching UniformDH public key.")
-
-        self.addElement(key)
-
-
-class SessionTicketTracker( Tracker ):
-
-    """
-    Extends the `Tracker' class with an `addKey()' method for session tickets.
-    """
-
-    def addKey( self, key ):
-        """
-        Add the given session ticket master key `key' to the lookup table.
-        """
-
-        log.debug("Caching session ticket master key.")
-
-        self.addElement(key)
