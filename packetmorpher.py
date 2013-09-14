@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 """
 Provides code to morph a chunk of data to a given probability distribution.
 

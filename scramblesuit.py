@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """
 The scramblesuit module implements the ScrambleSuit obfuscation protocol.
 

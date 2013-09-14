@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """
 This module implements a class to deal with Uniform Diffie-Hellman handshakes.
 
