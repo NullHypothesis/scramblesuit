@@ -84,7 +84,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Class to handle UniformDH handshakes.
         self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
 
-        # Used by the unpack mechanism
+        # Variables used to unpack protocol messages.
         self.totalLen = self.payloadLen = self.flags = None
 
     def _deriveSecrets( self, masterKey ):
