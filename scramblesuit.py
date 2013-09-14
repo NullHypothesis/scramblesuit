@@ -23,7 +23,6 @@ import const
 import util
 import packetmorpher
 import ticket
-import replay
 import uniformdh
 import state
 
