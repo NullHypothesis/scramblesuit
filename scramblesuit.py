@@ -121,15 +121,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter,
                                                            self.recvCrypter)
 
-    def circuitDestroyed( self, circuit, reason, side ):
-        """
-        Log a warning if the connection was closed in a non-clean fashion.
-        """
-
-        # This is only printed because the user might be interested in it.
-        if reason and reason.check(error.ConnectionLost):
-            log.info("The connection was lost in a non-clean fashion.")
-
     def handshake( self, circuit ):
         """
         Initiate a ScrambleSuit handshake.
