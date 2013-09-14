@@ -81,13 +81,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if self.weAreServer:
             self.decryptedTicket = False
 
-        # Shared secret k_B which is only used for UniformDH.
-        if not hasattr(self, "uniformDHSecret"):
-            self.uniformDHSecret = None
-        else:
-            log.debug("UniformDH shared secret is given.")
-            self.uniformdh = uniformdh.new(self.uniformDHSecret,
-                                           self.weAreServer)
+        # Class to handle UniformDH handshakes.
+        self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
 
         # Check for a session ticket in a custom location.
         if not hasattr(self, "ticketFile"):
