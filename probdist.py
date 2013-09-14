@@ -35,10 +35,10 @@ class RandProbDist:
         self.prng = random if (seed is None) else random.Random(seed)
 
         self.sampleList = []
-        self.dist = self._genDistribution(genSingleton)
+        self.dist = self.genDistribution(genSingleton)
         self.dumpDistribution()
 
-    def _genDistribution( self, genSingleton ):
+    def genDistribution( self, genSingleton ):
         """
         Generate a discrete probability distribution.
 

@@ -62,7 +62,7 @@ class UniformDH( object ):
         """
 
         # Extract the public key sent by the remote host.
-        remotePublicKey = self._extractPublicKey(data, srvState)
+        remotePublicKey = self.extractPublicKey(data, srvState)
         if not remotePublicKey:
             return False
 
@@ -86,7 +86,7 @@ class UniformDH( object ):
 
         return True
 
-    def _extractPublicKey( self, data, srvState=None ):
+    def extractPublicKey( self, data, srvState=None ):
         """
         Extract and return a UniformDH public key out of `data'.
 

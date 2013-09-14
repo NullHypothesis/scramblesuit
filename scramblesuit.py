@@ -87,7 +87,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Variables used to unpack protocol messages.
         self.totalLen = self.payloadLen = self.flags = None
 
-    def _deriveSecrets( self, masterKey ):
+    def deriveSecrets( self, masterKey ):
         """
         Derive various session keys from the given `masterKey'.
 
@@ -140,7 +140,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if storedTicket is not None:
             log.debug("Redeeming stored session ticket.")
             (masterKey, rawTicket) = storedTicket
-            self._deriveSecrets(masterKey)
+            self.deriveSecrets(masterKey)
 
             circuit.downstream.write(ticket.createTicketMessage(rawTicket,
                                                                 self.sendHMAC))
@@ -149,7 +149,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # yet whether the server accepted the ticket.
             log.debug("Switching to state ST_CONNECTED.")
             self.protoState = const.ST_CONNECTED
-            self._flushSendBuffer(circuit)
+            self.flushSendBuffer(circuit)
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
         elif self.uniformDHSecret is not None:
@@ -199,12 +199,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if len(self.choppingBuf) == 0:
             self.choppingBuf += blurb
             reactor.callLater(self.iatMorpher.randomSample(),
-                              self._flushPieces, circuit)
+                              self.flushPieces, circuit)
         else:
-            # _flushPieces() is still busy processing the chopping buffer.
+            # flushPieces() is still busy processing the chopping buffer.
             self.choppingBuf += blurb
 
-    def _flushPieces( self, circuit ):
+    def flushPieces( self, circuit ):
         """
         Write the application data in chunks to the wire.
 
@@ -227,7 +227,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             return
 
         reactor.callLater(self.iatMorpher.randomSample(),
-                          self._flushPieces, circuit)
+                          self.flushPieces, circuit)
 
     def extractMessages( self, data, aes ):
         """
@@ -332,7 +332,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
 
-    def _flushSendBuffer( self, circuit ):
+    def flushSendBuffer( self, circuit ):
         """
         Flush the application's queued data.
 
@@ -353,7 +353,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.sendRemote(circuit, self.sendBuf)
         self.sendBuf = ""
 
-    def _receiveTicket( self, data ):
+    def receiveTicket( self, data ):
         """
         Extract and verify a potential session ticket.
 
@@ -374,7 +374,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             newTicket = ticket.decrypt(potentialTicket[:const.TICKET_LENGTH],
                                        self.srvState)
             if newTicket != None and newTicket.isValid():
-                self._deriveSecrets(newTicket.masterKey)
+                self.deriveSecrets(newTicket.masterKey)
                 self.decryptedTicket = True
             else:
                 return False
@@ -446,9 +446,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if self.weAreServer and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
             # First, try to interpret the incoming data as session ticket.
-            if self._receiveTicket(data):
+            if self.receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
-                self._flushSendBuffer(circuit)
+                self.flushSendBuffer(circuit)
                 self.sendRemote(circuit,
                                 ticket.issueTicketAndKey(self.srvState),
                                 flags=const.FLAG_NEW_TICKET)
@@ -456,7 +456,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                 flags=const.FLAG_PRNG_SEED)
 
             # Second, interpret the data as a UniformDH handshake.
-            elif self.uniformdh.receivePublicKey(data, self._deriveSecrets,
+            elif self.uniformdh.receivePublicKey(data, self.deriveSecrets,
                     self.srvState):
                 # Now send the server's UniformDH public key to the client.
                 handshakeMsg = self.uniformdh.createHandshake()
@@ -475,7 +475,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
                 log.debug("Switching to state ST_CONNECTED.")
                 self.protoState = const.ST_CONNECTED
-                self._flushSendBuffer(circuit)
+                self.flushSendBuffer(circuit)
 
             else:
                 log.debug("Authentication unsuccessful so far.  "
@@ -484,12 +484,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         if self.weAreClient and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
-            if not self.uniformdh.receivePublicKey(data, self._deriveSecrets):
+            if not self.uniformdh.receivePublicKey(data, self.deriveSecrets):
                 log.debug("Unable to finish UniformDH handshake just yet.")
                 return
             log.debug("Switching to state ST_CONNECTED.")
             self.protoState = const.ST_CONNECTED
-            self._flushSendBuffer(circuit)
+            self.flushSendBuffer(circuit)
 
         if self.protoState == const.ST_CONNECTED:
 
