@@ -108,7 +108,7 @@ def storeNewTicket( masterKey, ticket, bridge ):
     util.writeToFile(yaml.dump(tickets), const.CLIENT_TICKET_FILE)
 
 
-def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
+def findStoredTicket( bridge ):
     """
     Retrieve a previously stored ticket from the ticket dictionary.
 
@@ -118,6 +118,8 @@ def findStoredTicket( bridge, fileName=const.CLIENT_TICKET_FILE ):
     """
 
     assert bridge
+
+    fileName = const.CLIENT_TICKET_FILE
 
     log.debug("Attempting to read master key and ticket from file `%s'." %
               fileName)

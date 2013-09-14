@@ -84,13 +84,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Class to handle UniformDH handshakes.
         self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
 
-        # Check for a session ticket in a custom location.
-        if not hasattr(self, "ticketFile"):
-            self.ticketFile = const.CLIENT_TICKET_FILE
-        else:
-            log.debug("Custom session ticket file `%s' was given." %
-                      self.ticketFile)
-
         # Used by the unpack mechanism
         self.totalLen = self.payloadLen = self.flags = None
 
@@ -148,8 +141,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # The preferred way to authenticate is a session ticket.
         srvAddr = circuit.downstream.transport.getPeer()
-        storedTicket = ticket.findStoredTicket(srvAddr,
-                                               fileName=self.ticketFile)
+        storedTicket = ticket.findStoredTicket(srvAddr)
         if storedTicket is not None:
             log.debug("Redeeming stored session ticket.")
             (masterKey, rawTicket) = storedTicket
@@ -522,11 +514,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                help="Shared secret for UniformDH",
                                dest="uniformDHSecret")
 
-        subparser.add_argument("--ticket-file",
-                               type=str,
-                               help="Path to a session ticket (client only)",
-                               dest="ticketFile")
-
         super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
 
     @classmethod
@@ -537,9 +524,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         if args.uniformDHSecret:
             cls.uniformDHSecret = base64.b32decode(args.uniformDHSecret)
-
-        if args.ticketFile:
-            cls.ticketFile = args.ticketFile
 
         rawLength = len(base64.b32decode(args.uniformDHSecret))
 
