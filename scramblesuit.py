@@ -78,7 +78,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                        const.MAX_PACKET_DELAY)
 
         # `True' if the ticket is already decrypted but not yet authenticated.
-        self.decryptedTicket = None
+        if self.weAreServer:
+            self.decryptedTicket = False
 
         # Shared secret k_B which is only used for UniformDH.
         if not hasattr(self, "uniformDHSecret"):
