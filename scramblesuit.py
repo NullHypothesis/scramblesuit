@@ -89,7 +89,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
     def _deriveSecrets( self, masterKey ):
         """
-        Derive session keys from the given master key.
+        Derive various session keys from the given `masterKey'.
 
         The argument `masterKey' is used to derive two session keys and nonces
         for AES-CTR and two HMAC keys.  The derivation is done using
@@ -98,16 +98,20 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         assert len(masterKey) == const.MASTER_KEY_LENGTH
 
-        log.debug("Deriving session keys from master key.")
+        log.debug("Deriving session keys from %d-byte master key." %
+                  len(masterKey))
 
-        # We need key material for two symmetric keys, nonces and HMACs.  In
-        # total, this equals 144 bytes of key material.
+        # We need key material for two symmetric AES-CTR keys, nonces and
+        # HMACs.  In total, this equals 144 bytes of key material.
         hkdf = mycrypto.HKDF_SHA256(masterKey, "", (32 * 4) + (8 * 2))
         okm = hkdf.expand()
+        assert len(okm) >= ((32 * 4) + (8 * 2))
 
+        # Set AES-CTR keys and nonces for our two AES instances.
         self.sendCrypter.setSessionKey(okm[0:32],  okm[32:40])
         self.recvCrypter.setSessionKey(okm[40:72], okm[72:80])
 
+        # Set the keys for the two HMACs protecting our data integrity.
         self.sendHMAC = okm[80:112]
         self.recvHMAC = okm[112:144]
 
