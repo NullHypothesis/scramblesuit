@@ -69,8 +69,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.recvCrypter = mycrypto.PayloadCrypter()
 
         # Packet morpher to modify the protocol's packet length distribution.
-        self.pktMorpher = packetmorpher.PacketMorpher(self.srvState.pktDist
-                          if self.weAreServer else None)
+        self.pktMorpher = packetmorpher.new(self.srvState.pktDist
+                                            if self.weAreServer else None)
 
         # Inter arrival time morpher to obfuscate inter arrival times.
         self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
