@@ -61,10 +61,10 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Buffers for incoming and outgoing data.
         self.sendBuf = self.recvBuf = ""
 
-        # Caches the outgoing data before written to the wire.
+        # Buffer for inter-arrival time obfuscation.
         self.choppingBuf = ""
 
-        # AES instances for incoming and outgoing data.
+        # AES instances to decrypt incoming and encrypt outgoing data.
         self.sendCrypter = mycrypto.PayloadCrypter()
         self.recvCrypter = mycrypto.PayloadCrypter()
 
@@ -72,7 +72,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.pktMorpher = packetmorpher.new(self.srvState.pktDist
                                             if self.weAreServer else None)
 
-        # Inter arrival time morpher to obfuscate inter arrival times.
+        # Inter-arrival time morpher to obfuscate inter arrival times.
         self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
                           probdist.new(lambda: random.random() %
                                        const.MAX_PACKET_DELAY)
