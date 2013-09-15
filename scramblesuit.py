@@ -556,28 +556,31 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.debug("Received the following arguments over SOCKS: %s." % args)
 
-        # A shared secret might already be set if obfsproxy is in
-        # external mode.
-        if self.uniformDHSecret:
-            log.info("A UniformDH shared secret was already specified over"
-                     "the command line.  Using the SOCKS secret.")
-
         if len(args) != 1:
             raise base.SOCKSArgsError("Too many SOCKS arguments "
                                       "(expected 1 but got %d)." % len(args))
 
-        if not args[0].startswith("shared-secret="):
-            raise base.SOCKSArgsError("The SOCKS argument should start with"
-                                      "`shared-secret='.")
+        # The ScrambleSuit specification defines that the shared secret is
+        # called "password".
+        if not args[0].startswith("password="):
+            raise base.SOCKSArgsError("The SOCKS argument must start with "
+                                      "`password='.")
 
-        self.uniformDHSecret = base64.b32decode(args[0][14:])
+        # A shared secret might already be set if obfsproxy is in external
+        # mode.
+        if self.uniformDHSecret:
+            log.warning("A UniformDH shared secret was already specified over "
+                        "the command line.  Using the SOCKS secret instead.")
 
-        rawLength = len(base64.b32decode(args.uniformDHSecret))
+        self.uniformDHSecret = base64.b32decode(args[0].split('=')[1].strip())
 
+        rawLength = len(self.uniformDHSecret)
         if rawLength != const.SHARED_SECRET_LENGTH:
             raise base.PluggableTransportError("The UniformDH shared secret "
                     "must be %d bytes in length but %d bytes are given." %
                     (const.SHARED_SECRET_LENGTH, rawLength))
+
+        self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
 
 
 class ScrambleSuitClient( ScrambleSuitTransport ):
