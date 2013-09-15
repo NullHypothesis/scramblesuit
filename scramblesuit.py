@@ -547,7 +547,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
     def handle_socks_args( self, args ):
         """
-        Receive arguments passed over a SOCKS connection.
+        Receive arguments `args' passed over a SOCKS connection.
 
         The SOCKS authentication mechanism is (ab)used to pass arguments to
         pluggable transports.  This method receives these arguments and parses
