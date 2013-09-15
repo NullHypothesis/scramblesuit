@@ -1,6 +1,5 @@
-
-         **WARNING: ScrambleSuit is NOT YET SAFE for practical use!**
--------------------------------------------------------------------------------
+**WARNING: ScrambleSuit is NOT YET SAFE for practical use!**
+------------------------------------------------------------
 
 Overview
 ========
@@ -20,8 +19,11 @@ randomness.  Clients can authenticate themselves towards a ScrambleSuit bridge
 by conducting a modified UniformDH handshake or by redeeming a special session
 ticket.
 
-For the detailed design of ScrambleSuit, please have a look at the project
-page available at <http://www.cs.kau.se/philwint/scramblesuit/>.
+For a more detailed overview of ScrambleSuit, please have a look at the project
+page available at <http://www.cs.kau.se/philwint/scramblesuit/>.  The research
+paper is available at <http://www.cs.kau.se/philwint/pdf/wpes2013.pdf>.
+Finally, the directory "doc/" in this repository contains the protocol
+specification of ScrambleSuit.
 
 Installation and Testing
 ========================
