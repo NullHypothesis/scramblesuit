@@ -153,15 +153,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.flushSendBuffer(circuit)
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
-        elif self.uniformDHSecret is not None:
+        else:
             log.debug("No session ticket to redeem.  Running UniformDH.")
             circuit.downstream.write(self.uniformdh.createHandshake())
-
-        else:
-            log.error("Neither a UniformDH secret nor a ticket is available."
-                      "  %s needs at least one of these for authentication." %
-                      const.TRANSPORT_NAME)
-            raise base.PluggableTransportError("Unable to authenticate.")
 
     def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
         """
