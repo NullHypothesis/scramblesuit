@@ -524,6 +524,27 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
 
+    @classmethod
+    def handle_server_transport_options( cls, transportOptions ):
+        """
+        Receive the shared secret contained in the `transportOptions' dict.
+
+        The shared secret contained in `transportOptions' is extracted and
+        set after some sanity checking.  This method is called by obfsproxy.
+        """
+
+        log.debug("Given server transport options: %s." %
+                  str(transportOptions))
+
+        # The ScrambleSuit specification defines that the shared secret is
+        # called "password".
+        assert transportOptions.has_key("password")
+
+        secret = base64.b32decode(transportOptions["password"]).strip()
+        assert len(secret) == const.SHARED_SECRET_LENGTH
+
+        cls.uniformDHSecret = secret
+
     def handle_socks_args( self, args ):
         """
         Receive arguments passed over a SOCKS connection.
