@@ -1,0 +1,34 @@
+# Feel free to adapt the path.
+DataDirectory /tmp/scramblesuit-torserver
+
+Log notice stdout
+
+SOCKSPort auto
+
+# This is just a test configuration.  As a result, we simply assume that we are
+# reachable.
+AssumeReachable 1
+
+# This is just a test configuration.  As a result, we are not publishing our
+# server descriptor.
+PublishServerDescriptor 0
+
+Exitpolicy reject *:*
+
+ORPort auto
+
+ControlPort auto
+
+Nickname "ScrambleSuitTest"
+
+BridgeRelay 1
+
+# Feel free to adapt the listen address, the port as well as the password's
+# value (as long as it is the same for the client).  The key "password=",
+# however, *must* be used.
+ServerTransportListenAddr scramblesuit 127.0.0.1:65535
+ServerTransportOptions scramblesuit password=3X5BIA2MIHLZ55UV4VAEGKZIQPPZ4QT3
+ServerTransportPlugin scramblesuit exec /usr/local/bin/obfsproxy \
+	--log-min-severity=debug \
+	--log-file=scramblesuit-server.log \
+	managed
