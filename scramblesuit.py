@@ -82,7 +82,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.decryptedTicket = False
 
         # Class to handle UniformDH handshakes.
-        self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
+        if hasattr(self, 'uniformDHSecret'):
+            self.uniformdh = uniformdh.new(self.uniformDHSecret,
+                                           self.weAreServer)
+        else:
+            self.uniformDHSecret = None
 
         # Variables used to unpack protocol messages.
         self.totalLen = self.payloadLen = self.flags = None
