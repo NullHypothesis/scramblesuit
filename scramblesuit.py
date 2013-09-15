@@ -123,25 +123,25 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
     def handshake( self, circuit ):
         """
-        Initiate a ScrambleSuit handshake.
+        Initiate a ScrambleSuit handshake over `circuit'.
 
-        This method is only relevant for clients.  If a session ticket is
-        available it is redeemed.  Otherwise, a UniformDH handshake is
-        initiated.
+        This method is only relevant for clients since servers never initiate
+        handshakes.  If a session ticket is available, it is redeemed.
+        Otherwise, a UniformDH handshake is conducted.
         """
 
         # The server handles the handshake passively.
         if self.weAreServer:
             return
 
-        # The preferred way to authenticate is a session ticket.
-        srvAddr = circuit.downstream.transport.getPeer()
-        storedTicket = ticket.findStoredTicket(srvAddr)
+        # The preferred authentication mechanism is a session ticket.
+        bridge = circuit.downstream.transport.getPeer()
+        storedTicket = ticket.findStoredTicket(bridge)
+
         if storedTicket is not None:
             log.debug("Redeeming stored session ticket.")
             (masterKey, rawTicket) = storedTicket
             self.deriveSecrets(masterKey)
-
             circuit.downstream.write(ticket.createTicketMessage(rawTicket,
                                                                 self.sendHMAC))
 
@@ -149,6 +149,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # yet whether the server accepted the ticket.
             log.debug("Switching to state ST_CONNECTED.")
             self.protoState = const.ST_CONNECTED
+
             self.flushSendBuffer(circuit)
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
