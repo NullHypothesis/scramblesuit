@@ -119,19 +119,17 @@ def findStoredTicket( bridge ):
 
     assert bridge
 
-    fileName = const.CLIENT_TICKET_FILE
-
     log.debug("Attempting to read master key and ticket from file `%s'." %
-              fileName)
+              const.CLIENT_TICKET_FILE)
 
-    if not os.path.exists(fileName):
+    if not os.path.exists(const.CLIENT_TICKET_FILE):
         return None
 
     # Load the ticket hash table from file.
-    blurb = util.readFromFile(fileName)
-    if (blurb is None) or (len(blurb) == 0):
+    yamlBlurb = util.readFromFile(const.CLIENT_TICKET_FILE)
+    if (yamlBlurb is None) or (len(yamlBlurb) == 0):
         return None
-    tickets = yaml.safe_load(blurb)
+    tickets = yaml.safe_load(yamlBlurb)
 
     try:
         timestamp, masterKey, ticket = tickets[str(bridge)]
