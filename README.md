@@ -20,10 +20,9 @@ by conducting a modified UniformDH handshake or by redeeming a special session
 ticket.
 
 For a more detailed overview of ScrambleSuit, please have a look at the project
-page available at <http://www.cs.kau.se/philwint/scramblesuit/>.  The research
-paper is available at <http://www.cs.kau.se/philwint/pdf/wpes2013.pdf>.
-Finally, the directory "doc/" in this repository contains the protocol
-specification of ScrambleSuit.
+page available at <http://veri.nymity.ch/scramblesuit/>.  The research paper is
+available at <http://veri.nymity.ch/pdf/wpes2013.pdf>.  Finally, the directory
+"doc/" in this repository contains the protocol specification of ScrambleSuit.
 
 Installation and Testing
 ========================
