@@ -137,6 +137,11 @@ def findStoredTicket( bridge ):
         log.info("Found no ticket for bridge `%s'." % str(bridge))
         return None
 
+    # We can remove the ticket now since we are about to redeem it.
+    log.debug("Deleting ticket since it is about to be redeemed.")
+    del tickets[str(bridge)]
+    util.writeToFile(yaml.dump(tickets), const.CLIENT_TICKET_FILE)
+
     # If our ticket is expired, we can't redeem it.
     if (int(time.time()) - timestamp) > const.KEY_ROTATION_TIME:
         log.warning("We did have a ticket but it already expired %s ago." %
