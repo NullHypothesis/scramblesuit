@@ -76,10 +76,10 @@ class Tracker( object ):
 
         for element in self.table.iterkeys():
             if (now - self.table[element]) > const.EPOCH_GRANULARITY:
-                log.debug("Deleting expired element.")
                 deleteList.append(element)
 
         # We can't delete from a dictionary while iterating over it; therefore
         # this construct.
         for elem in deleteList:
+            log.debug("Deleting expired element.")
             del self.table[elem]
