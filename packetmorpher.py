@@ -48,10 +48,5 @@ class PacketMorpher( object ):
 
         return padLen
 
-    def randomSample( self ):
-        """Return a random sample of the stored probability distribution."""
-
-        return self.dist.randomSample()
-
 # Alias class name in order to provide a more intuitive API.
 new = PacketMorpher
