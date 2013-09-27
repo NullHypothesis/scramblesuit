@@ -94,7 +94,7 @@ def storeNewTicket( masterKey, ticket, bridge ):
     assert len(masterKey) == const.MASTER_KEY_LENGTH
     assert len(ticket) == const.TICKET_LENGTH
 
-    ticketFile = const.DATA_DIRECTORY + const.CLIENT_TICKET_FILE
+    ticketFile = const.STATE_LOCATION + const.CLIENT_TICKET_FILE
 
     log.debug("Storing newly received ticket in `%s'." % ticketFile)
 
@@ -120,7 +120,7 @@ def findStoredTicket( bridge ):
 
     assert bridge
 
-    ticketFile = const.DATA_DIRECTORY + const.CLIENT_TICKET_FILE
+    ticketFile = const.STATE_LOCATION + const.CLIENT_TICKET_FILE
 
     log.debug("Attempting to read master key and ticket from file `%s'." %
               ticketFile)

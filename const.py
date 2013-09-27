@@ -16,7 +16,7 @@ TICKET_AES_CBC_IV_LENGTH = 16
 
 # Directory where long-lived information is stored.  It defaults to the current
 # directory but is later set by `setStateLocation()' in util.py.
-DATA_DIRECTORY = ""
+STATE_LOCATION = ""
 
 # Divisor (in seconds) for the Unix epoch used to defend against replay
 # attacks.

@@ -19,7 +19,7 @@ log = logging.get_obfslogger()
 
 def setStateLocation( stateLocation ):
     """
-    Set the constant `DATA_DIRECTORY' to the given `stateLocation'.
+    Set the constant `STATE_LOCATION' to the given `stateLocation'.
 
     The variable `stateLocation' determines where persistent information (such
     as the server's key material) is stored.  If `stateLocation' is `None', it
@@ -43,8 +43,8 @@ def setStateLocation( stateLocation ):
         log.info("Creating directory path `%s'." % stateLocation)
         os.makedirs(stateLocation)
 
-    log.debug("Setting the data directory to `%s'." % stateLocation)
-    const.DATA_DIRECTORY = stateLocation
+    log.debug("Setting the state location to `%s'." % stateLocation)
+    const.STATE_LOCATION = stateLocation
 
 
 def powMod( x, y, mod ):
