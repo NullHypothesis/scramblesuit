@@ -94,18 +94,19 @@ def storeNewTicket( masterKey, ticket, bridge ):
     assert len(masterKey) == const.MASTER_KEY_LENGTH
     assert len(ticket) == const.TICKET_LENGTH
 
-    log.debug("Storing newly received ticket in `%s'." %
-              const.CLIENT_TICKET_FILE)
+    ticketFile = const.DATA_DIRECTORY + const.CLIENT_TICKET_FILE
+
+    log.debug("Storing newly received ticket in `%s'." % ticketFile)
 
     # Add a new (key, ticket) tuple with the given bridge as hash key.
     tickets = dict()
-    content = util.readFromFile(const.CLIENT_TICKET_FILE)
+    content = util.readFromFile(ticketFile)
     if (content is not None) and (len(content) > 0):
         tickets = yaml.safe_load(content)
 
     # We also store a timestamp so we later know if our ticket already expired.
     tickets[str(bridge)] = [int(time.time()), masterKey, ticket]
-    util.writeToFile(yaml.dump(tickets), const.CLIENT_TICKET_FILE)
+    util.writeToFile(yaml.dump(tickets), ticketFile)
 
 
 def findStoredTicket( bridge ):
@@ -119,14 +120,16 @@ def findStoredTicket( bridge ):
 
     assert bridge
 
-    log.debug("Attempting to read master key and ticket from file `%s'." %
-              const.CLIENT_TICKET_FILE)
+    ticketFile = const.DATA_DIRECTORY + const.CLIENT_TICKET_FILE
 
-    if not os.path.exists(const.CLIENT_TICKET_FILE):
+    log.debug("Attempting to read master key and ticket from file `%s'." %
+              ticketFile)
+
+    if not os.path.exists(ticketFile):
         return None
 
     # Load the ticket hash table from file.
-    yamlBlurb = util.readFromFile(const.CLIENT_TICKET_FILE)
+    yamlBlurb = util.readFromFile(ticketFile)
     if (yamlBlurb is None) or (len(yamlBlurb) == 0):
         return None
     tickets = yaml.safe_load(yamlBlurb)
@@ -140,7 +143,7 @@ def findStoredTicket( bridge ):
     # We can remove the ticket now since we are about to redeem it.
     log.debug("Deleting ticket since it is about to be redeemed.")
     del tickets[str(bridge)]
-    util.writeToFile(yaml.dump(tickets), const.CLIENT_TICKET_FILE)
+    util.writeToFile(yaml.dump(tickets), ticketFile)
 
     # If our ticket is expired, we can't redeem it.
     if (int(time.time()) - timestamp) > const.KEY_ROTATION_TIME:

@@ -63,7 +63,7 @@ PUBLIC_KEY_LENGTH = 512
 PRNG_SEED_LENGTH = 32
 
 # File which holds the server's state information.
-SERVER_STATE_FILE = DATA_DIRECTORY + "server_state.cpickle"
+SERVER_STATE_FILE = "server_state.cpickle"
 
 # Life time of session tickets in seconds.
 SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
@@ -81,7 +81,7 @@ ST_WAIT_FOR_AUTH = 0
 ST_CONNECTED = 1
 
 # File which holds the client's session tickets.
-CLIENT_TICKET_FILE = DATA_DIRECTORY + "session_ticket.yaml"
+CLIENT_TICKET_FILE = "session_ticket.yaml"
 
 # Static validation string embedded in all tickets.  Must be a multiple of 16
 # bytes due to AES' block size.

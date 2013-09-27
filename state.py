@@ -30,21 +30,23 @@ def load( ):
     state file is found, a new one is created and returned.
     """
 
-    log.info("Attempting to load the server's state file from `%s'." %
-             const.SERVER_STATE_FILE)
+    stateFile = const.DATA_DIRECTORY + const.SERVER_STATE_FILE
 
-    if not os.path.exists(const.SERVER_STATE_FILE):
+    log.info("Attempting to load the server's state file from `%s'." %
+             stateFile)
+
+    if not os.path.exists(stateFile):
         log.info("The server's state file does not exist (yet).")
         state = State()
         state.genState()
         return state
 
     try:
-        with open(const.SERVER_STATE_FILE, 'r') as fd:
+        with open(stateFile, 'r') as fd:
             stateObject = cPickle.load(fd)
     except IOError as err:
         log.error("Error reading server state file from `%s': %s" %
-                  (const.SERVER_STATE_FILE, err))
+                  (stateFile, err))
         sys.exit(1)
 
     return stateObject
@@ -140,13 +142,15 @@ class State( object ):
         Write the state object to a file using the `cPickle' module.
         """
 
+        stateFile = const.DATA_DIRECTORY + const.SERVER_STATE_FILE
+
         log.debug("Writing server's state file to `%s'." %
-                  const.SERVER_STATE_FILE)
+                  stateFile)
 
         try:
-            with open(const.SERVER_STATE_FILE, 'w') as fd:
+            with open(stateFile, 'w') as fd:
                 cPickle.dump(self, fd)
         except IOError as err:
             log.error("Error writing state file to `%s': %s" %
-                      (const.SERVER_STATE_FILE, err))
+                      (stateFile, err))
             sys.exit(1)
