@@ -77,15 +77,21 @@ class ScrambleSuitTransport( base.BaseTransport ):
                           probdist.new(lambda: random.random() %
                                        const.MAX_PACKET_DELAY)
 
-        # `True' if the ticket is already decrypted but not yet authenticated.
         if self.weAreServer:
+            # `True' if the ticket is already decrypted but not yet
+            # authenticated.
             self.decryptedTicket = False
 
-        # Class to handle UniformDH handshakes.
-        if hasattr(self, 'uniformDHSecret'):
+            # As the server, we get the shared secret over the constructor.
+            cfg  = transportConfig.getServerTransportOptions()
+            self.uniformDHSecret = base64.b32decode(cfg["password"]).strip()
+            assert len(self.uniformDHSecret) == const.SHARED_SECRET_LENGTH
             self.uniformdh = uniformdh.new(self.uniformDHSecret,
                                            self.weAreServer)
+
         else:
+            # As the client, we get the shared secret from obfsproxy calling
+            # `handle_socks_args()'.
             self.uniformDHSecret = None
 
         util.setStateLocation(transportConfig.getStateLocation())
