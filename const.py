@@ -14,8 +14,9 @@ TICKET_AES_KEY_LENGTH = 16
 # Length of the IV for AES-CBC which is used to encrypt tickets in bytes.
 TICKET_AES_CBC_IV_LENGTH = 16
 
-# FIXME - Directory where long-lived information is stored.
-DATA_DIRECTORY = "/tmp/"
+# Directory where long-lived information is stored.  It defaults to the current
+# directory but is later set by `setStateLocation()' in util.py.
+DATA_DIRECTORY = ""
 
 # Divisor (in seconds) for the Unix epoch used to defend against replay
 # attacks.
