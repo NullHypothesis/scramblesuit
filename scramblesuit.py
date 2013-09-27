@@ -88,6 +88,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         else:
             self.uniformDHSecret = None
 
+        util.setStateLocation(transportConfig.getStateLocation())
+
         # Variables used to unpack protocol messages.
         self.totalLen = self.payloadLen = self.flags = None
 
