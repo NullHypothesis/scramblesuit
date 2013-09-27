@@ -7,6 +7,7 @@ from files and to convert a number to raw text.
 
 import obfsproxy.common.log as logging
 
+import os
 import time
 import const
 
@@ -15,6 +16,35 @@ import gmpy
 import mycrypto
 
 log = logging.get_obfslogger()
+
+def setStateLocation( stateLocation ):
+    """
+    Set the constant `DATA_DIRECTORY' to the given `stateLocation'.
+
+    The variable `stateLocation' determines where persistent information (such
+    as the server's key material) is stored.  If `stateLocation' is `None', it
+    remains to be the current directory.  In general, however, it should be a
+    subdirectory of Tor's data directory.
+    """
+
+    if stateLocation is None:
+        return
+
+    if not stateLocation.endswith('/'):
+        stateLocation += '/'
+
+    # To be polite, we create a subdirectory inside wherever we are asked to
+    # store data in.
+    stateLocation += (const.TRANSPORT_NAME).lower() + '/'
+
+    # ...and if it does not exist yet, we attempt to create the full
+    # directory path.
+    if not os.path.exists(stateLocation):
+        log.info("Creating directory path `%s'." % stateLocation)
+        os.makedirs(stateLocation)
+
+    log.debug("Setting the data directory to `%s'." % stateLocation)
+    const.DATA_DIRECTORY = stateLocation
 
 
 def powMod( x, y, mod ):
