@@ -82,17 +82,20 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # authenticated.
             self.decryptedTicket = False
 
-            # As the server, we get the shared secret over the constructor.
-            cfg  = transportConfig.getServerTransportOptions()
-            self.uniformDHSecret = base64.b32decode(cfg["password"]).strip()
-            assert len(self.uniformDHSecret) == const.SHARED_SECRET_LENGTH
-            self.uniformdh = uniformdh.new(self.uniformDHSecret,
-                                           self.weAreServer)
+            if not hasattr(self, 'uniformDHSecret'):
+
+                # As the server, we get the shared secret from the constructor.
+                cfg  = transportConfig.getServerTransportOptions()
+                self.uniformDHSecret = base64.b32decode(cfg["password"])
+                self.uniformDHSecret = self.uniformDHSecret.strip()
 
         else:
             # As the client, we get the shared secret from obfsproxy calling
             # `handle_socks_args()'.
-            self.uniformDHSecret = None
+            if not hasattr(self, 'uniformDHSecret'):
+                self.uniformDHSecret = None
+
+        self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
 
         util.setStateLocation(transportConfig.getStateLocation())
 
