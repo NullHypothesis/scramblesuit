@@ -45,8 +45,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         Initialise a ScrambleSuitTransport object.
         """
 
-        log.error("\n+++ Note that ScrambleSuit is still under "
-                  "development and is NOT safe for practical use. +++\n")
+        log.error("\n\n################################################\n"
+                  "Do NOT rely on ScrambleSuit for strong security!\n"
+                  "################################################\n")
 
         log.debug("Initialising %s." % const.TRANSPORT_NAME)
 
