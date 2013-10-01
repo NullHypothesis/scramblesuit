@@ -51,6 +51,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.debug("Initialising %s." % const.TRANSPORT_NAME)
 
+        util.setStateLocation(transportConfig.getStateLocation())
+
         # Load the server's persistent state from file.
         if self.weAreServer:
             self.srvState = state.load()
@@ -97,8 +99,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.uniformDHSecret = None
 
         self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
-
-        util.setStateLocation(transportConfig.getStateLocation())
 
         # Variables used to unpack protocol messages.
         self.totalLen = self.payloadLen = self.flags = None
