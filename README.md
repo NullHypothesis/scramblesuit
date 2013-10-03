@@ -27,38 +27,31 @@ available at <http://veri.nymity.ch/pdf/wpes2013.pdf>.  Finally, the directory
 Installation and Testing
 ========================
 
-The following software is needed in order to test ScrambleSuit:
+The following instructions were tested on Debian wheezy but they should work
+just fine on other GNU/Linux distributions as well.
 
-* `tor` in version v0.2.5.0-alpha-dev or newer.
-* `obfsproxy` with the code branch bug8979_draft checked out.
-* `pyptlib` with the code branch bug8979_take2 checked out.
+1. Two additional Python packages are necessary: gmpy and yaml.  Debian has
+   them under the names "python-gmpy" and "python-yaml".
 
-First, you have to copy ScrambleSuit's Python files into `obfsproxy`'s
-"obfsproxy/transports/" directory.  Finally, apply the following patch to
-`obfsproxy`'s "transports.py" file.  It will make `obfsproxy` aware that
-ScrambleSuit exists:
+2. Clone and compile the current Tor-git (or use a version of your choice as
+   long as it is >= v0.2.5.0-alpha-dev):  
+   `git clone https://git.torproject.org/tor.git`
 
-    --- a/obfsproxy/transports/transports.py
-    +++ b/obfsproxy/transports/transports.py
-    @@ -3,9 +3,11 @@ import obfsproxy.transports.dummy as dummy
-     import obfsproxy.transports.b64 as b64
-     import obfsproxy.transports.obfs2 as obfs2
-     import obfsproxy.transports.obfs3 as obfs3
-    +import obfsproxy.transports.scramblesuit as scramblesuit
+3. Clone the current version of pyptlib (or use a version of your choice as
+   long as it is >= 0.0.5):  
+   `git clone https://git.torproject.org/pluggable-transports/pyptlib.git`
 
-     transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyClient, 'server' : dummy.DummyServer },
-                    'b64'   : {'base': b64.B64Transport, 'client' : b64.B64Client, 'server' : b64.B64Server },
-    +               'scramblesuit' : {'base': scramblesuit.ScrambleSuitTransport, 'client' : scramblesuit.ScrambleSuitClient, 'server' : scramblesuit.ScrambleSuitServer },
-                    'obfs2' : {'base': obfs2.Obfs2Transport, 'client' : obfs2.Obfs2Client, 'server' : obfs2.Obfs2Server },
-                    'obfs3' : {'base': obfs3.Obfs3Transport, 'client' : obfs3.Obfs3Client, 'server' : obfs3.Obfs3Server } }
+4. Clone a modified version of obfsproxy which contains the scramblesuit
+   branch:  
+   `git clone -b scramblesuit https://git.torproject.org/user/phw/obfsproxy.git`  
+   `cd obfsproxy/`  
+   `git submodule init`  
+   `git submodule update`
 
 The directory "test/" in this repository contains two configuration files for
-`tor` which provide a simple ScrambleSuit setup.  They can be run by invoking
-`tor -f torrc.server` on the server and `tor -f torrc.client` on the client
-(You can use the `PYTHONPATH` environment variable to point towards your custom
-checkout of `obfsproxy` and `pyptlib`).  This will start a ScrambleSuit bridge
-waiting for connections on the loopback interface 127.0.0.1:65535.  The client
-will then try to connect to the bridge.
+`tor` which provide a simple ScrambleSuit setup.  Furthermore, the script
+`generate_secret.py` can be used to generate shared secrets for Tor's
+configuration file.
 
 Feedback
 ========
