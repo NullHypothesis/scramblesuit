@@ -16,13 +16,12 @@ in pure Python and solves two problems:
 
 Besides, ScrambleSuit's payload is computationally indistinguishable from
 randomness.  Clients can authenticate themselves towards a ScrambleSuit bridge
-by conducting a modified UniformDH handshake or by redeeming a special session
-ticket.
+by conducting a modified UniformDH handshake or by redeeming a session ticket.
 
 For a more detailed overview of ScrambleSuit, please have a look at the project
 page available at <http://veri.nymity.ch/scramblesuit/>.  The research paper is
 available at <http://veri.nymity.ch/pdf/wpes2013.pdf>.  Finally, the directory
-"doc/" in this repository contains the protocol specification of ScrambleSuit.
+"doc/" in this repository contains the protocol specification for ScrambleSuit.
 
 Installation and Testing
 ========================
