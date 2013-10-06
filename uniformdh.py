@@ -103,8 +103,8 @@ class UniformDH( object ):
                         const.HMAC_SHA256_128_LENGTH):
             return False
 
-        log.debug("Attempting to extract UniformDH public key out of %d bytes "
-                  "of data." % len(data))
+        log.debug("Attempting to extract the remote machine's UniformDH "
+                  "public key out of %d bytes of data." % len(data))
 
         handshake = data.peek()
 
