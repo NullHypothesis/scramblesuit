@@ -154,6 +154,10 @@ def readFromFile( fileName, length=-1 ):
 
     data = None
 
+    if not os.path.exists(fileName):
+        log.debug("File `%s' does not exist (yet?)." % fileName)
+        return None
+
     log.debug("Opening `%s' for reading." % fileName)
 
     try:
