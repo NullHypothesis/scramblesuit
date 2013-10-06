@@ -125,9 +125,6 @@ def findStoredTicket( bridge ):
     log.debug("Attempting to read master key and ticket from file `%s'." %
               ticketFile)
 
-    if not os.path.exists(ticketFile):
-        return None
-
     # Load the ticket hash table from file.
     yamlBlurb = util.readFromFile(ticketFile)
     if (yamlBlurb is None) or (len(yamlBlurb) == 0):
