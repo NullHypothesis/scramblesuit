@@ -80,8 +80,6 @@ def isValidHMAC( hmac1, hmac2, key ):
     doubleHmac2 = mycrypto.HMAC_SHA256_128(key, hmac2)
 
     if doubleHmac1 != doubleHmac2:
-        log.warning("The HMAC is invalid: `%s' vs. `%s'." %
-                    (hmac1.encode('hex'), hmac2.encode('hex')))
         return False
 
     log.debug("The computed HMAC is valid.")

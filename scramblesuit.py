@@ -408,6 +408,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                           util.getEpoch())
 
         if not util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
+            log.warning("The HMAC is invalid: `%s' vs. `%s'." %
+                        (myHMAC.encode('hex'), existingHMAC.encode('hex')))
             return False
 
         # Do nothing if the ticket is replayed.  Immediately closing the
