@@ -38,6 +38,28 @@ def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
     return messages
 
 
+def getFlagNames( flags ):
+    """
+    Return the flag names contained in the integer `flags' as string.
+
+    This function is only useful for printing easy-to-read flag names in debug
+    log messages.
+    """
+
+    names = ""
+
+    if flags & (1 << 0):
+        names += ",PAYLOAD"
+    elif flags & (1 << 1):
+        names += ",NEW_TICKET"
+    elif flags & (1 << 2):
+        names += ",PRNG_SEED"
+    else:
+        names += ",Undefined"
+
+    return names[1:]
+
+
 def isSane( totalLen, payloadLen, flags ):
     """
     Verifies whether the given header fields are sane.
@@ -51,7 +73,7 @@ def isSane( totalLen, payloadLen, flags ):
         return True if (0 <= length <= const.MPU) else False
 
     log.debug("Message header: totalLen=%d, payloadLen=%d, flags"
-              "=%d" % (totalLen, payloadLen, flags))
+              "=%s" % (totalLen, payloadLen, getFlagNames(flags)))
 
     validFlags = [
         const.FLAG_PAYLOAD,
