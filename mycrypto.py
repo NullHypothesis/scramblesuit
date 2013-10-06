@@ -112,7 +112,7 @@ class PayloadCrypter:
         Initialise a PayloadCrypter object.
         """
 
-        log.debug("Initialising payload crypter.")
+        log.debug("Initialising AES-CTR instance.")
 
         self.sessionKey = None
         self.crypter = None
