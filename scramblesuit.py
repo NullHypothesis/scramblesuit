@@ -444,7 +444,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Buffer data we are not ready to transmit yet.
         else:
             self.sendBuf += data.read()
-            log.debug("%d bytes of outgoing data buffered." %
+            log.debug("Buffered %d bytes of outgoing data." %
                       len(self.sendBuf))
 
     def receivedDownstream( self, data, circuit ):
