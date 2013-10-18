@@ -111,12 +111,12 @@ class ProtocolMessage( object ):
         self.payload = payload
         self.flags = flags
 
-    def encryptAndHMAC( self, crypter, HMACKey ):
+    def encryptAndHMAC( self, crypter, hmacKey ):
         """
         Encrypt and authenticate this protocol message.
 
         This protocol message is encrypted using `crypter' and authenticated
-        using `HMACKey'.  Finally, the encrypted message prepended by a
+        using `hmacKey'.  Finally, the encrypted message prepended by a
         HMAC-SHA256-128 is returned and ready to be sent over the wire.
         """
 
@@ -125,7 +125,7 @@ class ProtocolMessage( object ):
                                     chr(self.flags) + self.payload +
                                     (self.totalLen - self.payloadLen) * '\0')
 
-        hmac = mycrypto.HMAC_SHA256_128(HMACKey, encrypted)
+        hmac = mycrypto.HMAC_SHA256_128(hmacKey, encrypted)
 
         return hmac + encrypted
 
