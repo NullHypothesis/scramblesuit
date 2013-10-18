@@ -480,15 +480,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
                           "session ticket." % len(handshakeMsg))
 
                 circuit.downstream.write(handshakeMsg)
-
                 log.debug("UniformDH authentication succeeded.")
+
+                log.debug("Switching to state ST_CONNECTED.")
+                self.protoState = const.ST_CONNECTED
+
                 self.sendRemote(circuit, newTicket,
                                 flags=const.FLAG_NEW_TICKET)
                 self.sendRemote(circuit, self.srvState.prngSeed,
                                 flags=const.FLAG_PRNG_SEED)
-
-                log.debug("Switching to state ST_CONNECTED.")
-                self.protoState = const.ST_CONNECTED
                 self.flushSendBuffer(circuit)
 
             else:
