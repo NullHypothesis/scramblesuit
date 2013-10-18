@@ -52,7 +52,7 @@ class RandProbDist:
         # Cumulative probability of all bins.
         cumulProb = 0
 
-        for b in xrange(bins):
+        for _ in xrange(bins):
             p = self.prng.uniform(0, (1 - cumulProb))
             cumulProb += p
 
