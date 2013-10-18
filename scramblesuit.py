@@ -355,6 +355,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         assert circuit
 
         if len(self.sendBuf) == 0:
+            log.debug("Send buffer is empty; nothing to flush.")
             return
 
         # Flush the buffered data, the application is so eager to send.
