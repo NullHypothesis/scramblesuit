@@ -49,9 +49,9 @@ just fine on other GNU/Linux distributions as well.
    `git submodule update`
 
 The directory "test/" in this repository contains two configuration files for
-`tor` which provide a simple ScrambleSuit setup.  Furthermore, the script
-`generate_secret.py` can be used to generate shared secrets for Tor's
-configuration file.
+`tor` which provide a simple local (i.e., using the loopback interface)
+ScrambleSuit setup.  Furthermore, the script `generate_secret.py` can be used
+to generate shared secrets for Tor's configuration file.
 
 Feedback
 ========
