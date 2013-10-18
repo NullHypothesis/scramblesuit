@@ -69,7 +69,11 @@ def isSane( totalLen, payloadLen, flags ):
     If any of these fields has an invalid value, `False' is returned.
     """
 
-    def ok( length ):
+    def isFine( length ):
+        """
+        Check if the given length is fine.
+        """
+
         return True if (0 <= length <= const.MPU) else False
 
     log.debug("Message header: totalLen=%d, payloadLen=%d, flags"
@@ -81,7 +85,7 @@ def isSane( totalLen, payloadLen, flags ):
         const.FLAG_PRNG_SEED,
     ]
 
-    return ok(totalLen) and ok(payloadLen) and (flags in validFlags)
+    return isFine(totalLen) and isFine(payloadLen) and (flags in validFlags)
 
 
 class ProtocolMessage( object ):
