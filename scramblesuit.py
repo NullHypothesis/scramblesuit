@@ -504,7 +504,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                           "Waiting for more data.")
                 return
 
-        if self.weAreClient and (self.protoState == const.ST_WAIT_FOR_AUTH):
+        elif self.weAreClient and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
             if not self.uniformdh.receivePublicKey(data, self.deriveSecrets):
                 log.debug("Unable to finish UniformDH handshake just yet.")
