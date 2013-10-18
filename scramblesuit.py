@@ -509,6 +509,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if not self.uniformdh.receivePublicKey(data, self.deriveSecrets):
                 log.debug("Unable to finish UniformDH handshake just yet.")
                 return
+
+            log.debug("UniformDH authentication succeeded.")
+
             log.debug("Switching to state ST_CONNECTED.")
             self.protoState = const.ST_CONNECTED
             self.flushSendBuffer(circuit)
