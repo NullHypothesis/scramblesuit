@@ -9,7 +9,6 @@ of application data.
 import obfsproxy.common.log as logging
 import obfsproxy.common.serialize as serialize
 
-import struct
 import mycrypto
 import const
 
