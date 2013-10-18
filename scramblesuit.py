@@ -462,12 +462,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # First, try to interpret the incoming data as session ticket.
             if self.receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
-                self.flushSendBuffer(circuit)
                 self.sendRemote(circuit,
                                 ticket.issueTicketAndKey(self.srvState),
                                 flags=const.FLAG_NEW_TICKET)
                 self.sendRemote(circuit, self.srvState.prngSeed,
                                 flags=const.FLAG_PRNG_SEED)
+                self.flushSendBuffer(circuit)
 
             # Second, interpret the data as a UniformDH handshake.
             elif self.uniformdh.receivePublicKey(data, self.deriveSecrets,
