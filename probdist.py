@@ -53,11 +53,11 @@ class RandProbDist:
         cumulProb = 0
 
         for _ in xrange(bins):
-            p = self.prng.uniform(0, (1 - cumulProb))
-            cumulProb += p
+            prob = self.prng.uniform(0, (1 - cumulProb))
+            cumulProb += prob
 
             singleton = genSingleton()
-            dist[singleton] = p
+            dist[singleton] = prob
             self.sampleList.append((cumulProb, singleton,))
 
         dist[genSingleton()] = (1 - cumulProb)
