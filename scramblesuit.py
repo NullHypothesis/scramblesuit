@@ -448,6 +448,23 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.debug("Buffered %d bytes of outgoing data." %
                       len(self.sendBuf))
 
+    def sendTicketAndSeed( self, circuit ):
+        """
+        Send a session ticket and the PRNG seed to the client using `circuit'.
+
+        This method is only called by the server after successful
+        authentication.  Finally, the server's send buffer is flushed.
+        """
+
+        log.debug("Sending a new session ticket and the PRNG seed to the " \
+                  "client.")
+
+        self.sendRemote(circuit, ticket.issueTicketAndKey(self.srvState),
+                        flags=const.FLAG_NEW_TICKET)
+        self.sendRemote(circuit, self.srvState.prngSeed,
+                        flags=const.FLAG_PRNG_SEED)
+        self.flushSendBuffer(circuit)
+
     def receivedDownstream( self, data, circuit ):
         """
         Receives and processes data coming from the remote machine.
@@ -462,19 +479,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # First, try to interpret the incoming data as session ticket.
             if self.receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
-                self.sendRemote(circuit,
-                                ticket.issueTicketAndKey(self.srvState),
-                                flags=const.FLAG_NEW_TICKET)
-                self.sendRemote(circuit, self.srvState.prngSeed,
-                                flags=const.FLAG_PRNG_SEED)
-                self.flushSendBuffer(circuit)
+
+                self.sendTicketAndSeed(circuit)
 
             # Second, interpret the data as a UniformDH handshake.
             elif self.uniformdh.receivePublicKey(data, self.deriveSecrets,
                     self.srvState):
                 # Now send the server's UniformDH public key to the client.
                 handshakeMsg = self.uniformdh.createHandshake()
-                newTicket = ticket.issueTicketAndKey(self.srvState)
 
                 log.debug("Sending %d bytes of UniformDH handshake and "
                           "session ticket." % len(handshakeMsg))
@@ -485,11 +497,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 log.debug("Switching to state ST_CONNECTED.")
                 self.protoState = const.ST_CONNECTED
 
-                self.sendRemote(circuit, newTicket,
-                                flags=const.FLAG_NEW_TICKET)
-                self.sendRemote(circuit, self.srvState.prngSeed,
-                                flags=const.FLAG_PRNG_SEED)
-                self.flushSendBuffer(circuit)
+                self.sendTicketAndSeed(circuit)
 
             else:
                 log.debug("Authentication unsuccessful so far.  "
