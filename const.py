@@ -57,6 +57,12 @@ MTU = 1448
 # Maximum payload unit of a ScrambleSuit message in bytes.
 MPU = MTU - HDR_LENGTH
 
+# The minimum amount of distinct bins for probability distributions.
+MIN_BINS = 1
+
+# The maximum amount of distinct bins for probability distributions.
+MAX_BINS = 100
+
 # Length of a UniformDH public key in bytes.
 PUBLIC_KEY_LENGTH = 512
 
