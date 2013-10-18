@@ -29,8 +29,9 @@ Installation and Testing
 The following instructions were tested on Debian wheezy but they should work
 just fine on other GNU/Linux distributions as well.
 
-1. Two additional Python packages are necessary: gmpy and yaml.  Debian has
-   them under the names "python-gmpy" and "python-yaml".
+1. On a Debian stable system, the following packages are needed:
+   `git python-dev python-gmpy python-yaml python-setuptools automake
+   libevent-dev libssl-dev asciidoc`
 
 2. Clone and compile the current Tor-git (or use a version of your choice as
    long as it is >= v0.2.5.0-alpha-dev):  
