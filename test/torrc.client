@@ -7,7 +7,7 @@ SOCKSPort auto
 
 UseBridges 1
 
-# Feel free to adapt the listen address, the port as well as the password's
+# Feel free to adapt the bridge address, the port as well as the password's
 # value (as long as it is the same for the server).  The key "password=",
 # however, *must* be used.
 Bridge scramblesuit 127.0.0.1:65535 password=3X5BIA2MIHLZ55UV4VAEGKZIQPPZ4QT3
