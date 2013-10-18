@@ -151,4 +151,6 @@ class UtilTest( unittest.TestCase ):
         self.failIf(util.locateMark(mark, payload[:-1]) != None)
 
 if __name__ == '__main__':
+    print "Note that the unittests will trigger warnings which can " \
+          "safely be ignored.\n"
     unittest.main()
