@@ -264,7 +264,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 circuit.upstream.write(msg.payload)
 
             # Store newly received ticket and send ACK to the server.
-            elif self.weAreClient and msg.flags == const.FLAG_NEW_TICKET:
+            elif self.weAreClient and (msg.flags == const.FLAG_NEW_TICKET):
                 assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
                                     const.MASTER_KEY_LENGTH)
                 peer = circuit.downstream.transport.getPeer()
@@ -275,7 +275,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
             # Use the PRNG seed to generate the same probability distributions
             # as the server.  That's where the polymorphism comes from.
-            elif self.weAreClient and msg.flags == const.FLAG_PRNG_SEED:
+            elif self.weAreClient and (msg.flags == const.FLAG_PRNG_SEED):
                 assert len(msg.payload) == const.PRNG_SEED_LENGTH
                 log.debug("Obtained PRNG seed.")
                 prng = random.Random(msg.payload)
