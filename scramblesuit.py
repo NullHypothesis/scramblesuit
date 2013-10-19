@@ -263,7 +263,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if msg.flags & const.FLAG_PAYLOAD:
                 circuit.upstream.write(msg.payload)
 
-            # Store newly received ticket and send ACK to the server.
+            # Store newly received ticket.
             elif self.weAreClient and (msg.flags == const.FLAG_NEW_TICKET):
                 assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
                                     const.MASTER_KEY_LENGTH)
