@@ -260,7 +260,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         for msg in msgs:
             # Forward data to the application.
-            if msg.flags & const.FLAG_PAYLOAD:
+            if msg.flags == const.FLAG_PAYLOAD:
                 circuit.upstream.write(msg.payload)
 
             # Store newly received ticket.
