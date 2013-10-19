@@ -6,11 +6,9 @@ transport protocol is available here:
 http://www.cs.kau.se/philwint/scramblesuit/
 """
 
-from twisted.internet import error
 from twisted.internet import reactor
 
 import obfsproxy.transports.base as base
-import obfsproxy.common.serialize as pack
 import obfsproxy.common.log as logging
 
 import random
@@ -61,8 +59,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.debug("Switching to state ST_WAIT_FOR_AUTH.")
         self.protoState = const.ST_WAIT_FOR_AUTH
 
-        # Buffers for incoming and outgoing data.
-        self.sendBuf = self.recvBuf = ""
+        # Buffer for outgoing data.
+        self.sendBuf = ""
 
         # Buffer for inter-arrival time obfuscation.
         self.choppingBuf = ""
@@ -79,6 +77,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
                           probdist.new(lambda: random.random() %
                                        const.MAX_PACKET_DELAY)
+
+        # Used to extract protocol messages from encrypted data.
+        self.protoMsg = message.MessageExtractor()
 
         if self.weAreServer:
             # `True' if the ticket is already decrypted but not yet
@@ -99,9 +100,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.uniformDHSecret = None
 
         self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
-
-        # Variables used to unpack protocol messages.
-        self.totalLen = self.payloadLen = self.flags = None
 
     def deriveSecrets( self, masterKey ):
         """
@@ -240,57 +238,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
         reactor.callLater(self.iatMorpher.randomSample(),
                           self.flushPieces, circuit)
 
-    def extractMessages( self, data, aes ):
-        """
-        Unpacks (i.e., decrypts and authenticates) protocol messages.
-
-        The raw `data' coming directly from the wire is decrypted using `aes'
-        and authenticated.  The payload (be it a session ticket or actual
-        payload) is then returned as unencrypted protocol messages.  In case of
-        invalid headers or HMACs, an exception is raised.
-        """
-
-        assert aes and (data is not None)
-
-        self.recvBuf += data
-        msgs = []
-
-        # Keep trying to unpack as long as there is at least a header.
-        while len(self.recvBuf) >= const.HDR_LENGTH:
-
-            # If necessary, extract the header fields.
-            if self.totalLen == self.payloadLen == self.flags == None:
-                self.totalLen = pack.ntohs(aes.decrypt(self.recvBuf[16:18]))
-                self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
-                self.flags = ord(aes.decrypt(self.recvBuf[20]))
-
-                if not message.isSane(self.totalLen,
-                                      self.payloadLen, self.flags):
-                    raise base.PluggableTransportError("Invalid header.")
-
-            # Parts of the message are still on the wire; waiting.
-            if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
-                break
-
-            rcvdHMAC = self.recvBuf[0:const.HMAC_SHA256_128_LENGTH]
-            vrfyHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
-                              self.recvBuf[const.HMAC_SHA256_128_LENGTH:
-                              (self.totalLen + const.HDR_LENGTH)])
-
-            if rcvdHMAC != vrfyHMAC:
-                raise base.PluggableTransportError("Invalid message HMAC.")
-
-            # Decrypt the message and remove it from the input buffer.
-            extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH:
-                         (self.totalLen + const.HDR_LENGTH)])[:self.payloadLen]
-            msgs.append(message.new(payload=extracted, flags=self.flags))
-            self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
-
-            # Protocol message processed; now reset length fields.
-            self.totalLen = self.payloadLen = self.flags = None
-
-        return msgs
-
     def processMessages( self, circuit, data ):
         """
         Acts on extracted protocol messages based on header flags.
@@ -307,7 +254,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             return
 
         # Try to extract protocol messages from the encrypted blurb.
-        msgs  = self.extractMessages(data, self.recvCrypter)
+        msgs  = self.protoMsg.extract(data, self.recvCrypter, self.recvHMAC)
         if (msgs is None) or (len(msgs) == 0):
             return
 

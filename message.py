@@ -7,7 +7,8 @@ of application data.
 """
 
 import obfsproxy.common.log as logging
-import obfsproxy.common.serialize as serialize
+import obfsproxy.common.serialize as pack
+import obfsproxy.transports.base as base
 
 import mycrypto
 import const
@@ -120,8 +121,8 @@ class ProtocolMessage( object ):
         HMAC-SHA256-128 is returned and ready to be sent over the wire.
         """
 
-        encrypted = crypter.encrypt(serialize.htons(self.totalLen) +
-                                    serialize.htons(self.payloadLen) +
+        encrypted = crypter.encrypt(pack.htons(self.totalLen) +
+                                    pack.htons(self.payloadLen) +
                                     chr(self.flags) + self.payload +
                                     (self.totalLen - self.payloadLen) * '\0')
 
@@ -156,3 +157,69 @@ class ProtocolMessage( object ):
 
 # Alias class name in order to provide a more intuitive API.
 new = ProtocolMessage
+
+class MessageExtractor( object ):
+
+    """
+    Extracts ScrambleSuit protocol messages out of an encrypted stream.
+    """
+
+    def __init__( self ):
+        """
+        Initialise a new MessageExtractor object.
+        """
+
+        self.recvBuf = ""
+        self.totalLen = None
+        self.payloadLen = None
+        self.flags = None
+
+    def extract( self, data, aes, hmacKey ):
+        """
+        Extracts (i.e., decrypts and authenticates) protocol messages.
+
+        The raw `data' coming directly from the wire is decrypted using `aes'
+        and authenticated using `hmacKey'.  The payload is then returned as
+        unencrypted protocol messages.  In case of invalid headers or HMACs, an
+        exception is raised.
+        """
+
+        assert aes and hmacKey and (data is not None)
+
+        self.recvBuf += data
+        msgs = []
+
+        # Keep trying to unpack as long as there is at least a header.
+        while len(self.recvBuf) >= const.HDR_LENGTH:
+
+            # If necessary, extract the header fields.
+            if self.totalLen == self.payloadLen == self.flags == None:
+                self.totalLen = pack.ntohs(aes.decrypt(self.recvBuf[16:18]))
+                self.payloadLen = pack.ntohs(aes.decrypt(self.recvBuf[18:20]))
+                self.flags = ord(aes.decrypt(self.recvBuf[20]))
+
+                if not isSane(self.totalLen, self.payloadLen, self.flags):
+                    raise base.PluggableTransportError("Invalid header.")
+
+            # Parts of the message are still on the wire; waiting.
+            if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
+                break
+
+            rcvdHMAC = self.recvBuf[0:const.HMAC_SHA256_128_LENGTH]
+            vrfyHMAC = mycrypto.HMAC_SHA256_128(hmacKey,
+                              self.recvBuf[const.HMAC_SHA256_128_LENGTH:
+                              (self.totalLen + const.HDR_LENGTH)])
+
+            if rcvdHMAC != vrfyHMAC:
+                raise base.PluggableTransportError("Invalid message HMAC.")
+
+            # Decrypt the message and remove it from the input buffer.
+            extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH:
+                         (self.totalLen + const.HDR_LENGTH)])[:self.payloadLen]
+            msgs.append(ProtocolMessage(payload=extracted, flags=self.flags))
+            self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
+
+            # Protocol message processed; now reset length fields.
+            self.totalLen = self.payloadLen = self.flags = None
+
+        return msgs
