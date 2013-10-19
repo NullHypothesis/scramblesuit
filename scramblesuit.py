@@ -265,8 +265,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
             # Store newly received ticket.
             elif self.weAreClient and (msg.flags == const.FLAG_NEW_TICKET):
-                assert len(msg) == (const.HDR_LENGTH + const.TICKET_LENGTH +
-                                    const.MASTER_KEY_LENGTH)
+                assert len(msg.payload) == (const.TICKET_LENGTH +
+                                            const.MASTER_KEY_LENGTH)
                 peer = circuit.downstream.transport.getPeer()
                 ticket.storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH],
                                       msg.payload[const.MASTER_KEY_LENGTH:
