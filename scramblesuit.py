@@ -206,13 +206,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
                         self.sendHMAC) for msg in messages])
 
         # Flush data chunk for chunk to obfuscate inter arrival times.
-        if len(self.choppingBuf) == 0:
-            self.choppingBuf.write(blurb)
-            reactor.callLater(self.iatMorpher.randomSample(),
-                              self.flushPieces, circuit)
+        if const.USE_IAT_OBFUSCATION:
+            if len(self.choppingBuf) == 0:
+                self.choppingBuf.write(blurb)
+                reactor.callLater(self.iatMorpher.randomSample(),
+                                  self.flushPieces, circuit)
+            else:
+                # flushPieces() is still busy processing the chopping buffer.
+                self.choppingBuf.write(blurb)
         else:
-            # flushPieces() is still busy processing the chopping buffer.
-            self.choppingBuf.write(blurb)
+            circuit.downstream.write(blurb)
 
     def flushPieces( self, circuit ):
         """
