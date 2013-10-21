@@ -23,6 +23,7 @@ import packetmorpher
 import ticket
 import uniformdh
 import state
+import fifobuf
 
 
 log = logging.get_obfslogger()
@@ -63,7 +64,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.sendBuf = ""
 
         # Buffer for inter-arrival time obfuscation.
-        self.choppingBuf = ""
+        self.choppingBuf = fifobuf.Buffer()
 
         # AES instances to decrypt incoming and encrypt outgoing data.
         self.sendCrypter = mycrypto.PayloadCrypter()
@@ -206,12 +207,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Flush data chunk for chunk to obfuscate inter arrival times.
         if len(self.choppingBuf) == 0:
-            self.choppingBuf += blurb
+            self.choppingBuf.write(blurb)
             reactor.callLater(self.iatMorpher.randomSample(),
                               self.flushPieces, circuit)
         else:
             # flushPieces() is still busy processing the chopping buffer.
-            self.choppingBuf += blurb
+            self.choppingBuf.write(blurb)
 
     def flushPieces( self, circuit ):
         """
@@ -226,13 +227,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Drain and send an MTU-sized chunk from the chopping buffer.
         if len(self.choppingBuf) > const.MTU:
-            circuit.downstream.write(self.choppingBuf[0:const.MTU])
-            self.choppingBuf = self.choppingBuf[const.MTU:]
+
+            circuit.downstream.write(self.choppingBuf.read(const.MTU))
 
         # Drain and send whatever is left in the output buffer.
         else:
-            circuit.downstream.write(self.choppingBuf)
-            self.choppingBuf = ""
+            circuit.downstream.write(self.choppingBuf.read())
             return
 
         reactor.callLater(self.iatMorpher.randomSample(),
