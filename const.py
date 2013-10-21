@@ -33,6 +33,11 @@ HDR_LENGTH = 16 + 2 + 2 + 1
 # Length of the HMAC-SHA256-128 digest in bytes.
 HMAC_SHA256_128_LENGTH = 16
 
+# Whether or not to use inter-arrival time obfuscation.  Disabling this option
+# makes the transported protocol more identifiable but increases throughput a
+# lot.
+USE_IAT_OBFUSCATION = True
+
 # Key rotation time for session ticket keys in seconds.
 KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 
