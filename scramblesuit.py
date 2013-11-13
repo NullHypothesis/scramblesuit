@@ -530,17 +530,33 @@ class ScrambleSuitTransport( base.BaseTransport ):
         Assign the given command line arguments to local variables.
         """
 
-        if args.uniformDHSecret:
-            cls.uniformDHSecret = base64.b32decode(args.uniformDHSecret)
+        uniformDHSecret = None
 
-        rawLength = len(base64.b32decode(args.uniformDHSecret))
+        try:
+            uniformDHSecret = base64.b32decode(args.uniformDHSecret)
+        except (TypeError, AttributeError) as error:
+            log.error(error.message)
+            raise base.PluggableTransportError(
+                "UniformDH shared secret, '%s', isn't valid base32!"
+                % args.sharedSecret)
 
-        if args.uniformDHSecret and rawLength != const.SHARED_SECRET_LENGTH:
-            raise base.PluggableTransportError("The UniformDH shared secret "
-                    "must be %d bytes in length but %d bytes are given." %
-                    (const.SHARED_SECRET_LENGTH, rawLength))
+        parentalApproval = super(
+            ScrambleSuitTransport, cls).validate_external_mode_cli(args)
+        if not parentalApproval:
+            # XXX not very descriptive nor helpful, but the parent class only
+            #     returns a boolean without telling us what's wrong.
+            raise base.PluggableTransportError(
+                "Pluggable Transport args invalid: %s" % args )
 
-        super(ScrambleSuitTransport, cls).validate_external_mode_cli(args)
+        if uniformDHSecret:
+            rawLength = len(uniformDHSecret)
+            if rawLength != const.SHARED_SECRET_LENGTH:
+                raise base.PluggableTransportError(
+                    "The UniformDH shared secret must be %d bytes in length,",
+                    "but %d bytes are given."
+                    % (const.SHARED_SECRET_LENGTH, rawLength))
+            else:
+                cls.uniformDHSecret = uniformDHSecret
 
     def handle_socks_args( self, args ):
         """
