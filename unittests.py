@@ -5,11 +5,15 @@ import util
 import const
 import mycrypto
 import uniformdh
+import scramblesuit
+import base64
 
 import Crypto.Hash.SHA256
 import Crypto.Hash.HMAC
 
 import obfsproxy.network.buffer as obfs_buf
+import obfsproxy.common.transport_config as transport_config
+import obfsproxy.transports.base as base
 
 class CryptoTest( unittest.TestCase ):
 
@@ -149,6 +153,46 @@ class UtilTest( unittest.TestCase ):
 
         self.failIf(util.locateMark(mark, payload) == None)
         self.failIf(util.locateMark(mark, payload[:-1]) != None)
+
+
+class MockArgs( object ):
+    uniformDHSecret = sharedSecret = ext_cookie_file = dest = None
+    mode = 'socks'
+
+
+class ScrambleSuitTransportTest( unittest.TestCase ):
+
+    def setUp( self ):
+        config = transport_config.TransportConfig( )
+        config.state_location = const.STATE_LOCATION
+        args = MockArgs( )
+        suit = scramblesuit.ScrambleSuitTransport
+        suit.weAreServer = False
+
+        self.suit = suit
+        self.args = args
+        self.config = config
+
+        self.validSecret = base64.b32encode( 'A' * const.SHARED_SECRET_LENGTH )
+        self.invalidSecret = 'a' * const.SHARED_SECRET_LENGTH
+
+    def test1_validateExternalModeCli( self ):
+        """Test with valid scramblesuit args and valid obfsproxy args."""
+        self.args.uniformDHSecret = self.validSecret
+
+        self.assertTrue(
+            super( scramblesuit.ScrambleSuitTransport,
+                   self.suit ).validate_external_mode_cli( self.args ))
+
+        self.assertIsNone( self.suit.validate_external_mode_cli( self.args ) )
+
+    def test2_validateExternalModeCli( self ):
+        """Test with invalid scramblesuit args and valid obfsproxy args."""
+        self.args.uniformDHSecret = self.invalidSecret
+
+        with self.assertRaises( base.PluggableTransportError ):
+            self.suit.validate_external_mode_cli( self.args )
+
 
 if __name__ == '__main__':
     unittest.main()
