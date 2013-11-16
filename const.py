@@ -69,7 +69,7 @@ MIN_BINS = 1
 MAX_BINS = 100
 
 # Length of a UniformDH public key in bytes.
-PUBLIC_KEY_LENGTH = 512
+PUBLIC_KEY_LENGTH = 192
 
 # Length of the PRNG seed used to generate probability distributions in bytes.
 PRNG_SEED_LENGTH = 32
