@@ -12,17 +12,17 @@
 1. Overview
 
     ScrambleSuit is a pluggable transport protocol for the obfsproxy
-    obfuscation framework [XXX].  Its entire payload is computationally
+    obfuscation framework [0].  Its entire payload is computationally
     indistinguishable from randomness, it modifies its flow signature to foil
-    simple statistical classifiers and it handles authenticated encryption for
-    the transported protocol.
+    simple statistical classifiers and it employs authenticated encryption to
+    disguise the transported protocol.
 
-    For the motivation, a protocol overview, the threat model and evaluation,
-    please read the original research paper discussing ScrambleSuit [XXX].
-    This protocol specification discusses a subset of the research paper in
-    greater detail to facilitate alternative implementations of the protocol.
-    Besides, this specification is intended to be updated if necessary whereas
-    the research paper will remain as is.
+    For the motivation, a protocol overview, the threat model and an
+    evaluation, please refer to the original research paper [1].  This protocol
+    specification discusses a subset of the research paper in greater detail to
+    facilitate alternative implementations of the protocol.  Besides, this
+    specification is intended to be updated if necessary whereas the research
+    paper will remain as is.
 
 TODO:
     - Byte order
@@ -35,28 +35,25 @@ TODO:
     conducting a UniformDH handshake.  While a valid session ticket might not
     always be available, a client is always able to conduct a UniformDH
     handshake.  Both authentication mechanisms rely on a previously shared
-    secret without which authentication cannot succeed.  This should thwart
-    active probing attacks.
+    secret without which authentication cannot succeed.  Requiring a shared
+    secret should thwart active probing attacks.
 
 2.1 UniformDH Handshake
 
     A client can authenticate itself towards a ScrambleSuit server by
     conducting a UniformDH handshake.  UniformDH was originally proposed in the
-    obfs3 protocol specification [XXX].  ScrambleSuit uses obfs3's UniformDH
-    handshake with the single exception that it employs the 4096-bit MODP group
-    number 16 as defined in RFC 3526 instead of the 1536-bit group used in
-    obfs3.  The reason for that is for our protocol to achieve a security level
-    of at least 128 bits of symmetric security as defined by ECRYPT [XXX].
-    Note that in order for a UniformDH handshake to succeed, both parties share
-    a 160-bit secret k_B which is exchanged out-of-band over Tor's BridgeDB
-    component.  ScrambleSuit bridges automatically publish their k_B key.
+    obfs3 protocol specification [2].  ScrambleSuit uses obfs3's 1536-bit
+    UniformDH handshake.  Note that in order for a UniformDH handshake to
+    succeed, both parties MUST share a 160-bit secret k_B which is exchanged
+    out-of-band over Tor's BridgeDB component.  ScrambleSuit bridges
+    automatically publish their k_B key.
 
     A UniformDH handshake consists of two messages: one from the client to the
     server and one from the server to the client.  The diagram below
-    illustrates the handshake.  After the randomly chosen 512-byte public key
-    X, random padding P_C is appended.  The length of the padding must be
-    uniformly chosen from {0..988} bytes.  After the padding, a 16-byte mark
-    M_C is appended which is defined as:
+    illustrates the handshake.  After the randomly chosen 192-byte UniformDH
+    public key X, random padding P_C is appended.  The length of the padding
+    must be randomly chosen from {0..1308} bytes.  After the padding, a 16-byte
+    mark M_C is appended which is defined as:
 
       M = HMAC-SHA256-128(k_B, X)
 
@@ -66,16 +63,17 @@ TODO:
       MAC = HMAC-SHA256-128(k_B, X | P_C | E)
 
     The variable E is a string representation of the current Unix epoch divided
-    by 3600.  It represents the amount of hours passed since the epoch.  It is
-    used by the client and the server to prove liveness.  For example, the Unix
-    timestamp 1378768086 would map to E = 1378768086 / 3600 = "382991".
+    by 3600.  It represents the amount of hours which have passed since the
+    epoch.  It is used by the client and the server to prove liveness.  For
+    example, the Unix timestamp 1378768086 would map to E = 1378768086 / 3600 =
+    "382991".
 
     The server's handshake message is created analogous to the client.
 
-    After conducting UniformDH, a client and server agreed on a 512-byte random
+    After conducting UniformDH, a client and server agreed on a 192-byte random
     number.  This random number is then hashed using SHA256 to obtain the
     256-bit master key k_t.  Session keys are then derived from k_t as
-    discussed in Section XXX.
+    discussed in Section 2.3.
 
     Client                              Server  Legend:
       |  X | P_C | M_C | MAC(X | P_C | E)  |    X: client public key
@@ -91,24 +89,23 @@ TODO:
     send a new session ticket T_t+1 together with the according master key
     k_t+1.  Session tickets are discussed in Section 2.2.  This tuple can then
     be used by the client to authenticate itself the next time it connects to
-    the server.  Afterwards the newly issued ticket, encrypted and
-    authenticated Tor traffic is finally exchanged between the client and the
-    server.
+    the server.  After the newly issued ticket, encrypted and authenticated Tor
+    traffic is finally exchanged between the client and the server.
 
 2.2 Session Ticket Handshake
 
     Alternatively to UniformDH, implementations SHOULD support session tickets.
     A client can authenticate itself towards a ScrambleSuit server by redeeming
     a 112-byte session ticket T.  Such a ticket contains the master key k_t and
-    is encrypted by keys only known by the server.  The structure of a session
-    ticket is discussed in Section XXX.  If a valid session ticket is
-    available, a client SHOULD redeem it rather than conduct a UniformDH
-    handshake.
+    is encrypted and authenticated using keys only known to the server.  The
+    structure of a session ticket is discussed in Section XXX.  If a valid
+    session ticket is available, a client SHOULD redeem it rather than conduct
+    a UniformDH handshake.
 
-    The handshake is a single message which the client sends to the server.
-    The diagram below illustrates the handshake.  After the 112-byte session
-    ticket, random padding P is appended.  The padding must be uniformly chosen
-    from {0..1388} bytes.  After the padding, a 16-byte mark M
+    The handshake consists of one single message which is sent by the client to
+    the server.  The diagram below illustrates the handshake.  After the
+    112-byte session ticket, random padding P is appended.  The padding must be
+    uniformly chosen from {0..1388} bytes.  After the padding, a 16-byte mark M
     is appended which is defined as:
 
       M = HMAC-SHA256-128(k_t, T)
@@ -119,9 +116,10 @@ TODO:
       MAC = HMAC-SHA256-128(k_t, T | P | E)
 
     The variable E is a string representation of the current Unix epoch divided
-    by 3600.  It represents the amount of hours passed since the epoch.  It is
-    used by the client and the server to prove liveness.  For example, the Unix
-    timestamp 1378768086 would map to E = 1378768086 / 3600 = "382991".
+    by 3600.  It represents the amount of hours which have passed since the
+    epoch.  It is used by the client and the server to prove liveness.  For
+    example, the Unix timestamp 1378768086 would map to E = 1378768086 / 3600 =
+    "382991".
 
     Client                         Server  Legend:
       |  T | P | M | MAC(T | P | E)  |     T: session ticket
@@ -132,38 +130,36 @@ TODO:
       | <--------------------------> |     T_t+1: future ticket
 
     The server is initially unable to distinguish between a session ticket
-    handshake and a UniformDH handshake since both handshakes are
-    computationally indistinguishable from randomness.  Therefore, it first
-    tries to opportunistically decrypt the session ticket T after verifying its
-    MAC first.  If the MAC is valid and the ticket can be decrypted and is not
-    yet expired, the server then verifies the MAC which is built over T | P |
-    E.  If this MAC is valid, the handshake succeeded.  The server then
-    proceeds to derive session keys as described in Section XXX.
+    handshake and a UniformDH handshake as both handshakes are computationally
+    indistinguishable from randomness.  Therefore, it first tries to
+    opportunistically decrypt the session ticket T after verifying its MAC.  If
+    the ticket's MAC (which should not be confused with the handshake message's
+    MAC) is valid and the ticket can be decrypted and is not yet expired, the
+    server then verifies the MAC which is built over T | P | E.  If this MAC is
+    valid, the handshake succeeded.  The server, like the client, then proceeds
+    to derive session keys from the 256-bit master key as described in Section
+    2.3.
 
     After a ticket handshake succeeded, the server replies by issuing a new
     session ticket T_t+1 together with the according master key k_t+1.  The
     tuple can then be used by the client to authenticate itself the next time.
 
-    Finally, both parties share the same 256-bit master key k_t from which
-    session keys are then derived as discussed in Section XXX.  Afterwards,
-    data can be exchanged which is authenticated and encrypted.
+2.3 Key Derivation
 
-X. Key Derivation
+    After authenticating either by redeeming a ticket or by running UniformDH,
+    a client and server will have a shared 256-bit master key.  Overall, 144
+    bytes of key material is derived from the master key using HKDF based on
+    SHA256.  For expansion, the master key is used as HKDF's PRK and the empty
+    string as HKDF's "info" argument.
 
-   After authenticating either by redeeming a ticket or by running UniformDH, a
-   client and server will have a shared 256-bit master key.  Overall, 144 bytes
-   of key material is derived from the master key using HKDF based on SHA256.
-   For expansion, the master key is used as HKDF's PRK and the empty string as
-   HKDF's "info" argument.
+    The 144-byte output is used as follows.  The byte offsets are in decimal.
 
-   The 144-byte output is used as follows.  The byte offsets are in decimal.
-
-     Bytes 000:031 - 256-bit AES-CTR session key to send data.
-     Bytes 032:039 - 64-bit AES-CTR IV to send data.
-     Bytes 040:071 - 256-bit AES-CTR session key to receive data.
-     Bytes 072:079 - 64-bit AES-CTR IV to receive data.
-     Bytes 080:111 - 256-bit HMAC-SHA256-128 key to send data.
-     Bytes 112:143 - 256-bit HMAC-SHA256-128 key to receive data.
+      Bytes 000:031 - 256-bit AES-CTR session key to send data.
+      Bytes 032:039 - 64-bit  AES-CTR IV to send data.
+      Bytes 040:071 - 256-bit AES-CTR session key to receive data.
+      Bytes 072:079 - 64-bit  AES-CTR IV to receive data.
+      Bytes 080:111 - 256-bit HMAC-SHA256-128 key to send data.
+      Bytes 112:143 - 256-bit HMAC-SHA256-128 key to receive data.
 
 X. Header Format
 
@@ -223,6 +219,7 @@ X. Protocol Polymorphism
    probability distributions as the server.
 
    References
-   [XXX] http://www.cs.kau.se/philwint/pdf/wpes2013.pdf
-   [XXX] https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs3/obfs3-protocol-spec.txt
-   [XXX] http://www.ecrypt.eu.org/documents/D.SPA.20.pdf
+   [0] https://www.torproject.org/projects/obfsproxy.html.en
+   [1] http://www.cs.kau.se/philwint/pdf/wpes2013.pdf
+   [2] https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs3/obfs3-protocol-spec.txt
+   [3] http://www.ecrypt.eu.org/documents/D.SPA.20.pdf
