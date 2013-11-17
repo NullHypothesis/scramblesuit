@@ -170,7 +170,9 @@ TODO:
 X. Header Format
 
    ScrambleSuit defines a 21-byte message header which contains the transported
-   data.  The format of the header is depicted below.
+   data.  After authentication, all data is transported by encrypting it,
+   authenticating it, and wrapping it in ScrambleSuit messages whose header is
+   depicted below.
 
    +----------+------------+--------------+--------+------------+------------+
    | 16 bytes |   2 bytes  |  2 bytes     | 1 byte | (optional) | (optional) |
@@ -178,10 +180,11 @@ X. Header Format
    +----------+------------+--------------+--------+------------+------------+
    \_ Plain _/ \____________  Encrypted and authenticated __________________/
 
-   The 16-byte MAC refers to HMAC-SHA256-128 which is keyed by a dedicated and
-   shared HMAC key.  The MAC authenticates the remainder of the message.  In
-   accordance with the encrypt-then-MAC principle, the MAC is calculated after
-   the remainder of the message is already encrypted.
+   The 16-byte MAC refers to HMAC-SHA256-128 which is keyed by a dedicated HMAC
+   key which is derived from the session's master key (see Section 2.3).  The
+   MAC authenticates the remainder of the message.  In accordance with the
+   encrypt-then-MAC principle, the MAC is built over the already-encrypted
+   remainder of the message.
 
    The 2-byte total length refers to the overall length of the message
    excluding the header whereas the 2-byte payload length refers to the payload
@@ -191,22 +194,31 @@ X. Header Format
    message length is 1448 bytes.  Exluding the header, this results in 1437
    bytes for the transported data.
 
-   The 1-byte flag field is used for protocol signaling.  Below, all defined
+   The 1-byte flag field is used for protocol signalling.  Below, all defined
    flags along with their semantics are explained.
 
    Flag name       | Bit # | Description
-   ----------------+-------+-----------------------------------------------
-   FLAG_PAYLOAD    |   1   | Application data.
-   FLAG_NEW_TICKET |   2   | Newly issued session ticket and master key.
-   FLAG_PRNG_SEED  |   3   | PRNG seed to derive obfuscation distributions.
+   ----------------+-------+---------------------------------------------------
+   FLAG_PAYLOAD    |   1   | The entire payload consists of encrypted
+                   |       | application data which must be forwarded to the
+                   |       | application.
+   ----------------+-------+---------------------------------------------------
+   FLAG_NEW_TICKET |   2   | The payload holds a newly issued session ticket
+                   |       | and master key.  The format is:
+                   |       | 32-byte master key | 112-byte ticket
+   ----------------+-------+---------------------------------------------------
+   FLAG_PRNG_SEED  |   3   | The payload holds the PRNG seed which is used to
+                   |       | derive obfuscation distributions.  The format is:
+                   |       | 32-byte PRNG seed
+   ----------------+-------+---------------------------------------------------
 
    Finally, a ScrambleSuit message contains the transported data which is
-   followed by padding.  Padding MUST always be discarded when a protocol
-   message is processed.  Since padding is always encrypted, client and server
-   MAY simply pad with 0 bytes.
+   followed by padding.  Padding MUST always be discarded.  Since padding is
+   always encrypted, client and server MAY simply pad with 0 bytes.
 
    When ScrambleSuit protocol messages are received, the receiver first MUST
-   validate the MAC.  If the MAC is invalid, the connection MUST be terminated
+   validate the MAC.  The receiver may only process messages if the MAC is
+   valid.  If the MAC is invalid, the TCP connection MUST be terminated
    immediately.
 
 X. Protocol Polymorphism
@@ -224,8 +236,77 @@ X. Protocol Polymorphism
    "1".  The client then extracts the PRNG seed and derives the same
    probability distributions as the server.
 
-   References
-   [0] https://www.torproject.org/projects/obfsproxy.html.en
-   [1] http://www.cs.kau.se/philwint/pdf/wpes2013.pdf
-   [2] https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs3/obfs3-protocol-spec.txt
-   [3] http://www.ecrypt.eu.org/documents/D.SPA.20.pdf
+X. Session Tickets
+
+    ScrambleSuit employs a subset of RFC 5077 [3] as its session ticket
+    mechanism.  In a nutshell, clients can redeem session tickets to
+    authenticate themselves and bootstrap a ScrambleSuit connection.  This
+    section discusses the format of session tickets and how server's manage
+    them.
+
+X.X Session Ticket Structure
+
+    Session tickets contain a server's state with the most important element
+    being the 32-byte master key.  The state structure is encrypted using
+    16-byte AES-CBC and authenticated using HMAC-SHA256.  Refer to Section X.X
+    for how the server manages this key pair.  The basic structure of a
+    112-byte session ticket is depicted below:
+
+    +----------+----------+----------+
+    | 16 bytes | 64 bytes | 32 bytes |
+    |    IV    | E(state) |   HMAC   |
+    +----------+----------+----------+
+
+    The 16-byte IV is used for AES-CBC, MUST come from a CSPRNG and MUST be
+    different for every session ticket.  The 64-byte encrypted state is
+    described below.  The 32-byte HMAC authenticates the ticket.  It is defined
+    as follows:
+
+      HMAC = HMAC-SHA256(k, IV | E(state))
+
+    Server's MUST verify the HMAC before attempting to decrypt the state.
+
+    E(state), the 64-byte encrypted server state, has the following structure
+    in its decrypted form:
+
+    +------------+------------+------------+----------+
+    |  4 bytes   |  18 bytes  |  32 bytes  | 10 bytes |
+    | Issue date | Identifier | Master key | Padding  |
+    +------------+------------+------------+----------+
+
+    The 4-byte issue date is a Unix epoch and specifies when the ticket was
+    issued by the server.  The 18-byte identifier contains the ASCII string
+    "ScrambleSuitTicket".  It is checked by the server in order to make sure
+    that the ticket was decrypted successfully.  The 32-byte master key is used
+    to derive session keys as described in Section 2.3.  The 10-byte padding is
+    used to pad the entire structure to 64 byte; a multiple of AES' block size.
+    The padding is ignored and it MAY consist of 0 bytes.
+
+X.X Session Ticket Management
+
+    Session tickets are encrypted and authenticated with a pair of keys only
+    known to the server.  As a result, tickets are computationally
+    indistinguishable from randomness and opaque to clients as well as passive
+    observers.
+
+    For encryption, AES-CBC with a 16-byte key is used.  For authentication,
+    HMAC-SHA256 with a 32-byte key is used.  The server has to make sure that
+    the two keys are stored safely.  Furthermore, the server SHOULD regularly
+    rotate its keys.  A reasonable key rotation interval would be once a week.
+
+    At any given point in time, the server SHOULD have a current, valid key
+    pair as well as the previous, superseded key pair.  The current key pair
+    SHOULD be used to issue and verify new tickets.  The superseded key pair
+    SHOULD be used to verify tickets which cannot be verified with the current
+    key pair.  The superseded key pair further SHOULD NOT be used to issue new
+    tickets.
+
+References
+
+    [0] https://www.torproject.org/projects/obfsproxy.html.en
+
+    [1] http://www.cs.kau.se/philwint/pdf/wpes2013.pdf
+
+    [2] https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs3/obfs3-protocol-spec.txt
+
+    [3] https://tools.ietf.org/html/rfc5077
