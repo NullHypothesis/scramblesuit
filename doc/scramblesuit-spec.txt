@@ -38,6 +38,12 @@ TODO:
     secret without which authentication cannot succeed.  Requiring a shared
     secret should thwart active probing attacks.
 
+    As stated in the research paper [1], a server only replies to a client if
+    the client can prove knowledge of the shared secret.  If a client sends
+    data which lacks this knowledge, the server MUST NOT reply.  It MAY
+    terminate the connection if the client could not prove knowledge of the
+    shared secret after a timeout has passed.
+
 2.1 UniformDH Handshake
 
     A client can authenticate itself towards a ScrambleSuit server by
