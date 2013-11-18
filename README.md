@@ -1,6 +1,3 @@
-**WARNING: ScrambleSuit is NOT YET SAFE for practical use!**
-------------------------------------------------------------
-
 Overview
 ========
 
