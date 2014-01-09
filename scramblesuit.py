@@ -497,7 +497,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.error(error.message)
             raise base.PluggableTransportError(
                 "UniformDH shared secret, '%s', isn't valid base32!"
-                % args.sharedSecret)
+                % args.uniformDHSecret)
 
         parentalApproval = super(
             ScrambleSuitTransport, cls).validate_external_mode_cli(args)
