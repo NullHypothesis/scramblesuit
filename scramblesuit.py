@@ -50,6 +50,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         log.debug("Initialising %s." % const.TRANSPORT_NAME)
 
+        super(ScrambleSuitTransport, self).__init__()
+
         util.setStateLocation(transportConfig.getStateLocation())
 
         # Load the server's persistent state from file.
@@ -136,9 +138,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
             self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter,
                                                            self.recvCrypter)
 
-    def handshake( self, circuit ):
+    def circuitConnected( self ):
         """
-        Initiate a ScrambleSuit handshake over `circuit'.
+        Initiate a ScrambleSuit handshake.
 
         This method is only relevant for clients since servers never initiate
         handshakes.  If a session ticket is available, it is redeemed.
@@ -150,14 +152,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             return
 
         # The preferred authentication mechanism is a session ticket.
-        bridge = circuit.downstream.transport.getPeer()
+        bridge = self.circuit.downstream.transport.getPeer()
         storedTicket = ticket.findStoredTicket(bridge)
 
         if storedTicket is not None:
             log.debug("Redeeming stored session ticket.")
             (masterKey, rawTicket) = storedTicket
             self.deriveSecrets(masterKey)
-            circuit.downstream.write(ticket.createTicketMessage(rawTicket,
+            self.circuit.downstream.write(ticket.createTicketMessage(rawTicket,
                                                                 self.sendHMAC))
 
             # We switch to ST_CONNECTED opportunistically since we don't know
@@ -165,21 +167,21 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.debug("Switching to state ST_CONNECTED.")
             self.protoState = const.ST_CONNECTED
 
-            self.flushSendBuffer(circuit)
+            self.flushSendBuffer()
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
         else:
             log.debug("No session ticket to redeem.  Running UniformDH.")
-            circuit.downstream.write(self.uniformdh.createHandshake())
+            self.circuit.downstream.write(self.uniformdh.createHandshake())
 
-    def sendRemote( self, circuit, data, flags=const.FLAG_PAYLOAD ):
+    def sendRemote( self, data, flags=const.FLAG_PAYLOAD ):
         """
         Send data to the remote end after a connection was established.
 
         The given `data' is first encapsulated in protocol messages.  Then, the
-        protocol message(s) are sent over the wire using the given `circuit'.
-        The argument `flags' specifies the protocol message flags with the
-        default flags signalling payload.
+        protocol message(s) are sent over the wire.  The argument `flags'
+        specifies the protocol message flags with the default flags signalling
+        payload.
         """
 
         log.debug("Processing %d bytes of outgoing data." % len(data))
@@ -210,48 +212,45 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if len(self.choppingBuf) == 0:
                 self.choppingBuf.write(blurb)
                 reactor.callLater(self.iatMorpher.randomSample(),
-                                  self.flushPieces, circuit)
+                                  self.flushPieces)
             else:
                 # flushPieces() is still busy processing the chopping buffer.
                 self.choppingBuf.write(blurb)
         else:
-            circuit.downstream.write(blurb)
+            self.circuit.downstream.write(blurb)
 
-    def flushPieces( self, circuit ):
+    def flushPieces( self ):
         """
         Write the application data in chunks to the wire.
 
-        The cached data is written in chunks to `circuit'.  After every write
+        The cached data is sent over the wire in chunks.  After every write
         call, control is given back to the Twisted reactor so it has a chance
         to flush the data.  Shortly thereafter, this function is called again
         to write the next chunk of data.  The delays in between subsequent
-        write calls are controlled by the inter arrival time obfuscator.
+        write calls are controlled by the inter-arrival time obfuscator.
         """
 
         # Drain and send an MTU-sized chunk from the chopping buffer.
         if len(self.choppingBuf) > const.MTU:
 
-            circuit.downstream.write(self.choppingBuf.read(const.MTU))
+            self.circuit.downstream.write(self.choppingBuf.read(const.MTU))
 
         # Drain and send whatever is left in the output buffer.
         else:
-            circuit.downstream.write(self.choppingBuf.read())
+            self.circuit.downstream.write(self.choppingBuf.read())
             return
 
-        reactor.callLater(self.iatMorpher.randomSample(),
-                          self.flushPieces, circuit)
+        reactor.callLater(self.iatMorpher.randomSample(), self.flushPieces)
 
-    def processMessages( self, circuit, data ):
+    def processMessages( self, data ):
         """
         Acts on extracted protocol messages based on header flags.
 
         After the incoming `data' is decrypted and authenticated, this method
         processes the received data based on the header flags.  Payload is
-        written to the local application using `circuit', new tickets are
-        stored or keys are added to the replay table.
+        written to the local application, new tickets are stored, or keys are
+        added to the replay table.
         """
-
-        assert circuit
 
         if (data is None) or (len(data) == 0):
             return
@@ -264,13 +263,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
         for msg in msgs:
             # Forward data to the application.
             if msg.flags == const.FLAG_PAYLOAD:
-                circuit.upstream.write(msg.payload)
+                self.circuit.upstream.write(msg.payload)
 
             # Store newly received ticket.
             elif self.weAreClient and (msg.flags == const.FLAG_NEW_TICKET):
                 assert len(msg.payload) == (const.TICKET_LENGTH +
                                             const.MASTER_KEY_LENGTH)
-                peer = circuit.downstream.transport.getPeer()
+                peer = self.circuit.downstream.transport.getPeer()
                 ticket.storeNewTicket(msg.payload[0:const.MASTER_KEY_LENGTH],
                                       msg.payload[const.MASTER_KEY_LENGTH:
                                                   const.MASTER_KEY_LENGTH +
@@ -293,16 +292,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
 
-    def flushSendBuffer( self, circuit ):
+    def flushSendBuffer( self ):
         """
         Flush the application's queued data.
 
         The application could have sent data while we were busy authenticating
-        the remote machine.  Using `circuit', this method flushes the data
-        which could have been queued in the meanwhile in `self.sendBuf'.
+        the remote machine.  This method flushes the data which could have been
+        queued in the meanwhile in `self.sendBuf'.
         """
-
-        assert circuit
 
         if len(self.sendBuf) == 0:
             log.debug("Send buffer is empty; nothing to flush.")
@@ -312,7 +309,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.debug("Flushing %d bytes of buffered application data." %
                   len(self.sendBuf))
 
-        self.sendRemote(circuit, self.sendBuf)
+        self.sendRemote(self.sendBuf)
         self.sendBuf = ""
 
     def receiveTicket( self, data ):
@@ -380,17 +377,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         return True
 
-    def receivedUpstream( self, data, circuit ):
+    def receivedUpstream( self, data ):
         """
         Sends data to the remote machine or queues it to be sent later.
 
         Depending on the current protocol state, the given `data' is either
-        directly sent to the remote machine using `circuit' or queued.  The
-        buffer is then flushed once, a connection is established.
+        directly sent to the remote machine or queued.  The buffer is then
+        flushed once, a connection is established.
         """
 
         if self.protoState == const.ST_CONNECTED:
-            self.sendRemote(circuit, data.read())
+            self.sendRemote(data.read())
 
         # Buffer data we are not ready to transmit yet.
         else:
@@ -398,9 +395,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.debug("Buffered %d bytes of outgoing data." %
                       len(self.sendBuf))
 
-    def sendTicketAndSeed( self, circuit ):
+    def sendTicketAndSeed( self ):
         """
-        Send a session ticket and the PRNG seed to the client using `circuit'.
+        Send a session ticket and the PRNG seed to the client.
 
         This method is only called by the server after successful
         authentication.  Finally, the server's send buffer is flushed.
@@ -409,13 +406,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.debug("Sending a new session ticket and the PRNG seed to the " \
                   "client.")
 
-        self.sendRemote(circuit, ticket.issueTicketAndKey(self.srvState),
+        self.sendRemote(ticket.issueTicketAndKey(self.srvState),
                         flags=const.FLAG_NEW_TICKET)
-        self.sendRemote(circuit, self.srvState.prngSeed,
+        self.sendRemote(self.srvState.prngSeed,
                         flags=const.FLAG_PRNG_SEED)
-        self.flushSendBuffer(circuit)
+        self.flushSendBuffer()
 
-    def receivedDownstream( self, data, circuit ):
+    def receivedDownstream( self, data ):
         """
         Receives and processes data coming from the remote machine.
 
@@ -430,7 +427,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             if self.receiveTicket(data):
                 log.debug("Ticket authentication succeeded.")
 
-                self.sendTicketAndSeed(circuit)
+                self.sendTicketAndSeed()
 
             # Second, interpret the data as a UniformDH handshake.
             elif self.uniformdh.receivePublicKey(data, self.deriveSecrets,
@@ -441,13 +438,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 log.debug("Sending %d bytes of UniformDH handshake and "
                           "session ticket." % len(handshakeMsg))
 
-                circuit.downstream.write(handshakeMsg)
+                self.circuit.downstream.write(handshakeMsg)
                 log.debug("UniformDH authentication succeeded.")
 
                 log.debug("Switching to state ST_CONNECTED.")
                 self.protoState = const.ST_CONNECTED
 
-                self.sendTicketAndSeed(circuit)
+                self.sendTicketAndSeed()
 
             else:
                 log.debug("Authentication unsuccessful so far.  "
@@ -464,11 +461,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
             log.debug("Switching to state ST_CONNECTED.")
             self.protoState = const.ST_CONNECTED
-            self.flushSendBuffer(circuit)
+            self.flushSendBuffer()
 
         if self.protoState == const.ST_CONNECTED:
 
-            self.processMessages(circuit, data.read())
+            self.processMessages(data.read())
 
     @classmethod
     def register_external_mode_cli( cls, subparser ):
