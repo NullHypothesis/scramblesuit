@@ -33,6 +33,11 @@ HDR_LENGTH = 16 + 2 + 2 + 1
 # Length of the HMAC-SHA256-128 digest in bytes.
 HMAC_SHA256_128_LENGTH = 16
 
+# Whether or not to use inter-arrival time obfuscation.  Disabling this option
+# makes the transported protocol more identifiable but increases throughput a
+# lot.
+USE_IAT_OBFUSCATION = True
+
 # Key rotation time for session ticket keys in seconds.
 KEY_ROTATION_TIME = 60 * 60 * 24 * 7
 
@@ -57,8 +62,14 @@ MTU = 1448
 # Maximum payload unit of a ScrambleSuit message in bytes.
 MPU = MTU - HDR_LENGTH
 
+# The minimum amount of distinct bins for probability distributions.
+MIN_BINS = 1
+
+# The maximum amount of distinct bins for probability distributions.
+MAX_BINS = 100
+
 # Length of a UniformDH public key in bytes.
-PUBLIC_KEY_LENGTH = 512
+PUBLIC_KEY_LENGTH = 192
 
 # Length of the PRNG seed used to generate probability distributions in bytes.
 PRNG_SEED_LENGTH = 32

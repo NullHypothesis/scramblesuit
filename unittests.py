@@ -195,4 +195,6 @@ class ScrambleSuitTransportTest( unittest.TestCase ):
 
 
 if __name__ == '__main__':
+    print "Note that the unittests will trigger warnings which can " \
+          "safely be ignored.\n"
     unittest.main()

@@ -7,6 +7,8 @@ distributions.  Random samples can then be drawn from these distributions.
 
 import random
 
+import const
+
 import obfsproxy.common.log as logging
 
 log = logging.get_obfslogger()
@@ -28,10 +30,6 @@ class RandProbDist:
         generated deterministically.
         """
 
-        # Minimum and maximum amount of distinct bins for the distribution.
-        self.MIN_BINS = 1
-        self.MAX_BINS = 100
-
         self.prng = random if (seed is None) else random.Random(seed)
 
         self.sampleList = []
@@ -49,17 +47,17 @@ class RandProbDist:
         dist = {}
 
         # Amount of distinct bins, i.e., packet lengths or inter arrival times.
-        bins = self.prng.randint(self.MIN_BINS, self.MAX_BINS)
+        bins = self.prng.randint(const.MIN_BINS, const.MAX_BINS)
 
         # Cumulative probability of all bins.
         cumulProb = 0
 
-        for b in xrange(bins):
-            p = self.prng.uniform(0, (1 - cumulProb))
-            cumulProb += p
+        for _ in xrange(bins):
+            prob = self.prng.uniform(0, (1 - cumulProb))
+            cumulProb += prob
 
             singleton = genSingleton()
-            dist[singleton] = p
+            dist[singleton] = prob
             self.sampleList.append((cumulProb, singleton,))
 
         dist[genSingleton()] = (1 - cumulProb)

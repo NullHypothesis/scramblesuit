@@ -1,0 +1,13 @@
+2013-11-18 - Changes in version 2013.11.a:
+  - Revert UniformDH group size back to 1536 bits to have less of a timing
+    distinguisher at the cost of having less effective security.  Note that
+    this also breaks compatibility with version 2013.10.a!
+  - Add the config option "USE_IAT_OBFUSCATION" which can be used to disable
+    inter-arrival time obfuscation.  This would mean more throughput at the
+    cost of being slightly more detectable.
+  - Add a fast FIFO buffer implementation.
+  - Refactored plenty of code.
+  - Add this ChangeLog file.
+
+2013-10-02 - Changes in version 2013.10.a:
+  - First public release of ScrambleSuit.
