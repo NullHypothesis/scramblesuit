@@ -1,3 +1,7 @@
+2014-01-09 - Changes in version 2014.01.a:
+  - Update API to be compatible with recent obfsproxy changes.
+  - Improbe argument parsing.
+
 2013-11-18 - Changes in version 2013.11.a:
   - Revert UniformDH group size back to 1536 bits to have less of a timing
     distinguisher at the cost of having less effective security.  Note that
