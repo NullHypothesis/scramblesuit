@@ -477,6 +477,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         """
 
         subparser.add_argument("--shared-secret",
+                               required=True,
                                type=str,
                                help="Shared secret for UniformDH",
                                dest="uniformDHSecret")
