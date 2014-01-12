@@ -167,76 +167,76 @@ TODO:
       Bytes 080:111 - 256-bit HMAC-SHA256-128 key to send data.
       Bytes 112:143 - 256-bit HMAC-SHA256-128 key to receive data.
 
-X. Header Format
+3. Header Format
 
-   ScrambleSuit defines a 21-byte message header which contains the transported
-   data.  After authentication, all data is transported by encrypting it,
-   authenticating it, and wrapping it in ScrambleSuit messages whose header is
-   depicted below.
+    ScrambleSuit defines a 21-byte message header which contains the
+    transported data.  After authentication, all data is transported by
+    encrypting it, authenticating it, and wrapping it in ScrambleSuit messages
+    whose header is depicted below.
 
-   +----------+------------+--------------+--------+------------+------------+
-   | 16 bytes |   2 bytes  |  2 bytes     | 1 byte | (optional) | (optional) |
-   |   MAC    | Total len. | Payload len. | Flags  |  Payload   |  Padding   |
-   +----------+------------+--------------+--------+------------+------------+
-   \_ Plain _/ \____________  Encrypted and authenticated __________________/
+    +----------+------------+--------------+--------+------------+------------+
+    | 16 bytes |   2 bytes  |  2 bytes     | 1 byte | (optional) | (optional) |
+    |   MAC    | Total len. | Payload len. | Flags  |  Payload   |  Padding   |
+    +----------+------------+--------------+--------+------------+------------+
+    \_ Plain _/ \____________  Encrypted and authenticated __________________/
 
-   The 16-byte MAC refers to HMAC-SHA256-128 which is keyed by a dedicated HMAC
-   key which is derived from the session's master key (see Section 2.3).  The
-   MAC authenticates the remainder of the message.  In accordance with the
-   encrypt-then-MAC principle, the MAC is built over the already-encrypted
-   remainder of the message.
+    The 16-byte MAC refers to HMAC-SHA256-128 which is keyed by a dedicated
+    HMAC key which is derived from the session's master key (see Section 2.3).
+    The MAC authenticates the remainder of the message.  In accordance with the
+    encrypt-then-MAC principle, the MAC is built over the already-encrypted
+    remainder of the message.
 
-   The 2-byte total length refers to the overall length of the message
-   excluding the header whereas the 2-byte payload length refers to the payload
-   only.  The difference between total length and payload length is padding
-   which is used for packet length obfuscation.  Note that both fields can be
-   set to 0 which results in an empty protocol message.  ScrambleSuit's maximum
-   message length is 1448 bytes.  Exluding the header, this results in 1437
-   bytes for the transported data.
+    The 2-byte total length refers to the overall length of the message
+    excluding the header whereas the 2-byte payload length refers to the
+    payload only.  The difference between total length and payload length is
+    padding which is used for packet length obfuscation.  Note that both fields
+    can be set to 0 which results in an empty protocol message.  ScrambleSuit's
+    maximum message length is 1448 bytes.  Exluding the header, this results in
+    1437 bytes for the transported data.
 
-   The 1-byte flag field is used for protocol signalling.  Below, all defined
-   flags along with their semantics are explained.
+    The 1-byte flag field is used for protocol signalling.  Below, all defined
+    flags along with their semantics are explained.
 
-   Flag name       | Bit # | Description
-   ----------------+-------+---------------------------------------------------
-   FLAG_PAYLOAD    |   1   | The entire payload consists of encrypted
-                   |       | application data which must be forwarded to the
-                   |       | application.
-   ----------------+-------+---------------------------------------------------
-   FLAG_NEW_TICKET |   2   | The payload holds a newly issued session ticket
-                   |       | and master key.  The format is:
-                   |       | 32-byte master key | 112-byte ticket
-   ----------------+-------+---------------------------------------------------
-   FLAG_PRNG_SEED  |   3   | The payload holds the PRNG seed which is used to
-                   |       | derive obfuscation distributions.  The format is:
-                   |       | 32-byte PRNG seed
-   ----------------+-------+---------------------------------------------------
+    Flag name       | Bit # | Description
+    ----------------+-------+--------------------------------------------------
+    FLAG_PAYLOAD    |   1   | The entire payload consists of encrypted
+                    |       | application data which must be forwarded to the
+                    |       | application.
+    ----------------+-------+--------------------------------------------------
+    FLAG_NEW_TICKET |   2   | The payload holds a newly issued session ticket
+                    |       | and master key.  The format is:
+                    |       | 32-byte master key | 112-byte ticket
+    ----------------+-------+--------------------------------------------------
+    FLAG_PRNG_SEED  |   3   | The payload holds the PRNG seed which is used to
+                    |       | derive obfuscation distributions.  The format is:
+                    |       | 32-byte PRNG seed
+    ----------------+-------+--------------------------------------------------
 
-   Finally, a ScrambleSuit message contains the transported data which is
-   followed by padding.  Padding MUST always be discarded.  Since padding is
-   always encrypted, client and server MAY simply pad with 0 bytes.
+    Finally, a ScrambleSuit message contains the transported data which is
+    followed by padding.  Padding MUST always be discarded.  Since padding is
+    always encrypted, client and server MAY simply pad with 0 bytes.
 
-   When ScrambleSuit protocol messages are received, the receiver first MUST
-   validate the MAC.  The receiver may only process messages if the MAC is
-   valid.  If the MAC is invalid, the TCP connection MUST be terminated
-   immediately.
+    When ScrambleSuit protocol messages are received, the receiver first MUST
+    validate the MAC.  The receiver may only process messages if the MAC is
+    valid.  If the MAC is invalid, the TCP connection MUST be terminated
+    immediately.
 
-X. Protocol Polymorphism
+X.  Protocol Polymorphism
 
-   Implementations SHOULD implement protocol polymorphism whose purpose is to
-   modify ScrambleSuit's flow signature.  In particular, the packet length
-   distribution and the distribution of inter-arrival times are modified.
+    Implementations SHOULD implement protocol polymorphism whose purpose is to
+    modify ScrambleSuit's flow signature.  In particular, the packet length
+    distribution and the distribution of inter-arrival times are modified.
 
-   To alter these two flow signatures, implementations maintain two discrete
-   probability distributions from which random samples are drawn.  These random
-   samples dictate specific inter-arrival times and packet lengths.  Both
-   probability distributions are generated based on a random 256-bit PRNG seed
-   which is different for every ScrambleSuit server.  Servers communicate their
-   seed to clients in a protocol message whose FLAG_PRNG_SEED bit is set to
-   "1".  The client then extracts the PRNG seed and derives the same
-   probability distributions as the server.
+    To alter these two flow signatures, implementations maintain two discrete
+    probability distributions from which random samples are drawn.  These
+    random samples dictate specific inter-arrival times and packet lengths.
+    Both probability distributions are generated based on a random 256-bit PRNG
+    seed which is different for every ScrambleSuit server.  Servers communicate
+    their seed to clients in a protocol message whose FLAG_PRNG_SEED bit is set
+    to "1".  The client then extracts the PRNG seed and derives the same
+    probability distributions as the server.
 
-X. Session Tickets
+X.  Session Tickets
 
     ScrambleSuit employs a subset of RFC 5077 [3] as its session ticket
     mechanism.  In a nutshell, clients can redeem session tickets to
