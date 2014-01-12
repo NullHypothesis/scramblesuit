@@ -24,10 +24,6 @@
     specification is intended to be updated if necessary whereas the research
     paper will remain as is.
 
-TODO:
-    - Byte order
-    - Clarify operators (e.g., concatenation)
-
 2.  Authentication
 
     There exist two ways for a client to authenticate itself towards a
