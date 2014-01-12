@@ -163,7 +163,7 @@
       Bytes 080:111 - 256-bit HMAC-SHA256-128 key to send data.
       Bytes 112:143 - 256-bit HMAC-SHA256-128 key to receive data.
 
-3. Header Format
+3.  Header Format
 
     ScrambleSuit defines a 21-byte message header which contains the
     transported data.  After authentication, all data is transported by
@@ -217,7 +217,7 @@
     valid.  If the MAC is invalid, the TCP connection MUST be terminated
     immediately.
 
-X.  Protocol Polymorphism
+4.  Protocol Polymorphism
 
     Implementations SHOULD implement protocol polymorphism whose purpose is to
     modify ScrambleSuit's flow signature.  In particular, the packet length
@@ -232,7 +232,7 @@ X.  Protocol Polymorphism
     to "1".  The client then extracts the PRNG seed and derives the same
     probability distributions as the server.
 
-X.  Session Tickets
+5.  Session Tickets
 
     ScrambleSuit employs a subset of RFC 5077 [3] as its session ticket
     mechanism.  In a nutshell, clients can redeem session tickets to
@@ -240,7 +240,7 @@ X.  Session Tickets
     section discusses the format of session tickets and how server's manage
     them.
 
-X.X Session Ticket Structure
+5.1 Session Ticket Structure
 
     Session tickets contain a server's state with the most important element
     being the 32-byte master key.  The state structure is encrypted using
@@ -278,7 +278,7 @@ X.X Session Ticket Structure
     used to pad the entire structure to 64 byte; a multiple of AES' block size.
     The padding is ignored and it MAY consist of 0 bytes.
 
-X.X Session Ticket Management
+5.2 Session Ticket Management
 
     Session tickets are encrypted and authenticated with a pair of keys only
     known to the server.  As a result, tickets are computationally
