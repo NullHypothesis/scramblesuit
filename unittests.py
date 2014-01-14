@@ -154,6 +154,11 @@ class UtilTest( unittest.TestCase ):
         self.failIf(util.locateMark(mark, payload) == None)
         self.failIf(util.locateMark(mark, payload[:-1]) != None)
 
+    def test3_sanitiseBase32( self ):
+        self.failUnless(util.sanitiseBase32("abc") == "ABC")
+        self.failUnless(util.sanitiseBase32("ABC1XYZ") == "ABCIXYZ")
+        self.failUnless(util.sanitiseBase32("ABC1XYZ0") == "ABCIXYZO")
+
 
 class MockArgs( object ):
     uniformDHSecret = sharedSecret = ext_cookie_file = dest = None
