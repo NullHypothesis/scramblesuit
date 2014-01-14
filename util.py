@@ -174,3 +174,27 @@ def swap( var1, var2 ):
     """
 
     return (var2, var1)
+
+
+def sanitiseBase32( data ):
+    """
+    Try to sanitise a Base32 string if it's slightly wrong.
+
+    ScrambleSuit's shared secret might be distributed verbally which could
+    cause mistakes.  This function fixes simple mistakes, e.g., when a user
+    noted "1" rather than "I".
+    """
+
+    data = data.upper()
+
+    if "1" in data:
+        log.info("Found a \"1\" in Base32-encoded \"%s\".  Assuming " \
+                 "it's actually \"I\"." % data)
+        data = data.replace("1", "I")
+
+    if "0" in data:
+        log.info("Found a \"0\" in Base32-encoded \"%s\".  Assuming " \
+                 "it's actually \"O\"." % data)
+        data = data.replace("0", "O")
+
+    return data

@@ -93,7 +93,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
                 # As the server, we get the shared secret from the constructor.
                 cfg  = transportConfig.getServerTransportOptions()
-                self.uniformDHSecret = base64.b32decode(cfg["password"])
+                self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                                              cfg["password"]))
                 self.uniformDHSecret = self.uniformDHSecret.strip()
 
         else:
@@ -493,7 +494,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
         uniformDHSecret = None
 
         try:
-            uniformDHSecret = base64.b32decode(args.uniformDHSecret)
+            uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                                     args.uniformDHSecret))
         except (TypeError, AttributeError) as error:
             log.error(error.message)
             raise base.PluggableTransportError(
@@ -545,7 +547,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.warning("A UniformDH shared secret was already specified over "
                         "the command line.  Using the SOCKS secret instead.")
 
-        self.uniformDHSecret = base64.b32decode(args[0].split('=')[1].strip())
+        self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                                      args[0].split('=')[1].strip()))
 
         rawLength = len(self.uniformDHSecret)
         if rawLength != const.SHARED_SECRET_LENGTH:
