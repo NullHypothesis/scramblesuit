@@ -13,6 +13,7 @@ import tempfile
 import Crypto.Hash.SHA256
 import Crypto.Hash.HMAC
 
+import obfsproxy.common.log as logging
 import obfsproxy.network.buffer as obfs_buf
 import obfsproxy.common.transport_config as transport_config
 import obfsproxy.transports.base as base
@@ -241,6 +242,9 @@ class ScrambleSuitTransportTest( unittest.TestCase ):
 
 
 if __name__ == '__main__':
-    print "Note that the unittests will trigger warnings which can " \
-          "safely be ignored.\n"
+    # Disable all logging as it would yield plenty of warning and error
+    # messages.
+    log = logging.get_obfslogger()
+    log.disable_logs()
+
     unittest.main()
