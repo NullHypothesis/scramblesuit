@@ -7,6 +7,8 @@ import mycrypto
 import uniformdh
 import scramblesuit
 import base64
+import shutil
+import tempfile
 
 import Crypto.Hash.SHA256
 import Crypto.Hash.HMAC
@@ -158,6 +160,45 @@ class UtilTest( unittest.TestCase ):
         self.failUnless(util.sanitiseBase32("abc") == "ABC")
         self.failUnless(util.sanitiseBase32("ABC1XYZ") == "ABCIXYZ")
         self.failUnless(util.sanitiseBase32("ABC1XYZ0") == "ABCIXYZO")
+
+    def test4_setStateLocation( self ):
+        name = (const.TRANSPORT_NAME).lower()
+
+        util.setStateLocation("/tmp")
+        self.failUnless(const.STATE_LOCATION == "/tmp/%s/" % name)
+
+        # Nothing should change if we pass "None".
+        util.setStateLocation(None)
+        self.failUnless(const.STATE_LOCATION == "/tmp/%s/" % name)
+
+        # Check if function creates non-existant directories.
+        d = tempfile.mkdtemp()
+        util.setStateLocation(d)
+        self.failUnless(const.STATE_LOCATION == "%s/%s/" % (d, name))
+        self.failUnless(os.path.exists("%s/%s/" % (d, name)))
+        shutil.rmtree(d)
+
+    def test5_getEpoch( self ):
+        e = util.getEpoch()
+        self.failUnless(isinstance(e, basestring))
+
+    def test6_swap( self ):
+        self.failUnless(util.swap(1, 2) == (2, 1))
+
+    def test7_writeToFile( self ):
+        f = tempfile.mktemp()
+        content = "ThisIsATest\n"
+        util.writeToFile(content, f)
+        self.failUnless(util.readFromFile(f) == content)
+        os.unlink(f)
+
+    def test8_readFromFile( self ):
+
+        # Read from non-existant file.
+        self.failUnless(util.readFromFile(tempfile.mktemp()) == None)
+
+        # Read file where we (hopefully) don't have permissions.
+        self.failUnless(util.readFromFile("/etc/shadow") == None)
 
 
 class MockArgs( object ):
