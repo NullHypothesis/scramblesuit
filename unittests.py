@@ -80,6 +80,19 @@ class CryptoTest( unittest.TestCase ):
 
         self.runHKDF(ikm, salt, info, prk, okm)
 
+    def test4_HKDF_TestCase4( self ):
+
+        self.assertRaises(ValueError,
+                          mycrypto.HKDF_SHA256, "x" * 40, length=(32*255)+1)
+
+        self.assertRaises(ValueError,
+                          mycrypto.HKDF_SHA256, "tooShort")
+
+        # Accidental re-use should raise an exception.
+        hkdf = mycrypto.HKDF_SHA256("x" * 40)
+        hkdf.expand()
+        self.assertRaises(base.PluggableTransportError, hkdf.expand)
+
     def test4_CSPRNG( self ):
         self.failIf(mycrypto.strongRandom(10) == mycrypto.strongRandom(10))
         self.failIf(len(mycrypto.strongRandom(100)) != 100)
@@ -98,6 +111,14 @@ class CryptoTest( unittest.TestCase ):
 
         self.failIf(cipher == plain)
         self.failUnless(crypter2.decrypt(cipher) == plain)
+
+    def test6_HMAC_SHA256_128( self ):
+        self.assertRaises(AssertionError, mycrypto.HMAC_SHA256_128,
+                          "x" * (const.SHARED_SECRET_LENGTH - 1), "test")
+
+        self.failUnless(len(mycrypto.HMAC_SHA256_128("x" * \
+                        const.SHARED_SECRET_LENGTH, "test")) == 16)
+
 
 class UniformDHTest( unittest.TestCase ):
 
