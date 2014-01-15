@@ -54,7 +54,7 @@ def isValidHMAC( hmac1, hmac2, key ):
     The arguments `hmac1' and `hmac2' are compared.  If they are equal, `True'
     is returned and otherwise `False'.  To prevent timing attacks, double HMAC
     verification is used meaning that the two arguments are HMACed again before
-    (constant-time) string comparison.  The idea is taken from:
+    (variable-time) string comparison.  The idea is taken from:
     https://www.isecpartners.com/blog/2011/february/double-hmac-verification.aspx
     """
 
