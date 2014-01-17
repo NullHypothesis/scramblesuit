@@ -143,10 +143,11 @@ def findStoredTicket( bridge ):
     util.writeToFile(yaml.dump(tickets), ticketFile)
 
     # If our ticket is expired, we can't redeem it.
-    if (int(time.time()) - timestamp) > const.KEY_ROTATION_TIME:
+    ticketAge = int(time.time()) - timestamp
+    if ticketAge > const.SESSION_TICKET_LIFETIME:
         log.warning("We did have a ticket but it already expired %s ago." %
                     str(datetime.timedelta(seconds=
-                    (const.SESSION_TICKET_LIFETIME - lifetime))))
+                        (ticketAge - const.SESSION_TICKET_LIFETIME))))
         return None
 
     return (masterKey, ticket)
