@@ -27,7 +27,7 @@ def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
 
     messages = []
 
-    while len(data) >= const.MPU:
+    while len(data) > const.MPU:
         messages.append(ProtocolMessage(data[:const.MPU], flags=flags))
         data = data[const.MPU:]
 
@@ -40,24 +40,23 @@ def createProtocolMessages( data, flags=const.FLAG_PAYLOAD ):
 
 def getFlagNames( flags ):
     """
-    Return the flag names contained in the integer `flags' as string.
+    Return the flag name encoded in the integer `flags' as string.
 
     This function is only useful for printing easy-to-read flag names in debug
     log messages.
     """
 
-    names = ""
+    if flags == 1:
+        return "PAYLOAD"
 
-    if flags & (1 << 0):
-        names += ",PAYLOAD"
-    elif flags & (1 << 1):
-        names += ",NEW_TICKET"
-    elif flags & (1 << 2):
-        names += ",PRNG_SEED"
+    elif flags == 2:
+        return "NEW_TICKET"
+
+    elif flags == 4:
+        return "PRNG_SEED"
+
     else:
-        names += ",Undefined"
-
-    return names[1:]
+        return "Undefined"
 
 
 def isSane( totalLen, payloadLen, flags ):
@@ -104,7 +103,7 @@ class ProtocolMessage( object ):
         """
 
         payloadLen = len(payload)
-        assert((payloadLen + paddingLen) <= (const.MPU))
+        assert (payloadLen + paddingLen) <= const.MPU
 
         self.hmac = ""
         self.totalLen = payloadLen + paddingLen
@@ -139,7 +138,7 @@ class ProtocolMessage( object ):
         """
 
         # The padding must not exceed the message size.
-        assert ((self.totalLen + paddingLen) <= const.MPU)
+        assert (self.totalLen + paddingLen) <= const.MPU
 
         if paddingLen == 0:
             return
