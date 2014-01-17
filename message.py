@@ -109,7 +109,6 @@ class ProtocolMessage( object ):
         if (payloadLen + paddingLen) > const.MPU:
             raise base.PluggableTransportError("No overly long messages.")
 
-        self.hmac = ""
         self.totalLen = payloadLen + paddingLen
         self.payloadLen = payloadLen
         self.payload = payload
