@@ -78,7 +78,7 @@ PRNG_SEED_LENGTH = 32
 SERVER_STATE_FILE = "server_state.cpickle"
 
 # Life time of session tickets in seconds.
-SESSION_TICKET_LIFETIME = 60 * 60 * 24 * 7
+SESSION_TICKET_LIFETIME = KEY_ROTATION_TIME
 
 # SHA256's digest length in bytes.
 SHA256_LENGTH = 32
