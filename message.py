@@ -84,7 +84,10 @@ def isSane( totalLen, payloadLen, flags ):
         const.FLAG_PRNG_SEED,
     ]
 
-    return isFine(totalLen) and isFine(payloadLen) and (flags in validFlags)
+    return isFine(totalLen) and \
+           isFine(payloadLen) and \
+           totalLen >= payloadLen and \
+           (flags in validFlags)
 
 
 class ProtocolMessage( object ):
