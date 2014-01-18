@@ -141,7 +141,8 @@ class ProtocolMessage( object ):
         """
 
         # The padding must not exceed the message size.
-        assert (self.totalLen + paddingLen) <= const.MPU
+        if (self.totalLen + paddingLen) > const.MPU:
+            raise base.PluggableTransportError("Can't pad more than the MTU.")
 
         if paddingLen == 0:
             return
