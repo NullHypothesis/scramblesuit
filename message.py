@@ -186,8 +186,6 @@ class MessageExtractor( object ):
         exception is raised.
         """
 
-        assert aes and hmacKey and (data is not None)
-
         self.recvBuf += data
         msgs = []
 
