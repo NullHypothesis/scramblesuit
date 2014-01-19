@@ -1,3 +1,7 @@
+2014-01-19 - Changes in version 2014.01.b:
+  - More unit tests and several minor bug fixes.
+  - Sanitise shared secret if the user got it slightly wrong.
+
 2014-01-09 - Changes in version 2014.01.a:
   - Update API to be compatible with recent obfsproxy changes.
   - Improve argument parsing.
