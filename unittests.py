@@ -10,6 +10,8 @@ import base64
 import shutil
 import tempfile
 
+import message
+
 import Crypto.Hash.SHA256
 import Crypto.Hash.HMAC
 
@@ -260,6 +262,44 @@ class ScrambleSuitTransportTest( unittest.TestCase ):
 
         with self.assertRaises( base.PluggableTransportError ):
             self.suit.validate_external_mode_cli( self.args )
+
+class MessageTest( unittest.TestCase ):
+
+    def test1_createProtocolMessages( self ):
+        # An empty message consists only of a header.
+        self.failUnless(len(message.createProtocolMessages("")[0]) == \
+                        const.HDR_LENGTH)
+
+        msg = message.createProtocolMessages('X' * const.MPU)
+        self.failUnless((len(msg) == 1) and (len(msg[0]) == const.MTU))
+
+        msg = message.createProtocolMessages('X' * (const.MPU + 1))
+        self.failUnless((len(msg) == 2) and \
+                        (len(msg[0]) == const.MTU) and \
+                        (len(msg[1]) == (const.HDR_LENGTH + 1)))
+
+    def test2_getFlagNames( self ):
+        self.failUnless(message.getFlagNames(0) == "Undefined")
+        self.failUnless(message.getFlagNames(1) == "PAYLOAD")
+        self.failUnless(message.getFlagNames(2) == "NEW_TICKET")
+        self.failUnless(message.getFlagNames(4) == "PRNG_SEED")
+
+    def test3_isSane( self ):
+        self.failUnless(message.isSane(0, 0, const.FLAG_NEW_TICKET) == True)
+        self.failUnless(message.isSane(const.MPU, const.MPU,
+                                       const.FLAG_PRNG_SEED) == True)
+        self.failUnless(message.isSane(const.MPU + 1, 0,
+                                       const.FLAG_PAYLOAD) == False)
+        self.failUnless(message.isSane(0, 0, 1234) == False)
+        self.failUnless(message.isSane(0, 1, const.FLAG_PAYLOAD) == False)
+
+    def test4_ProtocolMessage( self ):
+        flags = [const.FLAG_NEW_TICKET,
+                 const.FLAG_PAYLOAD,
+                 const.FLAG_PRNG_SEED]
+
+        self.assertRaises(base.PluggableTransportError,
+                          message.ProtocolMessage, "1", paddingLen=const.MPU)
 
 
 if __name__ == '__main__':
