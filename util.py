@@ -11,8 +11,6 @@ import os
 import time
 import const
 
-import gmpy
-
 import mycrypto
 
 log = logging.get_obfslogger()
