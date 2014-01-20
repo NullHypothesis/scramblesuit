@@ -52,8 +52,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         super(ScrambleSuitTransport, self).__init__()
 
-        util.setStateLocation(transportConfig.getStateLocation())
-
         # Load the server's persistent state from file.
         if self.weAreServer:
             self.srvState = state.load()
@@ -88,15 +86,6 @@ class ScrambleSuitTransport( base.BaseTransport ):
             # `True' if the ticket is already decrypted but not yet
             # authenticated.
             self.decryptedTicket = False
-
-            if not hasattr(self, 'uniformDHSecret'):
-
-                # As the server, we get the shared secret from the constructor.
-                cfg  = transportConfig.getServerTransportOptions()
-                self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
-                                              cfg["password"]))
-                self.uniformDHSecret = self.uniformDHSecret.strip()
-
         else:
             # As the client, we get the shared secret from obfsproxy calling
             # `handle_socks_args()'.
@@ -104,6 +93,25 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.uniformDHSecret = None
 
         self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
+
+    @classmethod
+    def setup( cls, transportConfig ):
+        util.setStateLocation(transportConfig.getStateLocation())
+
+        cls.weAreClient = transportConfig.weAreClient
+        cls.weAreServer = not cls.weAreClient
+
+        # If we are server and in managed mode, we should get the
+        # shared secret from the server transport options.
+        if cls.weAreServer and not transportConfig.weAreExternal:
+            cfg  = transportConfig.getServerTransportOptions()
+            if "password" not in cfg:
+                raise base.PluggableTransportError(
+                    "Couldn't find 'password' in server transport options")
+
+            cls.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                    cfg["password"]))
+            cls.uniformDHSecret = cls.uniformDHSecret.strip()
 
     def deriveSecrets( self, masterKey ):
         """
@@ -570,8 +578,6 @@ class ScrambleSuitClient( ScrambleSuitTransport ):
         Initialise a ScrambleSuitClient object.
         """
 
-        self.weAreClient = True
-        self.weAreServer = False
         ScrambleSuitTransport.__init__(self, transportConfig)
 
 
@@ -586,6 +592,4 @@ class ScrambleSuitServer( ScrambleSuitTransport ):
         Initialise a ScrambleSuitServer object.
         """
 
-        self.weAreServer = True
-        self.weAreClient = False
         ScrambleSuitTransport.__init__(self, transportConfig)
