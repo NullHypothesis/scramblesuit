@@ -86,11 +86,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # decrypted but not yet authenticated.
         self.decryptedTicket = False
 
-        if self.weAreClient:
-            # As the client, we get the shared secret from obfsproxy calling
-            # `handle_socks_args()'.
-            if not hasattr(self, 'uniformDHSecret'):
-                self.uniformDHSecret = None
+        # If we are in external mode we should already have a shared
+        # secret set up because of validate_external_mode_cli().
+        if self.weAreExternal:
+            assert(self.uniformDHSecret)
+
+        if self.weAreClient and not self.weAreExternal:
+            # As a client in managed mode, we get the shared secret
+            # from callback `handle_socks_args()' per-connection. Set
+            # the shared secret to None for now.
+            self.uniformDHSecret = None
 
         self.uniformdh = uniformdh.new(self.uniformDHSecret, self.weAreServer)
 
@@ -100,10 +105,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         cls.weAreClient = transportConfig.weAreClient
         cls.weAreServer = not cls.weAreClient
+        cls.weAreExternal = transportConfig.weAreExternal
 
         # If we are server and in managed mode, we should get the
         # shared secret from the server transport options.
-        if cls.weAreServer and not transportConfig.weAreExternal:
+        if cls.weAreServer and not cls.weAreExternal:
             cfg  = transportConfig.getServerTransportOptions()
             if "password" not in cfg:
                 raise base.PluggableTransportError(
