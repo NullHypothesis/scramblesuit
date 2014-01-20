@@ -82,11 +82,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # Used to extract protocol messages from encrypted data.
         self.protoMsg = message.MessageExtractor()
 
-        if self.weAreServer:
-            # `True' if the ticket is already decrypted but not yet
-            # authenticated.
-            self.decryptedTicket = False
-        else:
+        # Used by the server-side: `True' if the ticket is already
+        # decrypted but not yet authenticated.
+        self.decryptedTicket = False
+
+        if self.weAreClient:
             # As the client, we get the shared secret from obfsproxy calling
             # `handle_socks_args()'.
             if not hasattr(self, 'uniformDHSecret'):
