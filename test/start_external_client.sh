@@ -9,6 +9,6 @@ python /usr/local/bin/obfsproxy \
 	--log-min-severity=debug \
 	--data-dir=/tmp/scramblesuit-client \
 	scramblesuit \
-	--shared-secret=BANANASAPPLESCOCONUTSPEACHESEGGS  \
+	--password=BANANASAPPLESCOCONUTSPEACHESEGGS  \
 	--dest 127.0.0.1:50000 \
 	client 127.0.0.1:50001

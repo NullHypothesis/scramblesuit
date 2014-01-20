@@ -477,7 +477,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         specify a ticket file and one to specify a UniformDH shared secret.
         """
 
-        subparser.add_argument("--shared-secret",
+        subparser.add_argument("--password",
                                required=True,
                                type=str,
                                help="Shared secret for UniformDH",
@@ -499,7 +499,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         except (TypeError, AttributeError) as error:
             log.error(error.message)
             raise base.PluggableTransportError(
-                "UniformDH shared secret, '%s', isn't valid base32!"
+                "UniformDH password '%s' isn't valid base32!"
                 % args.uniformDHSecret)
 
         parentalApproval = super(
@@ -514,7 +514,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             rawLength = len(uniformDHSecret)
             if rawLength != const.SHARED_SECRET_LENGTH:
                 raise base.PluggableTransportError(
-                    "The UniformDH shared secret must be %d bytes in length,",
+                    "The UniformDH password must be %d bytes in length, ",
                     "but %d bytes are given."
                     % (const.SHARED_SECRET_LENGTH, rawLength))
             else:
@@ -544,7 +544,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         # A shared secret might already be set if obfsproxy is in external
         # mode.
         if self.uniformDHSecret:
-            log.warning("A UniformDH shared secret was already specified over "
+            log.warning("A UniformDH password was already specified over "
                         "the command line.  Using the SOCKS secret instead.")
 
         self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
@@ -552,7 +552,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         rawLength = len(self.uniformDHSecret)
         if rawLength != const.SHARED_SECRET_LENGTH:
-            raise base.PluggableTransportError("The UniformDH shared secret "
+            raise base.PluggableTransportError("The UniformDH password "
                     "must be %d bytes in length but %d bytes are given." %
                     (const.SHARED_SECRET_LENGTH, rawLength))
 

@@ -10,6 +10,6 @@ python /usr/local/bin/obfsproxy \
 	--log-min-severity=debug \
 	--data-dir=/tmp/scramblesuit-server \
 	scramblesuit \
-	--shared-secret=BANANASAPPLESCOCONUTSPEACHESEGGS \
+	--password=BANANASAPPLESCOCONUTSPEACHESEGGS \
 	--dest 127.0.0.1:1234 \
 	server 127.0.0.1:50000
