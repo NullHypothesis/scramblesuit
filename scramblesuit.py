@@ -39,7 +39,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
     modules.
     """
 
-    def __init__( self, transportConfig ):
+    def __init__( self ):
         """
         Initialise a ScrambleSuitTransport object.
         """
@@ -579,12 +579,12 @@ class ScrambleSuitClient( ScrambleSuitTransport ):
     Extend the ScrambleSuit class.
     """
 
-    def __init__( self, transportConfig ):
+    def __init__( self ):
         """
         Initialise a ScrambleSuitClient object.
         """
 
-        ScrambleSuitTransport.__init__(self, transportConfig)
+        ScrambleSuitTransport.__init__(self)
 
 
 class ScrambleSuitServer( ScrambleSuitTransport ):
@@ -593,9 +593,9 @@ class ScrambleSuitServer( ScrambleSuitTransport ):
     Extend the ScrambleSuit class.
     """
 
-    def __init__( self, transportConfig ):
+    def __init__( self ):
         """
         Initialise a ScrambleSuitServer object.
         """
 
-        ScrambleSuitTransport.__init__(self, transportConfig)
+        ScrambleSuitTransport.__init__(self)
