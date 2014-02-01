@@ -151,14 +151,6 @@ def readFromFile( fileName, length=-1 ):
     return data
 
 
-def swap( var1, var2 ):
-    """
-    Returns `var1' and `var2' in reverse order, i.e., `var2' and `var1'.
-    """
-
-    return (var2, var1)
-
-
 def sanitiseBase32( data ):
     """
     Try to sanitise a Base32 string if it's slightly wrong.

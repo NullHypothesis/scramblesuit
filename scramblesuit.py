@@ -148,10 +148,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.recvHMAC = okm[112:144]
 
         if self.weAreServer:
-            self.sendHMAC, self.recvHMAC = util.swap(self.sendHMAC,
-                                                     self.recvHMAC)
-            self.sendCrypter, self.recvCrypter = util.swap(self.sendCrypter,
-                                                           self.recvCrypter)
+            self.sendHMAC, self.recvHMAC = self.recvHMAC, self.sendHMAC
+            self.sendCrypter, self.recvCrypter = self.recvCrypter, \
+                                                 self.sendCrypter
 
     def circuitConnected( self ):
         """
