@@ -1,3 +1,7 @@
+2014-XX-XX - Changes in version 2014.XX.X:
+  - Use a randomly generated fallback password if the bridge operator did not
+    use Tor's ServerTransportOptions.
+
 2014-01-19 - Changes in version 2014.01.b:
   - More unit tests and several minor bug fixes.
   - Sanitise shared secret if the user got it slightly wrong.
