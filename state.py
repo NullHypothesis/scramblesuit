@@ -75,6 +75,7 @@ class State( object ):
         self.uniformDhReplay = None
         self.pktDist = None
         self.iatDist = None
+        self.password = None
 
     def genState( self ):
         """
@@ -106,6 +107,10 @@ class State( object ):
         self.iatDist = probdist.new(lambda: prng.random() %
                                     const.MAX_PACKET_DELAY,
                                     seed=self.prngSeed)
+
+        # Fallback UniformDH shared secret.  Only used if the bridge operator
+        # did not set `ServerTransportOptions'.
+        self.password = os.urandom(const.SHARED_SECRET_LENGTH)
 
         self.writeState()
 

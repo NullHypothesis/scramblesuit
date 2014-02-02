@@ -124,36 +124,21 @@ class ScrambleSuitTransport( base.BaseTransport ):
     @classmethod
     def get_public_server_options( cls, transportOptions ):
         """
-        Generate and return a password if it's not in Tor's torrc.
+        Return ScrambleSuit's BridgeDB parameters, i.e., the shared secret.
 
-        This method implements a fallback mechanism if the bridge operator did
-        not specify `ServerTransportOptions'.  In that case, we silently
-        generate and store a password.
+        As a fallback mechanism, we return an automatically generated password
+        if the bridge operator did not use `ServerTransportOptions'.
         """
 
         log.debug("Tor's transport options: %s" % str(transportOptions))
 
         if not "password" in transportOptions:
-            log.info("No password found in transport options.  " \
-                     "Taking care of that.")
-
-            # First, try to load the password from file.
-            rawPassword = util.readFromFile(const.STATE_LOCATION +
-                                            const.SERVER_PASSWORD_FILE)
-            if rawPassword:
-                password = yaml.safe_load(rawPassword)
-                log.debug("Loaded password from file.")
-            else:
-                # ...if that fails, generate a new one and store it.
-                log.debug("Generating new password and storing it in `%s'." %
-                          (const.STATE_LOCATION + const.SERVER_PASSWORD_FILE))
-
-                password = mycrypto.strongRandom(const.SHARED_SECRET_LENGTH)
-                util.writeToFile(yaml.dump(password), const.STATE_LOCATION +
-                                 const.SERVER_PASSWORD_FILE)
-
-            transportOptions = {"password": base64.b32encode(password)}
-            cls.uniformDHSecret = password
+            log.warning("No password found in transport options (use Tor's " \
+                        "`ServerTransportOptions' to set your own password)." \
+                        "  Using automatically generated password instead.")
+            srv = state.load()
+            transportOptions = {"password": base64.b32encode(srv.password)}
+            cls.uniformDHSecret = srv.password
 
         return transportOptions
 
