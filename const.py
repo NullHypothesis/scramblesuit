@@ -77,6 +77,10 @@ PRNG_SEED_LENGTH = 32
 # File which holds the server's state information.
 SERVER_STATE_FILE = "server_state.cpickle"
 
+# Where the UniformDH shared secret is stored if the user failed to specify it
+# in the torrc when ScrambleSuit is run in managed mode.
+SERVER_PASSWORD_FILE = "password.yaml"
+
 # Life time of session tickets in seconds.
 SESSION_TICKET_LIFETIME = KEY_ROTATION_TIME
 
