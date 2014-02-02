@@ -260,6 +260,16 @@ class ScrambleSuitTransportTest( unittest.TestCase ):
         with self.assertRaises( base.PluggableTransportError ):
             self.suit.validate_external_mode_cli( self.args )
 
+    def test3_get_public_server_options( self ):
+        scramblesuit.ScrambleSuitTransport.setup(transport_config.TransportConfig())
+        options = scramblesuit.ScrambleSuitTransport.get_public_server_options("")
+        self.failUnless("password" in options)
+
+        d = { "password": "3X5BIA2MIHLZ55UV4VAEGKZIQPPZ4QT3" }
+        options = scramblesuit.ScrambleSuitTransport.get_public_server_options(d)
+        self.failUnless("password" in options)
+        self.failUnless(options["password"] == "3X5BIA2MIHLZ55UV4VAEGKZIQPPZ4QT3")
+
 class MessageTest( unittest.TestCase ):
 
     def test1_createProtocolMessages( self ):
