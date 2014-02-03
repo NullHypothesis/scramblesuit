@@ -75,7 +75,7 @@ class State( object ):
         self.uniformDhReplay = None
         self.pktDist = None
         self.iatDist = None
-        self.password = None
+        self.fallbackPassword = None
 
     def genState( self ):
         """
@@ -110,7 +110,7 @@ class State( object ):
 
         # Fallback UniformDH shared secret.  Only used if the bridge operator
         # did not set `ServerTransportOptions'.
-        self.password = os.urandom(const.SHARED_SECRET_LENGTH)
+        self.fallbackPassword = os.urandom(const.SHARED_SECRET_LENGTH)
 
         self.writeState()
 

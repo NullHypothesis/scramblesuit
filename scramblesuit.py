@@ -137,8 +137,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
                         "`ServerTransportOptions' to set your own password)." \
                         "  Using automatically generated password instead.")
             srv = state.load()
-            transportOptions = {"password": base64.b32encode(srv.password)}
-            cls.uniformDHSecret = srv.password
+            transportOptions = {"password":
+                                base64.b32encode(srv.fallbackPassword)}
+            cls.uniformDHSecret = srv.fallbackPassword
 
         return transportOptions
 
