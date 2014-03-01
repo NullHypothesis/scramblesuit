@@ -227,7 +227,7 @@
     probability distributions from which random samples are drawn.  These
     random samples dictate specific inter-arrival times and packet lengths.
     Both probability distributions are generated based on a random 256-bit PRNG
-    seed which is different for every ScrambleSuit server.  Servers communicate
+    seed which is unique for every ScrambleSuit server.  Servers communicate
     their seed to clients in a protocol message whose FLAG_PRNG_SEED bit is set
     to "1".  The client then extracts the PRNG seed and derives the same
     probability distributions as the server.
