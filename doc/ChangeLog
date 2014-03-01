@@ -3,6 +3,9 @@
     use Tor's ServerTransportOptions.
   - Fix bug <https://bugs.torproject.org/11100> which broke the server's key
     rotation.  Patch by Yawning Angel.
+  - Fix bug <https://bugs.torproject.org/11092> to prevent denial-of-service
+    attacks targeting the authentication mechanism.  The problem was pointed
+    out by Yawning Angel.
 
 2014-01-19 - Changes in version 2014.01.b:
   - More unit tests and several minor bug fixes.
