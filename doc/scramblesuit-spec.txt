@@ -188,7 +188,7 @@
     padding which is used for packet length obfuscation.  Note that both fields
     can be set to 0 which results in an empty protocol message.  ScrambleSuit's
     maximum message length is 1448 bytes.  Exluding the header, this results in
-    1437 bytes for the transported data.
+    1427 bytes for the transported data.
 
     The 1-byte flag field is used for protocol signalling.  Below, all defined
     flags along with their semantics are explained.
