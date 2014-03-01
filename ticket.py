@@ -176,7 +176,7 @@ def checkKeys( srvState ):
         # Create new key material...
         srvState.aesKey = mycrypto.strongRandom(const.TICKET_AES_KEY_LENGTH)
         srvState.hmacKey = mycrypto.strongRandom(const.TICKET_HMAC_KEY_LENGTH)
-        srvState.creationTime = int(time.time())
+        srvState.keyCreation = int(time.time())
 
         # ...and save it to disk.
         srvState.writeState()
