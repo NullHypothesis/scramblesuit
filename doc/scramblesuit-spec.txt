@@ -77,15 +77,15 @@
     256-bit master key k_t.  Session keys are then derived from k_t as
     discussed in Section 2.3.
 
-    Client                              Server  Legend:
-      |  X | P_C | M_C | MAC(X | P_C | E)  |    X: client public key
-      | ---------------------------------> |    Y: server public key
-      |  Y | P_S | M_S | MAC(X | P_S | E)  |    P_{C,S}: padding
-      | <--------------------------------- |    M_{C,S}: mark to locate the MAC
-      |         AEnc(k_t+1 | T_t+1)        |    E: approximate timestamp
-      | <--------------------------------- |    k_t+1: future master key
-      |          AEnc(Tor traffic)         |    T_t+1: future ticket
-      | <--------------------------------> |
+    Client                              Server     Legend:
+      |  X | P_C | M_C | MAC(X | P_C | M_C | E)  | X: client public key
+      | ---------------------------------------> | Y: server public key
+      |  Y | P_S | M_S | MAC(Y | P_S | M_S | E)  | P_{C,S}: padding
+      | <--------------------------------------- | M_{C,S}: mark to locate MAC
+      |            AEnc(k_t+1 | T_t+1)           | E: approximate timestamp
+      | <--------------------------------------- | k_t+1: future master key
+      |             AEnc(Tor traffic)            | T_t+1: future ticket
+      | <--------------------------------------> |
 
     Immediately after the handshake succeeded, the server proceeds to issue and
     send a new session ticket T_t+1 together with the according master key
