@@ -35,10 +35,13 @@
     secret should thwart active probing attacks.
 
     As stated in the research paper [1], a server only replies to a client if
-    the client can prove knowledge of the shared secret.  If a client sends
-    data which lacks this knowledge, the server MUST NOT reply.  It MAY
-    terminate the connection if the client could not prove knowledge of the
-    shared secret after a timeout has passed.
+    the client can prove knowledge of the shared secret.  As long as clients
+    cannot prove knowledge of the shared secret, servers MUST NOT reply.  If
+    authentication did not succeed after 1532 bytes have been received, the
+    server SHOULD stop processing incoming data to prevent denial-of-service
+    attacks.  The server MAY close the TCP connection.  Alternatively, the
+    server MAY proceed to accept data but it SHOULD stop buffering or
+    processing the data, thus effectively ignoring the client.
 
 2.1 UniformDH Handshake
 
