@@ -485,6 +485,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.sendTicketAndSeed()
 
             else:
+                if len(data) > self.srvState.closingThreshold:
+                    log.info("Terminating connection after having received %d"
+                             " bytes because client could not "
+                             "authenticate." % len(data))
+                    self.circuit.close()
+                    return
+
                 log.debug("Authentication unsuccessful so far.  "
                           "Waiting for more data.")
                 return
