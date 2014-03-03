@@ -96,7 +96,8 @@ SHARED_SECRET_LENGTH = 20
 
 # States which are used for the protocol state machine.
 ST_WAIT_FOR_AUTH = 0
-ST_CONNECTED = 1
+ST_AUTH_FAILED = 1
+ST_CONNECTED = 2
 
 # File which holds the client's session tickets.
 CLIENT_TICKET_FILE = "session_ticket.yaml"
