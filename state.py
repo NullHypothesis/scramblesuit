@@ -116,7 +116,7 @@ class State( object ):
         # Unauthenticated connections are closed after having received the
         # following amount of bytes.
         self.closingThreshold = prng.randint(const.MAX_HANDSHAKE_LENGTH,
-                                             const.MAX_HANDSHAKE_LENGTH * 2)
+                                             const.MAX_HANDSHAKE_LENGTH * 5)
 
         self.writeState()
 
