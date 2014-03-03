@@ -79,7 +79,7 @@ def locateMark( mark, payload ):
     `mark' could not be found, `None' is returned.
     """
 
-    index = payload.find(mark)
+    index = payload.find(mark, 0, const.MAX_PADDING_LENGTH + const.MARK_LENGTH)
     if index < 0:
         log.debug("Could not find the mark just yet.")
         return None
