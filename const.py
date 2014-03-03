@@ -55,6 +55,12 @@ MAX_PACKET_DELAY = 0.01
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 1500
 
+# The maximum length of a handshake in bytes (UniformDH as well as session
+# tickets).
+MAX_HANDSHAKE_LENGTH = MAX_PADDING_LENGTH + \
+                       MARK_LENGTH + \
+                       HMAC_SHA256_128_LENGTH
+
 # Length of ScrambleSuit's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
 MTU = 1448
