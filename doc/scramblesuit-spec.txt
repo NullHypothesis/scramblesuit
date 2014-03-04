@@ -68,7 +68,8 @@
     by 3600.  It represents the amount of hours which have passed since the
     epoch.  It is used by the client and the server to prove liveness.  For
     example, the Unix timestamp 1378768086 would map to E = 1378768086 / 3600 =
-    "382991".
+    "382991".  While the client MUST determine E, the server can simply echo
+    the client's E in its response.
 
     The server's handshake message is created analogous to the client.
 
@@ -121,7 +122,8 @@
     by 3600.  It represents the amount of hours which have passed since the
     epoch.  It is used by the client and the server to prove liveness.  For
     example, the Unix timestamp 1378768086 would map to E = 1378768086 / 3600 =
-    "382991".
+    "382991".  While the client MUST determine E, the server can simply echo
+    the client's E in its response.
 
     Client                         Server  Legend:
       |  T | P | M | MAC(T | P | E)  |     T: session ticket
