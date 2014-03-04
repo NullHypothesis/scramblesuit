@@ -9,6 +9,7 @@ import scramblesuit
 import base64
 import shutil
 import tempfile
+import state
 
 import message
 
@@ -221,6 +222,51 @@ class UtilTest( unittest.TestCase ):
         # Read file where we (hopefully) don't have permissions.
         self.failUnless(util.readFromFile("/etc/shadow") == None)
 
+class StateTest( unittest.TestCase ):
+
+    def setUp( self ):
+        const.STATE_LOCATION = "/tmp/"
+        self.stateFile = const.STATE_LOCATION + const.SERVER_STATE_FILE
+        self.state = state.State()
+
+    def tearDown( self ):
+        try:
+            os.unlink(self.stateFile)
+        except OSError:
+            pass
+
+    def test1_genState( self ):
+        self.state.genState()
+        self.failUnless(os.path.exists(self.stateFile))
+
+    def test2_loadState( self ):
+        # load() should create the state file if it doesn't exist yet.
+        self.failIf(os.path.exists(self.stateFile))
+        self.failUnless(isinstance(state.load(), state.State))
+        self.failUnless(os.path.exists(self.stateFile))
+
+    def test3_replay( self ):
+        key = "A" * const.HMAC_SHA256_128_LENGTH
+        self.state.genState()
+        self.state.registerKey(key)
+        self.failUnless(self.state.isReplayed(key))
+        self.failIf(self.state.isReplayed("B" * const.HMAC_SHA256_128_LENGTH))
+
+    def test4_ioerrorFail( self ):
+        def fake_open(name, mode):
+            raise IOError()
+        self.state.genState()
+
+        import __builtin__
+        real_open = __builtin__.open
+        __builtin__.open = fake_open
+
+        # Make state.load() fail
+        self.assertRaises(SystemExit, state.load)
+        # Make State.writeState() fail.
+        self.assertRaises(SystemExit, self.state.genState)
+
+        __builtin__.open = real_open
 
 class MockArgs( object ):
     uniformDHSecret = sharedSecret = ext_cookie_file = dest = None
