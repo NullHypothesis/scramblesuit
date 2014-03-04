@@ -46,6 +46,9 @@ class UniformDH( object ):
         # Uniform Diffie-Hellman object (implemented in obfs3_dh.py).
         self.udh = None
 
+        # Used by the server so it can simply echo the client's epoch.
+        self.echoEpoch = None
+
     def getRemotePublicKey( self ):
         """
         Return the cached remote UniformDH public key.
@@ -117,13 +120,15 @@ class UniformDH( object ):
         if not index:
             return False
 
+        self.echoEpoch = util.getEpoch()
+
         # Now that we know where the authenticating HMAC is: verify it.
         hmacStart = index + const.MARK_LENGTH
         existingHMAC = handshake[hmacStart:
                                  (hmacStart + const.HMAC_SHA256_128_LENGTH)]
         myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
                                           handshake[0 : hmacStart] +
-                                          util.getEpoch())
+                                          self.echoEpoch)
 
         if not util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
             log.warning("The HMAC is invalid: `%s' vs. `%s'." %
@@ -174,10 +179,15 @@ class UniformDH( object ):
         # Add a mark which enables efficient location of the HMAC.
         mark = mycrypto.HMAC_SHA256_128(self.sharedSecret, publicKey)
 
+        if self.echoEpoch is None:
+            epoch = util.getEpoch()
+        else:
+            epoch = self.echoEpoch
+            log.debug("Echoing epoch rather than recreating it.")
+
         # Authenticate the handshake including the current approximate epoch.
         mac = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                       publicKey + padding + mark +
-                                       util.getEpoch())
+                                       publicKey + padding + mark + epoch)
 
         return publicKey + padding + mark + mac
 
