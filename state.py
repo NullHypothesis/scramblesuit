@@ -76,6 +76,7 @@ class State( object ):
         self.pktDist = None
         self.iatDist = None
         self.fallbackPassword = None
+        self.closingThreshold = None
 
     def genState( self ):
         """
@@ -111,6 +112,11 @@ class State( object ):
         # Fallback UniformDH shared secret.  Only used if the bridge operator
         # did not set `ServerTransportOptions'.
         self.fallbackPassword = os.urandom(const.SHARED_SECRET_LENGTH)
+
+        # Unauthenticated connections are closed after having received the
+        # following amount of bytes.
+        self.closingThreshold = prng.randint(const.MAX_HANDSHAKE_LENGTH,
+                                             const.MAX_HANDSHAKE_LENGTH * 5)
 
         self.writeState()
 

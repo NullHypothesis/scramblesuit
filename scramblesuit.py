@@ -459,7 +459,19 @@ class ScrambleSuitTransport( base.BaseTransport ):
         payload or authentication data.
         """
 
-        if self.weAreServer and (self.protoState == const.ST_WAIT_FOR_AUTH):
+        if self.weAreServer and (self.protoState == const.ST_AUTH_FAILED):
+
+            self.drainedHandshake += len(data)
+            data.drain(len(data))
+
+            if self.drainedHandshake > self.srvState.closingThreshold:
+                log.info("Terminating connection after having received >= %d"
+                         " bytes because client could not "
+                         "authenticate." % self.srvState.closingThreshold)
+                self.circuit.close()
+                return
+
+        elif self.weAreServer and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
             # First, try to interpret the incoming data as session ticket.
             if self.receiveTicket(data):
@@ -483,6 +495,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.protoState = const.ST_CONNECTED
 
                 self.sendTicketAndSeed()
+
+            elif len(data) > const.MAX_HANDSHAKE_LENGTH:
+                self.protoState = const.ST_AUTH_FAILED
+                self.drainedHandshake = len(data)
+                data.drain(self.drainedHandshake)
+                log.info("No successful authentication after having " \
+                         "received >= %d bytes.  Now ignoring client." % \
+                         const.MAX_HANDSHAKE_LENGTH)
+                return
 
             else:
                 log.debug("Authentication unsuccessful so far.  "
