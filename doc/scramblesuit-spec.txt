@@ -111,12 +111,14 @@
     uniformly chosen from {0..1388} bytes.  After the padding, a 16-byte mark M
     is appended which is defined as:
 
-      M = HMAC-SHA256-128(k_t, T)
+      M = HMAC-SHA256-128(k_sh, T)
 
     The mark is used to easily locate the MAC which is the last part of the
-    handshake.  The MAC is defined as:
+    handshake.  k_sh is the 256-bit HMAC key which is used by the client to
+    authenticate outgoing data.  It is derived from k_t (which is embedded in
+    the ticket) as described in Section 2.3.  The MAC is defined as:
 
-      MAC = HMAC-SHA256-128(k_t, T | P | E)
+      MAC = HMAC-SHA256-128(k_sh, T | P | E)
 
     The variable E is a string representation of the current Unix epoch divided
     by 3600.  It represents the amount of hours which have passed since the
