@@ -9,6 +9,8 @@ import scramblesuit
 import base64
 import shutil
 import tempfile
+import ticket
+import state
 
 import message
 
@@ -160,6 +162,29 @@ class UniformDHTest( unittest.TestCase ):
 
         self.failIf(self.udh.receivePublicKey(buf, lambda x: x) == True)
 
+    def test4_extractPublicKey( self ):
+
+        # Create UniformDH authentication message.
+        sharedSecret = "A" * const.SHARED_SECRET_LENGTH
+
+        realEpoch = util.getEpoch
+
+        # Try three valid and one invalid epoch value.
+        for epoch in util.expandedEpoch() + ["000000"]:
+            udh = uniformdh.new(sharedSecret, True)
+
+            util.getEpoch = lambda: epoch
+            authMsg = udh.createHandshake()
+            util.getEpoch = realEpoch
+
+            buf = obfs_buf.Buffer()
+            buf.write(authMsg)
+
+            if epoch == "000000":
+                self.assertFalse(udh.extractPublicKey(buf))
+            else:
+                self.assertTrue(udh.extractPublicKey(buf))
+
 class UtilTest( unittest.TestCase ):
 
     def test1_isValidHMAC( self ):
@@ -308,6 +333,38 @@ class MessageTest( unittest.TestCase ):
         self.assertRaises(base.PluggableTransportError,
                           message.ProtocolMessage, "1", paddingLen=const.MPU)
 
+class TicketTest( unittest.TestCase ):
+
+    def test1_authentication( self ):
+        srvState = state.State()
+        srvState.genState()
+
+        ss = scramblesuit.ScrambleSuitTransport()
+        ss.srvState = srvState
+
+        realEpoch = util.getEpoch
+
+        # Try three valid and one invalid epoch value.
+        for epoch in util.expandedEpoch() + ["000000"]:
+
+            util.getEpoch = lambda: epoch
+
+            # Prepare ticket message.
+            blurb = ticket.issueTicketAndKey(srvState)
+            rawTicket = blurb[const.MASTER_KEY_LENGTH:]
+            masterKey = blurb[:const.MASTER_KEY_LENGTH]
+            ss.deriveSecrets(masterKey)
+            ticketMsg = ticket.createTicketMessage(rawTicket, ss.recvHMAC)
+
+            util.getEpoch = realEpoch
+
+            buf = obfs_buf.Buffer()
+            buf.write(ticketMsg)
+
+            if epoch == "000000":
+                self.assertFalse(ss.receiveTicket(buf))
+            else:
+                self.assertTrue(ss.receiveTicket(buf))
 
 if __name__ == '__main__':
     # Disable all logging as it would yield plenty of warning and error

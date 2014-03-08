@@ -120,19 +120,25 @@ class UniformDH( object ):
         if not index:
             return False
 
-        self.echoEpoch = util.getEpoch()
-
         # Now that we know where the authenticating HMAC is: verify it.
         hmacStart = index + const.MARK_LENGTH
         existingHMAC = handshake[hmacStart:
                                  (hmacStart + const.HMAC_SHA256_128_LENGTH)]
-        myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                          handshake[0 : hmacStart] +
-                                          self.echoEpoch)
 
-        if not util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
-            log.warning("The HMAC is invalid: `%s' vs. `%s'." %
-                        (myHMAC.encode('hex'), existingHMAC.encode('hex')))
+        authenticated = False
+        for epoch in util.expandedEpoch():
+            myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
+                                              handshake[0 : hmacStart] + epoch)
+
+            if util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
+                self.echoEpoch = epoch
+                authenticated = True
+                break
+
+            log.debug("HMAC invalid.  Trying next epoch value.")
+
+        if not authenticated:
+            log.warning("Could not verify the authentication message's HMAC.")
             return False
 
         # Do nothing if the ticket is replayed.  Immediately closing the

@@ -388,14 +388,20 @@ class ScrambleSuitTransport( base.BaseTransport ):
         existingHMAC = potentialTicket[index + const.MARK_LENGTH:
                                        index + const.MARK_LENGTH +
                                        const.HMAC_SHA256_128_LENGTH]
-        myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
-                                          potentialTicket[0:
-                                          index + const.MARK_LENGTH] +
-                                          util.getEpoch())
+        authenticated = False
+        for epoch in util.expandedEpoch():
+            myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
+                                              potentialTicket[0:index + \
+                                              const.MARK_LENGTH] + epoch)
 
-        if not util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
-            log.warning("The HMAC is invalid: `%s' vs. `%s'." %
-                        (myHMAC.encode('hex'), existingHMAC.encode('hex')))
+            if util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
+                authenticated = True
+                break
+
+            log.debug("HMAC invalid.  Trying next epoch value.")
+
+        if not authenticated:
+            log.warning("Could not verify the authentication message's HMAC.")
             return False
 
         # Do nothing if the ticket is replayed.  Immediately closing the

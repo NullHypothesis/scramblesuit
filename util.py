@@ -106,6 +106,16 @@ def getEpoch( ):
     return str(int(time.time()) / const.EPOCH_GRANULARITY)
 
 
+def expandedEpoch( ):
+    """
+    Return [epoch, epoch-1, epoch+1].
+    """
+
+    epoch = int(getEpoch())
+
+    return [str(epoch), str(epoch - 1), str(epoch + 1)]
+
+
 def writeToFile( data, fileName ):
     """
     Writes the given `data' to the file specified by `fileName'.
