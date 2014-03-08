@@ -117,8 +117,16 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if cls.weAreServer and not cls.weAreExternal:
             cfg  = transportConfig.getServerTransportOptions()
             if cfg and "password" in cfg:
-                cls.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
-                        cfg["password"]))
+                try:
+                    cls.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                            cfg["password"]))
+                except TypeError as error:
+                    log.error(error.message)
+                    raise base.PluggableTransportError("Given password '%s' " \
+                            "is not valid Base32!  Run " \
+                            "'generate_password.py' to generate a good " \
+                            "password." % cfg["password"])
+
                 cls.uniformDHSecret = cls.uniformDHSecret.strip()
 
     @classmethod
@@ -556,9 +564,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                      args.uniformDHSecret))
         except (TypeError, AttributeError) as error:
             log.error(error.message)
-            raise base.PluggableTransportError(
-                "UniformDH password '%s' isn't valid base32!"
-                % args.uniformDHSecret)
+            raise base.PluggableTransportError("Given password '%s' is not " \
+                    "valid Base32!  Run 'generate_password.py' to generate " \
+                    "a good password." % args.uniformDHSecret)
 
         parentalApproval = super(
             ScrambleSuitTransport, cls).validate_external_mode_cli(args)
@@ -605,8 +613,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.warning("A UniformDH password was already specified over "
                         "the command line.  Using the SOCKS secret instead.")
 
-        self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
-                                      args[0].split('=')[1].strip()))
+        try:
+            self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                                          args[0].split('=')[1].strip()))
+        except TypeError as error:
+            log.error(error.message)
+            raise base.PluggableTransportError("Given password '%s' is not " \
+                    "valid Base32!  Run 'generate_password.py' to generate " \
+                    "a good password." % args[0].split('=')[1].strip())
 
         rawLength = len(self.uniformDHSecret)
         if rawLength != const.SHARED_SECRET_LENGTH:
