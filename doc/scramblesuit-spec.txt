@@ -101,7 +101,7 @@
     A client can authenticate itself towards a ScrambleSuit server by redeeming
     a 112-byte session ticket T.  Such a ticket contains the master key k_t and
     is encrypted and authenticated using keys only known to the server.  The
-    structure of a session ticket is discussed in Section XXX.  If a valid
+    structure of a session ticket is discussed in Section 5.1.  If a valid
     session ticket is available, a client SHOULD redeem it rather than conduct
     a UniformDH handshake.
 
