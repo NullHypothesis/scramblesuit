@@ -1,4 +1,6 @@
 2014-XX-XX - Changes in version 2014.XX.X:
+  - Extend the spec and fix several issues.  This should fix bug
+    <https://bugs.torproject.org/10893>.  Thanks to Yawning Angel.
   - Use a randomly generated fallback password if the bridge operator did not
     use Tor's ServerTransportOptions.
   - Fix bug <https://bugs.torproject.org/11100> which broke the server's key
