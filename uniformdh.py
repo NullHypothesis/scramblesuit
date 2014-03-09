@@ -46,6 +46,9 @@ class UniformDH( object ):
         # Uniform Diffie-Hellman object (implemented in obfs3_dh.py).
         self.udh = None
 
+        # Used by the server so it can simply echo the client's epoch.
+        self.echoEpoch = None
+
     def getRemotePublicKey( self ):
         """
         Return the cached remote UniformDH public key.
@@ -121,13 +124,21 @@ class UniformDH( object ):
         hmacStart = index + const.MARK_LENGTH
         existingHMAC = handshake[hmacStart:
                                  (hmacStart + const.HMAC_SHA256_128_LENGTH)]
-        myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                          handshake[0 : hmacStart] +
-                                          util.getEpoch())
 
-        if not util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
-            log.warning("The HMAC is invalid: `%s' vs. `%s'." %
-                        (myHMAC.encode('hex'), existingHMAC.encode('hex')))
+        authenticated = False
+        for epoch in util.expandedEpoch():
+            myHMAC = mycrypto.HMAC_SHA256_128(self.sharedSecret,
+                                              handshake[0 : hmacStart] + epoch)
+
+            if util.isValidHMAC(myHMAC, existingHMAC, self.sharedSecret):
+                self.echoEpoch = epoch
+                authenticated = True
+                break
+
+            log.debug("HMAC invalid.  Trying next epoch value.")
+
+        if not authenticated:
+            log.warning("Could not verify the authentication message's HMAC.")
             return False
 
         # Do nothing if the ticket is replayed.  Immediately closing the
@@ -174,10 +185,15 @@ class UniformDH( object ):
         # Add a mark which enables efficient location of the HMAC.
         mark = mycrypto.HMAC_SHA256_128(self.sharedSecret, publicKey)
 
+        if self.echoEpoch is None:
+            epoch = util.getEpoch()
+        else:
+            epoch = self.echoEpoch
+            log.debug("Echoing epoch rather than recreating it.")
+
         # Authenticate the handshake including the current approximate epoch.
         mac = mycrypto.HMAC_SHA256_128(self.sharedSecret,
-                                       publicKey + padding + mark +
-                                       util.getEpoch())
+                                       publicKey + padding + mark + epoch)
 
         return publicKey + padding + mark + mac
 

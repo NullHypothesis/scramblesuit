@@ -65,13 +65,14 @@
     The mark is used to easily locate the MAC which is the last element of the
     client's handshake message.  The 16-byte MAC is defined as:
 
-      MAC = HMAC-SHA256-128(k_B, X | P_C | E)
+      MAC = HMAC-SHA256-128(k_B, X | P_C | M_C | E)
 
     The variable E is a string representation of the current Unix epoch divided
     by 3600.  It represents the amount of hours which have passed since the
     epoch.  It is used by the client and the server to prove liveness.  For
     example, the Unix timestamp 1378768086 would map to E = 1378768086 / 3600 =
-    "382991".
+    "382991".  While the client MUST determine E, the server can simply echo
+    the client's E in its response.
 
     The server's handshake message is created analogous to the client.
 
@@ -80,15 +81,15 @@
     256-bit master key k_t.  Session keys are then derived from k_t as
     discussed in Section 2.3.
 
-    Client                              Server  Legend:
-      |  X | P_C | M_C | MAC(X | P_C | E)  |    X: client public key
-      | ---------------------------------> |    Y: server public key
-      |  Y | P_S | M_S | MAC(X | P_S | E)  |    P_{C,S}: padding
-      | <--------------------------------- |    M_{C,S}: mark to locate the MAC
-      |         AEnc(k_t+1 | T_t+1)        |    E: approximate timestamp
-      | <--------------------------------- |    k_t+1: future master key
-      |          AEnc(Tor traffic)         |    T_t+1: future ticket
-      | <--------------------------------> |
+    Client                              Server     Legend:
+      |  X | P_C | M_C | MAC(X | P_C | M_C | E)  | X: client public key
+      | ---------------------------------------> | Y: server public key
+      |  Y | P_S | M_S | MAC(Y | P_S | M_S | E)  | P_{C,S}: padding
+      | <--------------------------------------- | M_{C,S}: mark to locate MAC
+      |            AEnc(k_t+1 | T_t+1)           | E: approximate timestamp
+      | <--------------------------------------- | k_t+1: future master key
+      |             AEnc(Tor traffic)            | T_t+1: future ticket
+      | <--------------------------------------> |
 
     Immediately after the handshake succeeded, the server proceeds to issue and
     send a new session ticket T_t+1 together with the according master key
@@ -103,7 +104,7 @@
     A client can authenticate itself towards a ScrambleSuit server by redeeming
     a 112-byte session ticket T.  Such a ticket contains the master key k_t and
     is encrypted and authenticated using keys only known to the server.  The
-    structure of a session ticket is discussed in Section XXX.  If a valid
+    structure of a session ticket is discussed in Section 5.1.  If a valid
     session ticket is available, a client SHOULD redeem it rather than conduct
     a UniformDH handshake.
 
@@ -113,26 +114,29 @@
     uniformly chosen from {0..1388} bytes.  After the padding, a 16-byte mark M
     is appended which is defined as:
 
-      M = HMAC-SHA256-128(k_t, T)
+      M = HMAC-SHA256-128(k_sh, T)
 
     The mark is used to easily locate the MAC which is the last part of the
-    handshake.  The MAC is defined as:
+    handshake.  k_sh is the 256-bit HMAC key which is used by the client to
+    authenticate outgoing data.  It is derived from k_t (which is embedded in
+    the ticket) as described in Section 2.3.  The MAC is defined as:
 
-      MAC = HMAC-SHA256-128(k_t, T | P | E)
+      MAC = HMAC-SHA256-128(k_sh, T | P | M | E)
 
     The variable E is a string representation of the current Unix epoch divided
     by 3600.  It represents the amount of hours which have passed since the
     epoch.  It is used by the client and the server to prove liveness.  For
     example, the Unix timestamp 1378768086 would map to E = 1378768086 / 3600 =
-    "382991".
+    "382991".  While the client MUST determine E, the server can simply echo
+    the client's E in its response.
 
-    Client                         Server  Legend:
-      |  T | P | M | MAC(T | P | E)  |     T: session ticket
-      | ---------------------------> |     P: random padding
-      |      AEnc(k_t+1 | T_t+1)     |     M: mark to locate the MAC
-      | <--------------------------- |     E: approximate timestamp
-      |       AEnc(Tor traffic)      |     k_t+1: future master key
-      | <--------------------------> |     T_t+1: future ticket
+    Client                            Server   Legend:
+      |  T | P | M | MAC(T | P | M | E)  |     T: session ticket
+      | -------------------------------> |     P: random padding
+      |        AEnc(k_t+1 | T_t+1)       |     M: mark to locate the MAC
+      | <------------------------------- |     E: approximate timestamp
+      |         AEnc(Tor traffic)        |     k_t+1: future master key
+      | <------------------------------> |     T_t+1: future ticket
 
     The server is initially unable to distinguish between a session ticket
     handshake and a UniformDH handshake as both handshakes are computationally
@@ -140,10 +144,10 @@
     opportunistically decrypt the session ticket T after verifying its MAC.  If
     the ticket's MAC (which should not be confused with the handshake message's
     MAC) is valid and the ticket can be decrypted and is not yet expired, the
-    server then verifies the MAC which is built over T | P | E.  If this MAC is
-    valid, the handshake succeeded.  The server, like the client, then proceeds
-    to derive session keys from the 256-bit master key as described in Section
-    2.3.
+    server then verifies the MAC which is built over T | P | M | E.  If this
+    MAC is valid, the handshake succeeded.  The server, like the client, then
+    proceeds to derive session keys from the 256-bit master key as described in
+    Section 2.3.
 
     After a ticket handshake succeeded, the server replies by issuing a new
     session ticket T_t+1 together with the according master key k_t+1.  The
@@ -191,7 +195,7 @@
     padding which is used for packet length obfuscation.  Note that both fields
     can be set to 0 which results in an empty protocol message.  ScrambleSuit's
     maximum message length is 1448 bytes.  Exluding the header, this results in
-    1437 bytes for the transported data.
+    1427 bytes for the transported data.
 
     The 1-byte flag field is used for protocol signalling.  Below, all defined
     flags along with their semantics are explained.
@@ -231,9 +235,58 @@
     random samples dictate specific inter-arrival times and packet lengths.
     Both probability distributions are generated based on a random 256-bit PRNG
     seed which is unique for every ScrambleSuit server.  Servers communicate
-    their seed to clients in a protocol message whose FLAG_PRNG_SEED bit is set
-    to "1".  The client then extracts the PRNG seed and derives the same
-    probability distributions as the server.
+    their seed to clients in a dedicated protocol message whose FLAG_PRNG_SEED
+    bit is set.  The client then extracts the PRNG seed and derives its own
+    probability distributions.
+
+4.1 Deriving Probability Distributions
+
+    Probability distributions SHOULD be derived from the 256-bit seed using a
+    cryptographically secure PRNG.  After the CSPRNG was seeded, the amount of
+    bins for the respective probability distribution must be determined.
+    Depending on the CSPRNG's output, the amount SHOULD be uniformly chosen
+    from {1..100}.  The exact way how the CSPRNG's output is used is up to the
+    implementation.
+
+    After the amount of bins has been determined, every bin is assigned a value
+    together with a corresponding probability which is in the interval ]0, 1].
+    The probability of all bins sums up to 1.  Again, the exact way how the
+    CSPRNG's output is used is up to the implementation.
+
+    For the packet length distribution, all values SHOULD be in {21..1448}.
+
+    For the inter-arrival time distribution, all values SHOULD be in the
+    interval [0, 0.01].
+
+    Since the distributions are generated randomly, it is possible that they
+    cause particularly bad throughput.  To prevent this, implementations MAY
+    trade off obfuscation for additional throughput by carefully tuning the
+    above parameters.
+
+4.2 Packet Length Obfuscation
+
+    In general, ScrambleSuit transmits MTU-sized segments as long as there is
+    enough data in the send buffer.  Packet length obfuscation only kicks in
+    once the send buffer is almost processed and a segment smaller than the MTU
+    would have to be sent.
+
+    Instead of simply flushing the send buffer, a random sample from the
+    discrete packet length probability distribution is drawn.  Padding messages
+    are then appended so that the size of the last segment in the burst equals
+    the freshly drawn sample.
+
+4.3 Inter-arrival Time Obfuscation
+
+    To obfuscate inter-arrival times, implementations could maintain a
+    dedicated send buffer.  As long as there is data in the send buffer, random
+    samples from the inter-arrival time distribution are drawn.  The thread
+    processing the send buffer is then paused for the duration of the freshly
+    drawn sample until the next MTU-sized chunk is written to the wire.  This
+    process is repeated until the send buffer is empty.
+
+    Note that inter-arrival time obfuscation has a drastic impact on
+    throughput.  As a result, implementations MAY implement packet length
+    obfuscation but ignore inter-arrival time obfuscation.
 
 5.  Session Tickets
 
