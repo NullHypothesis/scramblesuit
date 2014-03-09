@@ -62,7 +62,7 @@
     The mark is used to easily locate the MAC which is the last element of the
     client's handshake message.  The 16-byte MAC is defined as:
 
-      MAC = HMAC-SHA256-128(k_B, X | P_C | E)
+      MAC = HMAC-SHA256-128(k_B, X | P_C | M_C | E)
 
     The variable E is a string representation of the current Unix epoch divided
     by 3600.  It represents the amount of hours which have passed since the
@@ -118,7 +118,7 @@
     authenticate outgoing data.  It is derived from k_t (which is embedded in
     the ticket) as described in Section 2.3.  The MAC is defined as:
 
-      MAC = HMAC-SHA256-128(k_sh, T | P | E)
+      MAC = HMAC-SHA256-128(k_sh, T | P | M | E)
 
     The variable E is a string representation of the current Unix epoch divided
     by 3600.  It represents the amount of hours which have passed since the
@@ -127,13 +127,13 @@
     "382991".  While the client MUST determine E, the server can simply echo
     the client's E in its response.
 
-    Client                         Server  Legend:
-      |  T | P | M | MAC(T | P | E)  |     T: session ticket
-      | ---------------------------> |     P: random padding
-      |      AEnc(k_t+1 | T_t+1)     |     M: mark to locate the MAC
-      | <--------------------------- |     E: approximate timestamp
-      |       AEnc(Tor traffic)      |     k_t+1: future master key
-      | <--------------------------> |     T_t+1: future ticket
+    Client                            Server   Legend:
+      |  T | P | M | MAC(T | P | M | E)  |     T: session ticket
+      | -------------------------------> |     P: random padding
+      |        AEnc(k_t+1 | T_t+1)       |     M: mark to locate the MAC
+      | <------------------------------- |     E: approximate timestamp
+      |         AEnc(Tor traffic)        |     k_t+1: future master key
+      | <------------------------------> |     T_t+1: future ticket
 
     The server is initially unable to distinguish between a session ticket
     handshake and a UniformDH handshake as both handshakes are computationally
@@ -141,10 +141,10 @@
     opportunistically decrypt the session ticket T after verifying its MAC.  If
     the ticket's MAC (which should not be confused with the handshake message's
     MAC) is valid and the ticket can be decrypted and is not yet expired, the
-    server then verifies the MAC which is built over T | P | E.  If this MAC is
-    valid, the handshake succeeded.  The server, like the client, then proceeds
-    to derive session keys from the 256-bit master key as described in Section
-    2.3.
+    server then verifies the MAC which is built over T | P | M | E.  If this
+    MAC is valid, the handshake succeeded.  The server, like the client, then
+    proceeds to derive session keys from the 256-bit master key as described in
+    Section 2.3.
 
     After a ticket handshake succeeded, the server replies by issuing a new
     session ticket T_t+1 together with the according master key k_t+1.  The
