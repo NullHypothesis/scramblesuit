@@ -1,4 +1,6 @@
 2014-XX-XX - Changes in version 2014.XX.X:
+  - Improve the packet morphing algorithm.  This should fix bug
+    <https://bugs.torproject.org/10991>.  Thanks to Yawning Angel.
   - Extend the spec and fix several issues.  This should fix bug
     <https://bugs.torproject.org/10893>.  Thanks to Yawning Angel.
   - Use a randomly generated fallback password if the bridge operator did not
