@@ -11,6 +11,8 @@ import shutil
 import tempfile
 import ticket
 import state
+import packetmorpher
+import probdist
 
 import message
 
@@ -410,6 +412,40 @@ class TicketTest( unittest.TestCase ):
                 self.assertFalse(ss.receiveTicket(buf))
             else:
                 self.assertTrue(ss.receiveTicket(buf))
+
+class PacketMorpher( unittest.TestCase ):
+
+    def test1_calcPadding( self ):
+
+        def checkDistribution( dist ):
+            pm = packetmorpher.new(dist)
+            for i in xrange(0, const.MTU + 2):
+                padLen = pm.calcPadding(i)
+                self.assertTrue(const.HDR_LENGTH <= \
+                                padLen < \
+                                (const.MTU + const.HDR_LENGTH))
+
+        # Test randomly generated distributions.
+        for i in xrange(0, 100):
+            checkDistribution(None)
+
+        # Test border-case distributions.
+        checkDistribution(probdist.new(lambda: 0))
+        checkDistribution(probdist.new(lambda: 1))
+        checkDistribution(probdist.new(lambda: const.MTU))
+        checkDistribution(probdist.new(lambda: const.MTU + 1))
+
+    def test2_getPadding( self ):
+        pm = packetmorpher.new()
+        sendCrypter = mycrypto.PayloadCrypter()
+        sendCrypter.setSessionKey("A" * 32,  "A" * 8)
+        sendHMAC = "A" * 32
+
+        for i in xrange(0, const.MTU + 2):
+            padLen = len(pm.getPadding(sendCrypter, sendHMAC, i))
+            self.assertTrue(const.HDR_LENGTH <= padLen < const.MTU + \
+                            const.HDR_LENGTH)
+
 
 if __name__ == '__main__':
     # Disable all logging as it would yield plenty of warning and error

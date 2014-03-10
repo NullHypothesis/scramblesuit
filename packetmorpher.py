@@ -8,6 +8,7 @@ morphed network data should then match the probability distribution.
 
 import random
 
+import message
 import probdist
 import const
 
@@ -39,14 +40,37 @@ class PacketMorpher( object ):
             self.dist = probdist.new(lambda: random.randint(const.HDR_LENGTH,
                                                             const.MTU))
 
+    def getPadding( self, sendCrypter, sendHMAC, dataLen ):
+        """
+        Based on the burst's size, return a ready-to-send padding blurb.
+        """
+
+        padLen = self.calcPadding(dataLen)
+
+        assert const.HDR_LENGTH <= padLen < (const.MTU + const.HDR_LENGTH), \
+               "Invalid padding length %d." % padLen
+
+        # We have to use two padding messages if the padding is > MTU.
+        if padLen > const.MTU:
+            padMsgs = [message.new("", paddingLen=700 - const.HDR_LENGTH),
+                       message.new("", paddingLen=padLen - 700 - \
+                                       const.HDR_LENGTH)]
+        else:
+            padMsgs = [message.new("", paddingLen=padLen - const.HDR_LENGTH)]
+
+        blurbs = [msg.encryptAndHMAC(sendCrypter, sendHMAC) for msg in padMsgs]
+
+        return "".join(blurbs)
+
     def calcPadding( self, dataLen ):
         """
-        Based on `dataLen', determines the padding for a network packet.
+        Based on `dataLen', determine and return a burst's padding.
 
-        ScrambleSuit morphs packets which are smaller than the link's MTU.
-        This method draws a random sample from the probability distribution
-        which is used to determine and return the padding for such packets.
-        This effectively gets rid of Tor's 586-byte signature.
+        ScrambleSuit morphs the last packet in a burst, i.e., packets which
+        don't fill the link's MTU.  This is done by drawing a random sample
+        from our probability distribution which is used to determine and return
+        the padding for such packets.  This effectively gets rid of Tor's
+        586-byte signature.
         """
 
         # The `is' and `should-be' length of the burst's last packet.
@@ -58,6 +82,9 @@ class PacketMorpher( object ):
             padLen = sampleLen - dataLen
         else:
             padLen = (const.MTU - dataLen) + sampleLen
+
+        if padLen < const.HDR_LENGTH:
+            padLen += const.MTU
 
         log.debug("Morphing the last %d-byte packet to %d bytes by adding %d "
                   "bytes of padding." %

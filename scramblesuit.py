@@ -234,27 +234,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Wrap the application's data in ScrambleSuit protocol messages.
         messages = message.createProtocolMessages(data, flags=flags)
-
-        # Let the packet morpher tell us how much we should pad.
-        paddingLen = self.pktMorpher.calcPadding(sum([len(msg) for
-                                                 msg in messages]))
-
-        # If padding > header length, a single message will do...
-        if paddingLen > const.HDR_LENGTH:
-            messages.append(message.new("", paddingLen=paddingLen -
-                                                       const.HDR_LENGTH))
-
-        # ...otherwise, we use two padding-only messages.
-        else:
-            messages.append(message.new("", paddingLen=const.MPU -
-                                                       const.HDR_LENGTH))
-            messages.append(message.new("", paddingLen=paddingLen))
-
         blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
                         self.sendHMAC) for msg in messages])
 
-        # Flush data chunk for chunk to obfuscate inter arrival times.
+        # Flush data chunk for chunk to obfuscate inter-arrival times.
         if const.USE_IAT_OBFUSCATION:
+
             if len(self.choppingBuf) == 0:
                 self.choppingBuf.write(blurb)
                 reactor.callLater(self.iatMorpher.randomSample(),
@@ -262,8 +247,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
             else:
                 # flushPieces() is still busy processing the chopping buffer.
                 self.choppingBuf.write(blurb)
+
         else:
-            self.circuit.downstream.write(blurb)
+            padBlurb = self.pktMorpher.getPadding(self.sendCrypter,
+                                                  self.sendHMAC,
+                                                  len(blurb))
+            self.circuit.downstream.write(blurb + padBlurb)
 
     def flushPieces( self ):
         """
@@ -283,7 +272,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Drain and send whatever is left in the output buffer.
         else:
-            self.circuit.downstream.write(self.choppingBuf.read())
+            blurb = self.choppingBuf.read()
+            padBlurb = self.pktMorpher.getPadding(self.sendCrypter,
+                                                  self.sendHMAC,
+                                                  len(blurb))
+            self.circuit.downstream.write(blurb + padBlurb)
             return
 
         reactor.callLater(self.iatMorpher.randomSample(), self.flushPieces)
