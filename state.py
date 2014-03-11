@@ -12,6 +12,7 @@ import sys
 import time
 import cPickle
 import random
+import base64
 
 import const
 import replay
@@ -50,6 +51,34 @@ def load( ):
         sys.exit(1)
 
     return stateObject
+
+def writeServerDescriptor( password, bindAddr, external ):
+    """
+    Dump our ScrambleSuit server descriptor to file.
+
+    The file should make it easy for bridge operators to obtain copy &
+    pasteable server descriptors.
+    """
+
+    assert len(password) == const.SHARED_SECRET_LENGTH
+    assert const.STATE_LOCATION != ""
+
+    descriptor = "%s:%d password=%s\n" % (bindAddr[0],
+                                          bindAddr[1],
+                                          base64.b32encode(password))
+
+    if not external:
+        descriptor = "Bridge scramblesuit " + descriptor
+
+    descriptorFile = const.STATE_LOCATION + const.DESCRIPTOR_FILE
+    log.info("Writing server descriptor to file `%s'." % descriptorFile)
+
+    try:
+        with open(descriptorFile, 'w') as fd:
+            fd.write(descriptor)
+    except IOError as err:
+        log.error("Error writing descriptor file to `%s': %s" %
+                  (descriptorFile, err))
 
 class State( object ):
 

@@ -18,6 +18,10 @@ TICKET_AES_CBC_IV_LENGTH = 16
 # directory but is later set by `setStateLocation()' in util.py.
 STATE_LOCATION = ""
 
+# Contains a ready-to-use bridge descriptor (in managed mode) or simply the
+# server's bind address together with the password (in external mode).
+DESCRIPTOR_FILE = "server_descriptor"
+
 # Divisor (in seconds) for the Unix epoch used to defend against replay
 # attacks.
 EPOCH_GRANULARITY = 3600

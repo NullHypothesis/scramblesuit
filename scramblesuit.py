@@ -129,6 +129,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
                 cls.uniformDHSecret = cls.uniformDHSecret.strip()
 
+        if cls.weAreServer:
+            if not hasattr(cls, "uniformDHSecret"):
+                log.debug("Using fallback password for descriptor file.")
+                srv = state.load()
+                cls.uniformDHSecret = srv.fallbackPassword
+            state.writeServerDescriptor(cls.uniformDHSecret,
+                                        transportConfig.getBindAddr(),
+                                        cls.weAreExternal)
+
     @classmethod
     def get_public_server_options( cls, transportOptions ):
         """
