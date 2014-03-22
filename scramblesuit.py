@@ -588,7 +588,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             rawLength = len(uniformDHSecret)
             if rawLength != const.SHARED_SECRET_LENGTH:
                 raise base.PluggableTransportError(
-                    "The UniformDH password must be %d bytes in length, ",
+                    "The UniformDH password must be %d bytes in length, "
                     "but %d bytes are given."
                     % (const.SHARED_SECRET_LENGTH, rawLength))
             else:
