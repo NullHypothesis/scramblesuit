@@ -47,6 +47,12 @@ The directory "test/" in this repository contains two configuration files for
 setup.  Furthermore, the script `generate_secret.py` can be used to generate
 shared secrets for Tor's configuration file.
 
+Alternatives
+============
+
+Check out [obfs4](https://gitweb.torproject.org/pluggable-transports/obfs4.git)
+which is an enhancement of ScrambleSuit.
+
 Feedback
 ========
 
